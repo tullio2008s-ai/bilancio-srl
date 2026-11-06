@@ -107,7 +107,7 @@ button.l{background:none;border:1px solid var(--ln);color:var(--tx);padding:5px 
     mesi.forEach(function (m) {
       var d = dash.mesi[m] || vuoto();
       rows[m] = { m: m, fonte: dash.fonte[m] || '', ricaviDash: d.ricavi, costiDash: d.costi,
-        ricaviMan: 0, costiMan: 0, ivaDeb: d.ivaDeb, ivaCred: d.ivaCred, irapInded: 0, uscitaNonCosto: 0 };
+        ricaviMan: 0, costiMan: 0, ivaDeb: d.ivaDeb, ivaCred: d.ivaCred, irapInded: 0, uscitaNonCosto: 0, cat: {} };
     });
     Object.keys(dash.mesi).forEach(function (m) {
       if (!idx[m] && (dash.mesi[m].ricavi || dash.mesi[m].costi)) avvisi.push('Dati Dashboard fuori periodo (' + m + ') non conteggiati');
@@ -119,10 +119,10 @@ button.l{background:none;border:1px solid var(--ln);color:var(--tx);padding:5px 
       if (!idx[m]) { avvisi.push('Voce fuori periodo (' + m + '): ' + (v.descrizione || v.id)); return; }
       var imp = +v.imponibile || 0, iva = +v.iva || 0, r = rows[m];
       if (c.nonCosto) { r.uscitaNonCosto += imp + iva; return; }
-      if (c.tipo === 'ricavo') { r.ricaviMan += imp; r.ivaDeb += iva; }
+      if (c.tipo === 'ricavo') { r.ricaviMan += imp; r.ivaDeb += iva; r.cat[v.categoria] = (r.cat[v.categoria] || 0) + imp; }
       else {
         var detr = v.detraibile !== false;
-        r.costiMan += imp + (detr ? 0 : iva);
+        r.costiMan += imp + (detr ? 0 : iva); r.cat[v.categoria] = (r.cat[v.categoria] || 0) + imp + (detr ? 0 : iva);
         if (detr) r.ivaCred += iva;
         if (c.irapIndeducibile) r.irapInded += imp;
       }
@@ -257,7 +257,7 @@ function render(){ nav(); var r=calc(); var f={riepilogo:vRiepilogo,pl:vPL,iva:v
   if(S.tab==='riepilogo') grafico(r); }
 function kpi(l,v,c){ return '<div class="kpi card"><span>'+l+'</span><b class="'+(c||'')+'">'+v+' €</b></div>'; }
 function vRiepilogo(r){ var t=r.totali, ok=r.controlli.every(function(c){return c.ok;});
-  return '<div class="kpis">'+kpi('Ricavi',eur(t.ricavi))+kpi('Costi',eur(t.costi))+kpi('Utile ante imposte',eur(t.utile),cls(t.utile))+kpi('Imposte stimate',eur(t.imposte))+kpi('Utile stimato dopo imposte',eur(t.utileNetto),cls(t.utileNetto))+kpi('IVA da versare nel periodo',eur(t.ivaVersare))+kpi('Credito IVA residuo',eur(t.ivaCreditoFinale))+'</div>'
+  return '<div class="kpis">'+kpi('Ricavi',eur(t.ricavi))+kpi('Costi',eur(t.costi))+kpi('Utile ante imposte',eur(t.utile),cls(t.utile))+'<div class="kpi card"><span>Margine utile sul fatturato</span><b class="'+cls(t.utile)+'">'+pct(t.utile,t.ricavi)+'</b></div>'+kpi('Imposte stimate',eur(t.imposte))+kpi('Utile stimato dopo imposte',eur(t.utileNetto),cls(t.utileNetto))+kpi('IVA da versare nel periodo',eur(t.ivaVersare))+kpi('Credito IVA residuo',eur(t.ivaCreditoFinale))+'</div>'
   +'<div class="card"><b>Utile cumulato per mese</b><svg id="gr" viewBox="0 0 640 180" width="100%"></svg></div>'
   +'<div class="card"><span class="'+(ok?'ok':'ko')+'">'+(ok?'✔ Tutti i controlli incrociati tornano':'✖ Controlli incrociati falliti: vedi scheda Controlli')+'</span>'
   +(r.avvisi.length?'<div class="wa note">'+r.avvisi.map(esc).join('<br>')+'</div>':'')
@@ -268,6 +268,16 @@ function grafico(r){ var svg=document.getElementById('gr'); if(!svg) return; var
   svg.innerHTML=h+'<line x1="0" x2="'+W+'" y1="'+z+'" y2="'+z+'" stroke="#888" stroke-width=".5"/>'; }
 function tab(head,rows){ return '<div class="card tw"><table><tr><th></th>'+head.map(function(h){return '<th>'+h+'</th>';}).join('')+'</tr>'+rows.join('')+'</table></div>'; }
 function rowM(l,r,f,o){ o=o||{}; return '<tr class="'+(o.t?'t':'')+(o.s?' s':'')+'"><td>'+l+'</td>'+r.mesi.map(function(m){var x=f(m);return '<td class="'+(o.c?cls(x):'')+'">'+eur(x)+'</td>';}).join('')+'<td class="'+(o.c?cls(o.tot):'')+'">'+eur(o.tot)+'</td></tr>'; }
+var pct=function(x,tot){ return tot>0.004 ? IT.format(Math.round(x/tot*1000)/10)+' %' : '–'; };
+function rowP(l,r,f,o){ o=o||{}; return '<tr class="s"><td>'+l+'</td>'+r.mesi.map(function(m){var x=f(m);return '<td class="'+(o.c?cls(x):'')+'">'+pct(x,m.ricavi)+'</td>';}).join('')+'<td class="'+(o.c?cls(o.tot):'')+'">'+pct(o.tot,r.totali.ricavi)+'</td></tr>'; }
+function dettaglioCat(r){ var tot={}, tipo={};
+  E.CATEGORIE.forEach(function(c){ tipo[c.id]=c.tipo; });
+  r.mesi.forEach(function(m){ Object.keys(m.cat||{}).forEach(function(k){ tot[k]=(tot[k]||0)+m.cat[k]; }); });
+  var ids=Object.keys(tot).sort(function(a,b){ return (tipo[a]==='ricavo'?0:1)-(tipo[b]==='ricavo'?0:1) || Math.abs(tot[b])-Math.abs(tot[a]); });
+  if(!ids.length) return '';
+  var h=r.mesi.map(function(m){return etm(m.m);}).concat(['Totale','% fatturato']);
+  var rows=ids.map(function(k){ return '<tr><td>'+esc(catNome(k))+(tipo[k]==='ricavo'?' (ricavo)':'')+'</td>'+r.mesi.map(function(m){return '<td>'+eur((m.cat||{})[k]||0)+'</td>';}).join('')+'<td>'+eur(tot[k])+'</td><td><b>'+pct(tot[k],r.totali.ricavi)+'</b></td></tr>'; });
+  return '<div class="card"><b>Dettaglio per categoria e incidenza sul fatturato</b></div>'+tab(h,rows)+'<div class="note">Le voci "da Dashboard V6" non hanno dettaglio per categoria. % = importo / ricavi totali del periodo.</div>'; }
 function sum(r,f){ return r.mesi.reduce(function(s,m){return s+f(m);},0); }
 function vPL(r){ var h=r.mesi.map(function(m){return etm(m.m);}).concat(['Totale']);
   var rows=[rowM('Ricavi da Dashboard V6',r,function(m){return m.ricaviDash;},{tot:sum(r,function(m){return m.ricaviDash;})}),
@@ -276,11 +286,13 @@ function vPL(r){ var h=r.mesi.map(function(m){return etm(m.m);}).concat(['Totale
    rowM('Costi da Dashboard V6',r,function(m){return m.costiDash;},{tot:sum(r,function(m){return m.costiDash;})}),
    rowM('Costi manuali',r,function(m){return m.costiMan;},{tot:sum(r,function(m){return m.costiMan;})}),
    rowM('COSTI',r,function(m){return m.costi;},{t:1,tot:r.totali.costi}),
+   rowP('% costi sul fatturato',r,function(m){return m.costi;},{tot:r.totali.costi}),
    rowM('UTILE / PERDITA',r,function(m){return m.utile;},{t:1,c:1,tot:r.totali.utile}),
+   rowP('% utile sul fatturato',r,function(m){return m.utile;},{c:1,tot:r.totali.utile}),
    rowM('Utile cumulato',r,function(m){return m.utileCum;},{c:1,tot:r.totali.utile}),
    rowM('Fonte Dashboard',r,function(){return 0;},{s:1,tot:0}).replace(/<td class="">0,00<\/td>/g,'<td></td>')];
-  rows[8]='<tr class="s"><td>Fonte Dashboard</td>'+r.mesi.map(function(m){return '<td>'+esc(m.fonte)+'</td>';}).join('')+'<td></td></tr>';
-  return tab(h,rows)+'<div class="note">F24 ritenute e simili versamenti non sono costi: '+eur(r.totali.uscitaNonCosto)+' € registrati fuori dal P&L.</div>'; }
+  rows[10]='<tr class="s"><td>Fonte Dashboard</td>'+r.mesi.map(function(m){return '<td>'+esc(m.fonte)+'</td>';}).join('')+'<td></td></tr>';
+  return tab(h,rows)+dettaglioCat(r)+'<div class="note">F24 ritenute e simili versamenti non sono costi: '+eur(r.totali.uscitaNonCosto)+' € registrati fuori dal P&L.</div>'; }
 function vIva(r){ var h=r.mesi.map(function(m){return etm(m.m);}).concat(['Totale']);
   return tab(h,[rowM('IVA a debito (vendite)',r,function(m){return m.ivaDeb;},{tot:r.totali.ivaDeb}),
    rowM('IVA a credito (acquisti detraibili)',r,function(m){return m.ivaCred;},{tot:r.totali.ivaCred}),
