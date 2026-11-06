@@ -37,16 +37,26 @@ button.l{background:none;border:1px solid var(--ln);color:var(--tx);padding:5px 
 /* Motore di calcolo Bilancio gestionale SRL. Funzioni pure: stesso file usato dalla pagina e dai test. */
 (function (root) {
   var CATEGORIE = [
-    { id: 'servizi', nome: 'Servizi a terzi', tipo: 'ricavo' },
+    { id: 'servizi', nome: 'Servizi a terzi (consulenze)', tipo: 'ricavo' },
+    { id: 'vendite', nome: 'Vendite gettoniere e abbonamenti clienti', tipo: 'ricavo' },
+    { id: 'intercompany_ricavo', nome: 'Fatture a Paysolution (intercompany)', tipo: 'ricavo' },
+    { id: 'acquisti_materiali', nome: 'Acquisti materiali e merci', tipo: 'costo' },
+    { id: 'intercompany_costo', nome: 'Fatture da Paysolution (intercompany)', tipo: 'costo' },
+    { id: 'trasporti', nome: 'Trasporti e spedizioni', tipo: 'costo' },
+    { id: 'pubblicita', nome: 'Pubblicita', tipo: 'costo' },
+    { id: 'servizi_prof', nome: 'Commercialista, consulenti e servizi', tipo: 'costo' },
+    { id: 'abbonamenti_utenze', nome: 'Abbonamenti, utenze, sicurezza, assicurazioni', tipo: 'costo' },
+    { id: 'trasferte_welfare', nome: 'Trasferte, welfare e rappresentanza', tipo: 'costo' },
+    { id: 'oneri_bancari', nome: 'Commissioni e oneri bancari', tipo: 'costo' },
     { id: 'compensi_amm', nome: 'Compensi amministratori', tipo: 'costo', irapIndeducibile: true },
     { id: 'stipendi', nome: 'Stipendi', tipo: 'costo', irapIndeducibile: true },
     { id: 'contributi', nome: 'Contributi (INPS ecc.)', tipo: 'costo', irapIndeducibile: true },
-    { id: 'f24_ritenute', nome: 'F24 ritenute (solo versamento, non è un costo)', tipo: 'costo', nonCosto: true },
+    { id: 'f24_ritenute', nome: "F24 ritenute (solo versamento, non e' un costo)", tipo: 'costo', nonCosto: true },
     { id: 'altri', nome: 'Altri costi generali', tipo: 'costo' }
   ];
   var PARAMS_DEFAULT = {
     inizio: '2026-01', mesi: 12, ires: 24, irap: 3.9,
-    ivaPeriodo: 'mensile', includeAcquistiSrl: false
+    ivaPeriodo: 'mensile', includeAcquistiSrl: false, includeDashboard: true
   };
 
   function r2(x) { return Math.round((x + Number.EPSILON) * 100) / 100; }
@@ -92,7 +102,7 @@ button.l{background:none;border:1px solid var(--ln);color:var(--tx);padding:5px 
     var cats = {}; (input.categorie || CATEGORIE).forEach(function (c) { cats[c.id] = c; });
     var mesi = elencoMesi(P.inizio, P.mesi), idx = {};
     mesi.forEach(function (m) { idx[m] = true; });
-    var dash = daDashboard(input.dash, P);
+    var dash = daDashboard(P.includeDashboard === false ? {} : input.dash, P);
     var avvisi = [], rows = {};
     mesi.forEach(function (m) {
       var d = dash.mesi[m] || vuoto();
@@ -236,7 +246,7 @@ var SINT = (function(){
 
 /* ── Stato e calcolo ── */
 function params(){ var c=S.config||{}; return {inizio:c.inizio||'2026-01',mesi:+c.mesi||12,ires:c.ires!=null&&c.ires!==''?+c.ires:24,irap:c.irap!=null&&c.irap!==''?+c.irap:3.9,
-  ivaPeriodo:c.ivaPeriodo||'mensile',includeAcquistiSrl:String(c.includeAcquistiSrl)==='true'}; }
+  ivaPeriodo:c.ivaPeriodo||'mensile',includeAcquistiSrl:String(c.includeAcquistiSrl)==='true',includeDashboard:String(c.includeDashboard)!=='false'}; }
 function calc(){ return E.calcola({voci:S.voci,dash:S.dash||{},params:params()}); }
 function cls(x){ return x<-0.004?'neg':(x>0.004?'pos':''); }
 
@@ -310,6 +320,7 @@ function vParam(){ var p=params();
   return '<div class="card"><div class="g"><div><label>Primo mese del P&L</label><input type="month" id="p_inizio" value="'+p.inizio+'"></div><div><label>Numero di mesi</label><input type="number" id="p_mesi" min="1" max="24" value="'+p.mesi+'"></div>'
   +'<div><label>Aliquota IRES %</label><input type="number" step="0.01" id="p_ires" value="'+p.ires+'"></div><div><label>Aliquota IRAP % (da confermare)</label><input type="number" step="0.01" id="p_irap" value="'+p.irap+'"></div>'
   +'<div><label>Liquidazione IVA</label><select id="p_ivaPeriodo"><option value="mensile"'+(p.ivaPeriodo==='mensile'?' selected':'')+'>Mensile</option><option value="trimestrale"'+(p.ivaPeriodo==='trimestrale'?' selected':'')+'>Trimestrale</option></select></div>'
+  +'<div><label>Dati Dashboard V6 nel P&L</label><select id="p_dash"><option value="true"'+(p.includeDashboard?' selected':'')+'>Sì (solo se non importi le fatture a Paysolution)</option><option value="false"'+(!p.includeDashboard?' selected':'')+'>No (solo controllo: uso le fatture)</option></select></div>'
   +'<div><label>Acquisti materiali SRL nel P&L</label><select id="p_inc"><option value="false"'+(!p.includeAcquistiSrl?' selected':'')+'>No (memo)</option><option value="true"'+(p.includeAcquistiSrl?' selected':'')+'>Sì, come costo</option></select></div></div><button class="p" data-a="salvaparam">Salva parametri</button><div id="msg" class="note"></div></div>'; }
 function vControlli(r){ return '<div class="card"><b>Controlli incrociati</b>'+r.controlli.map(function(c){return '<div class="ck '+(c.ok?'ok':'ko')+'">'+(c.ok?'✔':'✖')+' '+esc(c.nome)+'</div>';}).join('')+'</div>'; }
 function vStorico(){ return '<div class="card tw"><table><tr><th>Quando</th><th>Evento</th><th style="text-align:left">Dettaglio</th></tr>'+(S.storico.map(function(s){return '<tr><td>'+esc(String(s.quando).replace('T',' ').slice(0,16))+'</td><td>'+esc(s.evento)+'</td><td style="text-align:left;white-space:normal">'+esc(String(s.dettaglio||'').slice(0,120))+'</td></tr>';}).join('')||'<tr><td colspan="3">Nessun evento</td></tr>')+'</table></div>'; }
@@ -320,13 +331,13 @@ function msg(t,ko){ var m=document.getElementById('msg'); if(m){ m.textContent=t
 async function azione(a,id){
   try{
     if(a==='salva'){ var v={id:(S.edit&&S.edit.id)||'',categoria:val('f_categoria'),data:val('f_data'),competenza:val('f_competenza'),imponibile:+val('f_imponibile'),iva:+val('f_iva')||0,detraibile:val('f_detraibile')==='1',descrizione:val('f_descrizione'),riferimento:val('f_riferimento'),note:val('f_note')};
-      if(!v.data||!v.competenza||!(v.imponibile>=0)||val('f_imponibile')===''){ msg('Compila data, competenza e imponibile',1); return; }
+      if(!v.data||!v.competenza||isNaN(v.imponibile)||val('f_imponibile')===''){ msg('Compila data, competenza e imponibile',1); return; }
       await call('apiSalvaVoce',v); S.edit=null; await ricarica(); }
     else if(a==='mod'){ S.edit=S.voci.filter(function(x){return x.id===id;})[0]; render(); }
     else if(a==='annulla'){ S.edit=null; render(); }
     else if(a==='del'){ if(confirm('Eliminare la voce? Resta nello storico e si può ripristinare.')){ await call('apiEliminaVoce',id,false); await ricarica(); } }
     else if(a==='rip'){ await call('apiEliminaVoce',id,true); await ricarica(); }
-    else if(a==='salvaparam'){ S.config=await call('apiSalvaConfig',{inizio:val('p_inizio'),mesi:val('p_mesi'),ires:val('p_ires'),irap:val('p_irap'),ivaPeriodo:val('p_ivaPeriodo'),includeAcquistiSrl:val('p_inc')}); msg('Parametri salvati'); render(); }
+    else if(a==='salvaparam'){ S.config=await call('apiSalvaConfig',{inizio:val('p_inizio'),mesi:val('p_mesi'),ires:val('p_ires'),irap:val('p_irap'),ivaPeriodo:val('p_ivaPeriodo'),includeAcquistiSrl:val('p_inc'),includeDashboard:val('p_dash')}); msg('Parametri salvati'); render(); }
     else if(a==='login'){ var rr=await call('apiLogin',val('l_u'),val('l_p')); TOKEN=rr.token; try{sessionStorage.setItem('bsrl_t',TOKEN);}catch(e){} await avvia(); }
     else if(a==='logout'){ try{await call('apiLogout');}catch(e){} esci(); }
     else if(a==='importa'){ document.getElementById('imp').click(); }
