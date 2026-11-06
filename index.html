@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="it"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Bilancio SRL</title>
+<style>
+:root{--bg:#f4f6fa;--card:#fff;--tx:#1b2433;--mu:#66728a;--ln:#dde3ee;--ac:#1f4e9c;--ok:#1a7f4b;--ko:#b3261e;--wa:#a86400}
+@media(prefers-color-scheme:dark){:root{--bg:#111722;--card:#1a2232;--tx:#e8edf6;--mu:#93a0b8;--ln:#2b3750;--ac:#6ea0ff;--ok:#4cc38a;--ko:#ff7b72;--wa:#e0a43a}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.4 system-ui,-apple-system,Segoe UI,sans-serif}
+header{padding:12px 16px;background:var(--ac);color:#fff;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+header h1{font-size:18px;margin:0;flex:1}header small{opacity:.85}
+.demo{background:#a86400;color:#fff;padding:6px 16px;font-size:13px}
+nav{display:flex;gap:4px;padding:8px 12px;overflow:auto;background:var(--card);border-bottom:1px solid var(--ln)}
+nav button{border:0;background:none;color:var(--mu);padding:8px 12px;border-radius:8px;font:inherit;cursor:pointer;white-space:nowrap}
+nav button.on{background:var(--ac);color:#fff}
+main{padding:12px 16px;max-width:1200px;margin:auto}
+.card{background:var(--card);border:1px solid var(--ln);border-radius:12px;padding:14px;margin-bottom:12px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.kpi b{display:block;font-size:20px}.kpi span{color:var(--mu);font-size:12px}
+.tw{overflow:auto}table{border-collapse:collapse;width:100%;font-size:13px}
+th,td{padding:6px 8px;border-bottom:1px solid var(--ln);text-align:right;white-space:nowrap}
+th:first-child,td:first-child{text-align:left;position:sticky;left:0;background:var(--card)}
+tr.t td{font-weight:700}tr.s td{color:var(--mu);font-size:12px}
+.neg{color:var(--ko)}.pos{color:var(--ok)}
+label{display:block;font-size:12px;color:var(--mu);margin:8px 0 2px}
+input,select,textarea{width:100%;padding:8px;border:1px solid var(--ln);border-radius:8px;background:var(--bg);color:var(--tx);font:inherit}
+.g{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:0 12px}
+button.p{background:var(--ac);color:#fff;border:0;padding:9px 16px;border-radius:8px;font:inherit;cursor:pointer;margin:10px 6px 0 0}
+button.l{background:none;border:1px solid var(--ln);color:var(--tx);padding:5px 10px;border-radius:8px;cursor:pointer;font:inherit;font-size:12px}
+.ck{display:flex;gap:8px;padding:3px 0;font-size:13px}.ok{color:var(--ok)}.ko{color:var(--ko)}.wa{color:var(--wa)}
+.note{font-size:12px;color:var(--mu)}.hid{display:none}
+</style></head><body>
+<header><h1>Bilancio SRL <small>Tullio Serci S.r.l. · gestionale riservato</small></h1><small id="utente"></small><button class="l" id="exit" data-a="logout" style="color:#fff;border-color:#fff8">Esci</button></header>
+<div id="demo" class="demo hid">MODALITÀ DEMO: dati sintetici salvati solo in questo browser. Nessun dato reale.</div>
+<nav id="nav"></nav>
+<main id="main"></main>
+<script src="config.js"></script>
+<script>
+/* Motore di calcolo Bilancio gestionale SRL. Funzioni pure: stesso file usato dalla pagina e dai test. */
+(function (root) {
+  var CATEGORIE = [
+    { id: 'servizi', nome: 'Servizi a terzi', tipo: 'ricavo' },
+    { id: 'compensi_amm', nome: 'Compensi amministratori', tipo: 'costo', irapIndeducibile: true },
+    { id: 'stipendi', nome: 'Stipendi', tipo: 'costo', irapIndeducibile: true },
+    { id: 'contributi', nome: 'Contributi (INPS ecc.)', tipo: 'costo', irapIndeducibile: true },
+    { id: 'f24_ritenute', nome: 'F24 ritenute (solo versamento, non è un costo)', tipo: 'costo', nonCosto: true },
+    { id: 'altri', nome: 'Altri costi generali', tipo: 'costo' }
+  ];
+  var PARAMS_DEFAULT = {
+    inizio: '2026-01', mesi: 12, ires: 24, irap: 3.9,
+    ivaPeriodo: 'mensile', includeAcquistiSrl: false
+  };
+
+  function r2(x) { return Math.round((x + Number.EPSILON) * 100) / 100; }
+  function mese(d) { return String(d).slice(0, 7); }
+  function elencoMesi(inizio, n) {
+    var y = +inizio.slice(0, 4), m = +inizio.slice(5, 7), out = [];
+    for (var i = 0; i < n; i++) { out.push(y + '-' + (m < 10 ? '0' : '') + m); m++; if (m > 12) { m = 1; y++; } }
+    return out;
+  }
+  function vuoto() { return { ricavi: 0, costi: 0, ivaDeb: 0, ivaCred: 0, irapInded: 0, nonCosto: 0 }; }
+
+  /* Dati comuni dalla Dashboard V6: mese chiuso -> chiusura; altrimenti fatture intercompany approvate. */
+  function daDashboard(dash, params) {
+    var out = {}, fonte = {}, memo = {};
+    function get(m) { return out[m] || (out[m] = vuoto()); }
+    var ch = (dash && dash.chiusure) || {};
+    Object.keys(ch).forEach(function (m) {
+      var c = ch[m], o = get(m);
+      o.ricavi += +c.imponibileTSaPS || 0; o.ivaDeb += +c.ivaTSaPS || 0;
+      o.costi += +c.imponibilePSaTS || 0; o.ivaCred += +c.ivaPSaTS || 0;
+      fonte[m] = 'chiusura';
+    });
+    ((dash && dash.ic) || []).forEach(function (r) {
+      var m = mese(r.data);
+      if (ch[m]) return;
+      if (r.stato && r.stato !== 'approvato' && r.stato !== 'migrato_v2') return;
+      var o = get(m), net = +r.netto || +r.imp || 0, iva = +r.iva || 0;
+      if (r.dir === 'srl-srls') { o.ricavi += net; o.ivaDeb += iva; }
+      else if (r.dir === 'srls-srl') { o.costi += net; o.ivaCred += iva; }
+      else return;
+      fonte[m] = fonte[m] || 'fatture intercompany';
+    });
+    ((dash && dash.acquistiSrl) || []).forEach(function (r) {
+      var m = mese(r.data), net = +r.netto || 0, iva = r.ivaFlag === 'inclusa' ? (+r.importo || 0) - net : 0;
+      memo[m] = (memo[m] || 0) + net;
+      if (params.includeAcquistiSrl) { var o = get(m); o.costi += net; o.ivaCred += iva; }
+    });
+    return { mesi: out, fonte: fonte, memoAcquisti: memo };
+  }
+
+  function calcola(input) {
+    var P = Object.assign({}, PARAMS_DEFAULT, input.params || {});
+    var cats = {}; (input.categorie || CATEGORIE).forEach(function (c) { cats[c.id] = c; });
+    var mesi = elencoMesi(P.inizio, P.mesi), idx = {};
+    mesi.forEach(function (m) { idx[m] = true; });
+    var dash = daDashboard(input.dash, P);
+    var avvisi = [], rows = {};
+    mesi.forEach(function (m) {
+      var d = dash.mesi[m] || vuoto();
+      rows[m] = { m: m, fonte: dash.fonte[m] || '', ricaviDash: d.ricavi, costiDash: d.costi,
+        ricaviMan: 0, costiMan: 0, ivaDeb: d.ivaDeb, ivaCred: d.ivaCred, irapInded: 0, uscitaNonCosto: 0 };
+    });
+    Object.keys(dash.mesi).forEach(function (m) {
+      if (!idx[m] && (dash.mesi[m].ricavi || dash.mesi[m].costi)) avvisi.push('Dati Dashboard fuori periodo (' + m + ') non conteggiati');
+    });
+    (input.voci || []).forEach(function (v) {
+      if (v.eliminata) return;
+      var m = mese(v.competenza), c = cats[v.categoria];
+      if (!c) { avvisi.push('Voce con categoria sconosciuta: ' + v.id); return; }
+      if (!idx[m]) { avvisi.push('Voce fuori periodo (' + m + '): ' + (v.descrizione || v.id)); return; }
+      var imp = +v.imponibile || 0, iva = +v.iva || 0, r = rows[m];
+      if (c.nonCosto) { r.uscitaNonCosto += imp + iva; return; }
+      if (c.tipo === 'ricavo') { r.ricaviMan += imp; r.ivaDeb += iva; }
+      else {
+        var detr = v.detraibile !== false;
+        r.costiMan += imp + (detr ? 0 : iva);
+        if (detr) r.ivaCred += iva;
+        if (c.irapIndeducibile) r.irapInded += imp;
+      }
+    });
+    // P&L, IVA, imposte (stime cumulative)
+    var cum = { ricavi: 0, costi: 0, utile: 0, ivaSaldo: 0, inded: 0 }, riporto = 0, accP = 0, prevIres = 0, prevIrap = 0;
+    var perLen = P.ivaPeriodo === 'trimestrale' ? 3 : 1;
+    var lista = mesi.map(function (m, i) {
+      var r = rows[m];
+      r.ricavi = r.ricaviDash + r.ricaviMan; r.costi = r.costiDash + r.costiMan;
+      r.utile = r.ricavi - r.costi;
+      cum.ricavi += r.ricavi; cum.costi += r.costi; cum.utile += r.utile; cum.inded += r.irapInded;
+      r.ricaviCum = cum.ricavi; r.costiCum = cum.costi; r.utileCum = cum.utile;
+      r.ivaSaldo = r.ivaDeb - r.ivaCred; cum.ivaSaldo += r.ivaSaldo; r.ivaCum = cum.ivaSaldo;
+      accP += r.ivaSaldo; r.ivaVersare = 0; r.ivaCreditoRiportato = riporto < 0 ? -riporto : 0;
+      var fineP = ((i + 1) % perLen === 0) || i === mesi.length - 1;
+      if (fineP) {
+        var net = accP + riporto;
+        if (net > 0) { r.ivaVersare = net; riporto = 0; } else { riporto = net; }
+        r.ivaCreditoRiportato = riporto < 0 ? -riporto : 0; accP = 0;
+      }
+      var iresCum = Math.max(0, cum.utile) * P.ires / 100;
+      var irapBase = cum.utile + cum.inded, irapCum = Math.max(0, irapBase) * P.irap / 100;
+      r.irapBaseCum = irapBase; r.iresCum = iresCum; r.irapCum = irapCum;
+      r.ires = iresCum - prevIres; r.irap = irapCum - prevIrap; prevIres = iresCum; prevIrap = irapCum;
+      r.imposteCum = iresCum + irapCum;
+      r.utileNettoCum = cum.utile - r.imposteCum;
+      return r;
+    });
+    var tot = lista.reduce(function (a, r) {
+      ['ricavi', 'costi', 'utile', 'ivaDeb', 'ivaCred', 'ivaSaldo', 'ivaVersare', 'ires', 'irap', 'uscitaNonCosto'].forEach(function (k) { a[k] = (a[k] || 0) + r[k]; });
+      return a;
+    }, {});
+    var ult = lista[lista.length - 1] || {};
+    tot.imposte = tot.ires + tot.irap; tot.utileNetto = tot.utile - tot.imposte;
+    tot.ivaCreditoFinale = ult.ivaCreditoRiportato || 0;
+    var memoAcq = Object.keys(dash.memoAcquisti).filter(function (m) { return idx[m]; }).reduce(function (s, m) { return s + dash.memoAcquisti[m]; }, 0);
+    var res = { params: P, mesi: lista, totali: tot, avvisi: avvisi, memoAcquistiSrl: memoAcq };
+    res.controlli = controlli(res, input, dash);
+    return res;
+  }
+
+  /* Controlli incrociati: ogni totale deve tornare per una via indipendente. */
+  function controlli(res, input, dash) {
+    var c = [], L = res.mesi, T = res.totali, eq = function (a, b) { return Math.abs(a - b) < 0.005; };
+    function add(n, ok, det) { c.push({ nome: n, ok: !!ok, dettaglio: det || '' }); }
+    var uc = L.length ? L[L.length - 1] : {};
+    add('Utile cumulato finale = somma utili mensili', eq(uc.utileCum || 0, T.utile));
+    add('Ricavi - costi = utile (totale)', eq(T.ricavi - T.costi, T.utile));
+    add('Ricavi cumulati finali = totale ricavi', eq(uc.ricaviCum || 0, T.ricavi));
+    add('IVA cumulata finale = debito - credito', eq(uc.ivaCum || 0, T.ivaDeb - T.ivaCred));
+    add('IVA versata + credito residuo = IVA cumulata', eq(T.ivaVersare - T.ivaCreditoFinale, T.ivaSaldo),
+      'Verifica del riporto del credito');
+    add('Imposte mensili sommate = imposte cumulate', eq(T.imposte, uc.imposteCum || 0));
+    var man = { r: 0, c: 0 };
+    var cats = {}; (input.categorie || CATEGORIE).forEach(function (x) { cats[x.id] = x; });
+    (input.voci || []).forEach(function (v) {
+      var cc = cats[v.categoria]; if (v.eliminata || !cc || cc.nonCosto) return;
+      var m = String(v.competenza).slice(0, 7); if (m < res.params.inizio || m > L[L.length - 1].m) return;
+      var imp = +v.imponibile || 0, iva = +v.iva || 0;
+      if (cc.tipo === 'ricavo') man.r += imp; else man.c += imp + (v.detraibile === false ? iva : 0);
+    });
+    var sr = L.reduce(function (s, r) { return s + r.ricaviMan; }, 0), sc = L.reduce(function (s, r) { return s + r.costiMan; }, 0);
+    add('Ricavi manuali del P&L = somma voci inserite', eq(sr, man.r));
+    add('Costi manuali del P&L = somma voci inserite', eq(sc, man.c));
+    return c;
+  }
+
+  var api = { CATEGORIE: CATEGORIE, PARAMS_DEFAULT: PARAMS_DEFAULT, calcola: calcola, daDashboard: daDashboard, elencoMesi: elencoMesi, r2: r2 };
+  if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.Engine = api;
+})(typeof window !== 'undefined' ? window : this);
+
+</script>
+<script>
+var E = window.Engine;
+var IT = new Intl.NumberFormat('it-IT', {minimumFractionDigits:2, maximumFractionDigits:2, useGrouping:'always'});
+var eur = function(x){ return IT.format(Math.round((x||0)*100)/100); };
+var MESI = ['gen','feb','mar','apr','mag','giu','lug','ago','set','ott','nov','dic'];
+var etm = function(m){ return MESI[+m.slice(5,7)-1]+' '+m.slice(2,4); };
+var esc = function(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); };
+var S = {voci:[], config:{}, dash:null, tab:'riepilogo', edit:null, storico:[]};
+
+/* ── Backend: Apps Script reale oppure demo locale ── */
+var API = window.BILANCIO_API || '', DEMO = !API, TOKEN = '';
+try { TOKEN = sessionStorage.getItem('bsrl_t') || ''; } catch (e) {}
+async function call(fn){
+  var args = [].slice.call(arguments,1);
+  if (DEMO) return demoApi(fn,args);
+  var r = await fetch(API,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({fn:fn,args:args,token:TOKEN})});
+  var j = await r.json();
+  if (j.error) { if (j.status===401 && fn!=='apiLogin') { esci(); } throw new Error(j.error); }
+  return j.data;
+}
+function esci(){ TOKEN=''; try{sessionStorage.removeItem('bsrl_t');}catch(e){} document.getElementById('nav').innerHTML=''; document.getElementById('utente').textContent=''; mostraLogin(); }
+function mostraLogin(msg){ document.getElementById('main').innerHTML='<div class="card" style="max-width:360px;margin:30px auto"><b>Accesso riservato</b><label>Utente</label><input id="l_u" autocomplete="username"><label>Password</label><input id="l_p" type="password" autocomplete="current-password"><button class="p" data-a="login">Entra</button><div id="msg" class="note '+(msg?'ko':'')+'">'+esc(msg||'')+'</div></div>'; }
+function demoApi(fn,a){
+  var K='bilancioSRL_demo', st; try{ st=JSON.parse(localStorage.getItem(K)); }catch(e){}
+  if(!st){ st={voci:SINT.voci,config:{},storico:[]}; }
+  function save(){ try{localStorage.setItem(K,JSON.stringify(st));}catch(e){} }
+  var map={
+    apiStato:function(){return {utente:'demo',voci:st.voci,config:st.config};},
+    apiDashboard:function(){return SINT.dash;},
+    apiSalvaVoce:function(v){ v.totale=+v.imponibile+(+v.iva||0); v.tipo=v.categoria==='servizi'?'ricavo':'costo';
+      if(!v.id){v.id=Math.random().toString(36).slice(2,10);v.eliminata=false;st.voci.push(v);} else {st.voci=st.voci.map(function(x){return x.id===v.id?Object.assign({},x,v):x;});}
+      st.storico.push({quando:new Date().toISOString(),utente:'demo',evento:'salvata',voce_id:v.id,dettaglio:v.descrizione}); save(); return v;},
+    apiEliminaVoce:function(id,rip){ st.voci.forEach(function(x){if(x.id===id)x.eliminata=!rip;}); st.storico.push({quando:new Date().toISOString(),utente:'demo',evento:rip?'ripristinata':'eliminata',voce_id:id,dettaglio:''}); save(); },
+    apiSalvaConfig:function(c){ st.config=Object.assign(st.config,c); save(); return st.config; },
+    apiStorico:function(){ return st.storico.slice().reverse(); },
+    apiLogout:function(){return true;},
+    apiImportaVoci:function(l){ l.forEach(function(v){ map.apiSalvaVoce(Object.assign({},v,{id:''})); }); return l.length; }
+  };
+  return map[fn].apply(null,a);
+}
+var SINT = (function(){
+  var voci=[]; function v(c,m,imp,iva,d){ voci.push({id:'s'+voci.length,categoria:c,tipo:c==='servizi'?'ricavo':'costo',data:m+'-15',competenza:m,descrizione:d,imponibile:imp,iva:iva,detraibile:true,totale:imp+iva,eliminata:false}); }
+  ['2026-01','2026-02','2026-03','2026-04','2026-05','2026-06'].forEach(function(m,i){ v('servizi',m,3000+i*250,(3000+i*250)*0.22,'Consulenza (sintetica)'); v('compensi_amm',m,1500,0,'Compenso amm. (sintetico)'); v('stipendi',m,1200,0,'Stipendio (sintetico)'); v('contributi',m,380,0,'Contributi (sintetici)'); v('altri',m,150,33,'Spese generali (sintetiche)'); });
+  return {voci:voci, dash:{chiusure:{'2026-08':{imponibileTSaPS:2916.06,ivaTSaPS:641.53,imponibilePSaTS:300,ivaPSaTS:66},'2026-09':{imponibileTSaPS:9500.19,ivaTSaPS:2090.04,imponibilePSaTS:1851.91,ivaPSaTS:407.42}},
+    ic:[{dir:'srls-srl',data:'2026-03-15',netto:3900.23,iva:858.06,stato:'approvato'},{dir:'srl-srls',data:'2026-04-03',netto:71.31,iva:15.69,stato:'approvato'}],
+    acquistiSrl:[{data:'2026-05-19',tipo:'materiale',ivaFlag:'inclusa',importo:122,netto:100}]}};
+})();
+
+/* ── Stato e calcolo ── */
+function params(){ var c=S.config||{}; return {inizio:c.inizio||'2026-01',mesi:+c.mesi||12,ires:c.ires!=null&&c.ires!==''?+c.ires:24,irap:c.irap!=null&&c.irap!==''?+c.irap:3.9,
+  ivaPeriodo:c.ivaPeriodo||'mensile',includeAcquistiSrl:String(c.includeAcquistiSrl)==='true'}; }
+function calc(){ return E.calcola({voci:S.voci,dash:S.dash||{},params:params()}); }
+function cls(x){ return x<-0.004?'neg':(x>0.004?'pos':''); }
+
+/* ── Viste ── */
+var TABS=[['riepilogo','Riepilogo'],['pl','P&L mensile'],['iva','IVA'],['imposte','Imposte (stima)'],['voci','Voci manuali'],['dashboard','Da Dashboard V6'],['param','Parametri'],['controlli','Controlli'],['storico','Storico']];
+function nav(){ document.getElementById('nav').innerHTML=TABS.map(function(t){return '<button class="'+(S.tab===t[0]?'on':'')+'" data-t="'+t[0]+'">'+t[1]+'</button>';}).join(''); }
+function render(){ nav(); var r=calc(); var f={riepilogo:vRiepilogo,pl:vPL,iva:vIva,imposte:vImposte,voci:vVoci,dashboard:vDash,param:vParam,controlli:vControlli,storico:vStorico}[S.tab]; document.getElementById('main').innerHTML=f(r);
+  if(S.tab==='riepilogo') grafico(r); }
+function kpi(l,v,c){ return '<div class="kpi card"><span>'+l+'</span><b class="'+(c||'')+'">'+v+' €</b></div>'; }
+function vRiepilogo(r){ var t=r.totali, ok=r.controlli.every(function(c){return c.ok;});
+  return '<div class="kpis">'+kpi('Ricavi',eur(t.ricavi))+kpi('Costi',eur(t.costi))+kpi('Utile ante imposte',eur(t.utile),cls(t.utile))+kpi('Imposte stimate',eur(t.imposte))+kpi('Utile stimato dopo imposte',eur(t.utileNetto),cls(t.utileNetto))+kpi('IVA da versare nel periodo',eur(t.ivaVersare))+kpi('Credito IVA residuo',eur(t.ivaCreditoFinale))+'</div>'
+  +'<div class="card"><b>Utile cumulato per mese</b><svg id="gr" viewBox="0 0 640 180" width="100%"></svg></div>'
+  +'<div class="card"><span class="'+(ok?'ok':'ko')+'">'+(ok?'✔ Tutti i controlli incrociati tornano':'✖ Controlli incrociati falliti: vedi scheda Controlli')+'</span>'
+  +(r.avvisi.length?'<div class="wa note">'+r.avvisi.map(esc).join('<br>')+'</div>':'')
+  +(!r.params.includeAcquistiSrl&&r.memoAcquistiSrl?'<div class="note">Acquisti materiali SRL per '+eur(r.memoAcquistiSrl)+' € NON inclusi nel P&L (magazzino/rimanenze da definire): attivabili in Parametri.</div>':'')
+  +'<div class="note">Bilancio gestionale a ipotesi: imposte e IVA sono stime. Il bilancio ufficiale resta quello del commercialista.</div></div>'; }
+function grafico(r){ var svg=document.getElementById('gr'); if(!svg) return; var v=r.mesi.map(function(m){return m.utileCum;}), mx=Math.max.apply(null,v.concat([1])), mn=Math.min.apply(null,v.concat([0])), W=640,H=180,pb=22,n=v.length,bw=W/n,sc=(H-pb-10)/(mx-mn||1),z=10+mx*sc,h='';
+  v.forEach(function(x,i){ var hh=Math.abs(x)*sc, y=x>=0?z-hh:z; h+='<rect x="'+(i*bw+4)+'" y="'+y+'" width="'+(bw-8)+'" height="'+Math.max(hh,1)+'" fill="'+(x>=0?'#1a7f4b':'#b3261e')+'"/><text x="'+(i*bw+bw/2)+'" y="'+(H-6)+'" font-size="10" text-anchor="middle" fill="#888">'+etm(r.mesi[i].m).slice(0,3)+'</text>'; });
+  svg.innerHTML=h+'<line x1="0" x2="'+W+'" y1="'+z+'" y2="'+z+'" stroke="#888" stroke-width=".5"/>'; }
+function tab(head,rows){ return '<div class="card tw"><table><tr><th></th>'+head.map(function(h){return '<th>'+h+'</th>';}).join('')+'</tr>'+rows.join('')+'</table></div>'; }
+function rowM(l,r,f,o){ o=o||{}; return '<tr class="'+(o.t?'t':'')+(o.s?' s':'')+'"><td>'+l+'</td>'+r.mesi.map(function(m){var x=f(m);return '<td class="'+(o.c?cls(x):'')+'">'+eur(x)+'</td>';}).join('')+'<td class="'+(o.c?cls(o.tot):'')+'">'+eur(o.tot)+'</td></tr>'; }
+function sum(r,f){ return r.mesi.reduce(function(s,m){return s+f(m);},0); }
+function vPL(r){ var h=r.mesi.map(function(m){return etm(m.m);}).concat(['Totale']);
+  var rows=[rowM('Ricavi da Dashboard V6',r,function(m){return m.ricaviDash;},{tot:sum(r,function(m){return m.ricaviDash;})}),
+   rowM('Ricavi manuali (servizi a terzi)',r,function(m){return m.ricaviMan;},{tot:sum(r,function(m){return m.ricaviMan;})}),
+   rowM('RICAVI',r,function(m){return m.ricavi;},{t:1,tot:r.totali.ricavi}),
+   rowM('Costi da Dashboard V6',r,function(m){return m.costiDash;},{tot:sum(r,function(m){return m.costiDash;})}),
+   rowM('Costi manuali',r,function(m){return m.costiMan;},{tot:sum(r,function(m){return m.costiMan;})}),
+   rowM('COSTI',r,function(m){return m.costi;},{t:1,tot:r.totali.costi}),
+   rowM('UTILE / PERDITA',r,function(m){return m.utile;},{t:1,c:1,tot:r.totali.utile}),
+   rowM('Utile cumulato',r,function(m){return m.utileCum;},{c:1,tot:r.totali.utile}),
+   rowM('Fonte Dashboard',r,function(){return 0;},{s:1,tot:0}).replace(/<td class="">0,00<\/td>/g,'<td></td>')];
+  rows[8]='<tr class="s"><td>Fonte Dashboard</td>'+r.mesi.map(function(m){return '<td>'+esc(m.fonte)+'</td>';}).join('')+'<td></td></tr>';
+  return tab(h,rows)+'<div class="note">F24 ritenute e simili versamenti non sono costi: '+eur(r.totali.uscitaNonCosto)+' € registrati fuori dal P&L.</div>'; }
+function vIva(r){ var h=r.mesi.map(function(m){return etm(m.m);}).concat(['Totale']);
+  return tab(h,[rowM('IVA a debito (vendite)',r,function(m){return m.ivaDeb;},{tot:r.totali.ivaDeb}),
+   rowM('IVA a credito (acquisti detraibili)',r,function(m){return m.ivaCred;},{tot:r.totali.ivaCred}),
+   rowM('Saldo del mese (+debito / -credito)',r,function(m){return m.ivaSaldo;},{t:1,tot:r.totali.ivaSaldo}),
+   rowM('Saldo cumulato',r,function(m){return m.ivaCum;},{tot:r.totali.ivaSaldo}),
+   rowM('IVA da versare ('+r.params.ivaPeriodo+')',r,function(m){return m.ivaVersare;},{t:1,tot:r.totali.ivaVersare}),
+   rowM('Credito riportato a fine periodo',r,function(m){return m.ivaCreditoRiportato;},{tot:r.totali.ivaCreditoFinale})])+'<div class="note">Calcolo per competenza. Non considera acconto di dicembre, interessi trimestrali (1%) né versamenti effettivi.</div>'; }
+function vImposte(r){ var h=r.mesi.map(function(m){return etm(m.m);}).concat(['Totale']);
+  return '<div class="card wa">STIME: IRES '+r.params.ires+'% sull\'utile cumulato; IRAP '+r.params.irap+'% su utile + compensi amministratori, stipendi e contributi (base semplificata, senza deduzioni). Da confermare con il commercialista. Nessun riporto perdite.</div>'+
+  tab(h,[rowM('Utile cumulato',r,function(m){return m.utileCum;},{c:1,tot:r.totali.utile}),
+   rowM('Base IRAP cumulata',r,function(m){return m.irapBaseCum;},{tot:r.mesi.length?r.mesi[r.mesi.length-1].irapBaseCum:0}),
+   rowM('IRES del mese',r,function(m){return m.ires;},{tot:r.totali.ires}),rowM('IRAP del mese',r,function(m){return m.irap;},{tot:r.totali.irap}),
+   rowM('Imposte cumulate',r,function(m){return m.imposteCum;},{t:1,tot:r.totali.imposte}),
+   rowM('Utile cumulato dopo imposte',r,function(m){return m.utileNettoCum;},{t:1,c:1,tot:r.totali.utileNetto})]); }
+function catNome(id){ var c=E.CATEGORIE.filter(function(x){return x.id===id;})[0]; return c?c.nome:id; }
+function vVoci(){ var e=S.edit||{categoria:'servizi',data:new Date().toISOString().slice(0,10),competenza:new Date().toISOString().slice(0,7),imponibile:'',iva:'',detraibile:true};
+  var form='<div class="card"><b>'+(e.id?'Modifica voce':'Nuova voce')+'</b><div class="g">'
+   +'<div><label>Categoria</label><select id="f_categoria">'+E.CATEGORIE.map(function(c){return '<option value="'+c.id+'"'+(c.id===e.categoria?' selected':'')+'>'+esc(c.nome)+'</option>';}).join('')+'</select></div>'
+   +'<div><label>Data documento</label><input type="date" id="f_data" value="'+esc(e.data)+'"></div>'
+   +'<div><label>Competenza (mese)</label><input type="month" id="f_competenza" value="'+esc(e.competenza)+'"></div>'
+   +'<div><label>Imponibile €</label><input type="number" step="0.01" id="f_imponibile" value="'+esc(e.imponibile)+'"></div>'
+   +'<div><label>IVA € (0 se esente / escluso)</label><input type="number" step="0.01" id="f_iva" value="'+esc(e.iva)+'"></div>'
+   +'<div><label>IVA detraibile (costi)</label><select id="f_detraibile"><option value="1"'+(e.detraibile!==false?' selected':'')+'>Sì</option><option value="0"'+(e.detraibile===false?' selected':'')+'>No (va a costo)</option></select></div></div>'
+   +'<label>Descrizione</label><input id="f_descrizione" value="'+esc(e.descrizione)+'"><div class="g"><div><label>Riferimento / allegato</label><input id="f_riferimento" value="'+esc(e.riferimento)+'"></div><div><label>Note</label><input id="f_note" value="'+esc(e.note)+'"></div></div>'
+   +'<button class="p" data-a="salva">Salva</button>'+(e.id?'<button class="l" data-a="annulla">Annulla modifica</button>':'')
+   +'<button class="l" data-a="importa">Importa da file JSON</button><input type="file" id="imp" accept=".json" class="hid"><div id="msg" class="note"></div></div>';
+  var rows=S.voci.slice().sort(function(a,b){return (b.competenza+b.data).localeCompare(a.competenza+a.data);}).map(function(v){
+   return '<tr style="'+(v.eliminata?'opacity:.45;text-decoration:line-through':'')+'"><td>'+esc(v.competenza)+'</td><td style="text-align:left">'+esc(catNome(v.categoria))+'</td><td style="text-align:left">'+esc(v.descrizione)+'</td><td>'+eur(v.imponibile)+'</td><td>'+eur(v.iva)+'</td><td>'+eur(+v.imponibile+(+v.iva||0))+'</td><td>'
+   +(v.eliminata?'<button class="l" data-a="rip" data-id="'+v.id+'">Ripristina</button>':'<button class="l" data-a="mod" data-id="'+v.id+'">Modifica</button> <button class="l" data-a="del" data-id="'+v.id+'">Elimina</button>')+'</td></tr>'; }).join('');
+  return form+'<div class="card tw"><table><tr><th>Mese</th><th style="text-align:left">Categoria</th><th style="text-align:left">Descrizione</th><th>Imponibile</th><th>IVA</th><th>Totale</th><th></th></tr>'+(rows||'<tr><td colspan="7">Nessuna voce</td></tr>')+'</table></div>'; }
+function vDash(r){ var d=S.dash||{}, ch=Object.keys(d.chiusure||{}).sort();
+  return '<div class="card"><b>Dati letti dalla Dashboard V6 (sola lettura)</b><div class="note">Letti il '+esc(d.letto_il||'—')+'. Mese con chiusura = valori della chiusura (immutabili); mesi senza chiusura = fatture intercompany approvate.</div></div>'
+  +'<div class="card tw"><table><tr><th>Mese</th><th>Ricavi (TS→PS)</th><th>IVA debito</th><th>Costi (PS→TS)</th><th>IVA credito</th><th>Fonte</th></tr>'
+  +r.mesi.map(function(m){return '<tr><td>'+etm(m.m)+'</td><td>'+eur(m.ricaviDash)+'</td><td>'+eur(m.ivaDeb)+'</td><td>'+eur(m.costiDash)+'</td><td>'+eur(m.ivaCred)+'</td><td>'+esc(m.fonte)+'</td></tr>';}).join('')+'</table></div>'
+  +'<div class="note">Chiusure disponibili: '+(ch.join(', ')||'nessuna')+'. Nota: nei mesi con fatture manuali di ricavo/IVA, i valori Dashboard e manuali si sommano (colonne distinte nel P&L).</div>'; }
+function vParam(){ var p=params();
+  return '<div class="card"><div class="g"><div><label>Primo mese del P&L</label><input type="month" id="p_inizio" value="'+p.inizio+'"></div><div><label>Numero di mesi</label><input type="number" id="p_mesi" min="1" max="24" value="'+p.mesi+'"></div>'
+  +'<div><label>Aliquota IRES %</label><input type="number" step="0.01" id="p_ires" value="'+p.ires+'"></div><div><label>Aliquota IRAP % (da confermare)</label><input type="number" step="0.01" id="p_irap" value="'+p.irap+'"></div>'
+  +'<div><label>Liquidazione IVA</label><select id="p_ivaPeriodo"><option value="mensile"'+(p.ivaPeriodo==='mensile'?' selected':'')+'>Mensile</option><option value="trimestrale"'+(p.ivaPeriodo==='trimestrale'?' selected':'')+'>Trimestrale</option></select></div>'
+  +'<div><label>Acquisti materiali SRL nel P&L</label><select id="p_inc"><option value="false"'+(!p.includeAcquistiSrl?' selected':'')+'>No (memo)</option><option value="true"'+(p.includeAcquistiSrl?' selected':'')+'>Sì, come costo</option></select></div></div><button class="p" data-a="salvaparam">Salva parametri</button><div id="msg" class="note"></div></div>'; }
+function vControlli(r){ return '<div class="card"><b>Controlli incrociati</b>'+r.controlli.map(function(c){return '<div class="ck '+(c.ok?'ok':'ko')+'">'+(c.ok?'✔':'✖')+' '+esc(c.nome)+'</div>';}).join('')+'</div>'; }
+function vStorico(){ return '<div class="card tw"><table><tr><th>Quando</th><th>Evento</th><th style="text-align:left">Dettaglio</th></tr>'+(S.storico.map(function(s){return '<tr><td>'+esc(String(s.quando).replace('T',' ').slice(0,16))+'</td><td>'+esc(s.evento)+'</td><td style="text-align:left;white-space:normal">'+esc(String(s.dettaglio||'').slice(0,120))+'</td></tr>';}).join('')||'<tr><td colspan="3">Nessun evento</td></tr>')+'</table></div>'; }
+
+/* ── Azioni ── */
+function val(id){ return document.getElementById(id).value; }
+function msg(t,ko){ var m=document.getElementById('msg'); if(m){ m.textContent=t; m.className='note '+(ko?'ko':'ok'); } }
+async function azione(a,id){
+  try{
+    if(a==='salva'){ var v={id:(S.edit&&S.edit.id)||'',categoria:val('f_categoria'),data:val('f_data'),competenza:val('f_competenza'),imponibile:+val('f_imponibile'),iva:+val('f_iva')||0,detraibile:val('f_detraibile')==='1',descrizione:val('f_descrizione'),riferimento:val('f_riferimento'),note:val('f_note')};
+      if(!v.data||!v.competenza||!(v.imponibile>=0)||val('f_imponibile')===''){ msg('Compila data, competenza e imponibile',1); return; }
+      await call('apiSalvaVoce',v); S.edit=null; await ricarica(); }
+    else if(a==='mod'){ S.edit=S.voci.filter(function(x){return x.id===id;})[0]; render(); }
+    else if(a==='annulla'){ S.edit=null; render(); }
+    else if(a==='del'){ if(confirm('Eliminare la voce? Resta nello storico e si può ripristinare.')){ await call('apiEliminaVoce',id,false); await ricarica(); } }
+    else if(a==='rip'){ await call('apiEliminaVoce',id,true); await ricarica(); }
+    else if(a==='salvaparam'){ S.config=await call('apiSalvaConfig',{inizio:val('p_inizio'),mesi:val('p_mesi'),ires:val('p_ires'),irap:val('p_irap'),ivaPeriodo:val('p_ivaPeriodo'),includeAcquistiSrl:val('p_inc')}); msg('Parametri salvati'); render(); }
+    else if(a==='login'){ var rr=await call('apiLogin',val('l_u'),val('l_p')); TOKEN=rr.token; try{sessionStorage.setItem('bsrl_t',TOKEN);}catch(e){} await avvia(); }
+    else if(a==='logout'){ try{await call('apiLogout');}catch(e){} esci(); }
+    else if(a==='importa'){ document.getElementById('imp').click(); }
+  }catch(e){ msg(e.message,1); }
+}
+async function ricarica(){ var st=await call('apiStato'); S.voci=st.voci; S.config=st.config||{}; document.getElementById('utente').textContent=st.utente||''; if(S.tab==='storico') S.storico=await call('apiStorico'); render(); }
+document.addEventListener('click',function(e){ var t=e.target.closest('[data-t]'); if(t){ S.tab=t.dataset.t; if(S.tab==='storico') call('apiStorico').then(function(x){S.storico=x;render();}); else render(); return; }
+  var a=e.target.closest('[data-a]'); if(a) azione(a.dataset.a,a.dataset.id); });
+document.addEventListener('change',function(e){ if(e.target.id!=='imp'||!e.target.files[0]) return; var f=e.target.files[0], rd=new FileReader();
+  rd.onload=async function(){ try{ var l=JSON.parse(rd.result); if(!Array.isArray(l)) throw new Error('Il file deve contenere un elenco di voci'); var n=await call('apiImportaVoci',l); await ricarica(); S.tab='voci'; render(); msg('Importate '+n+' voci'); }catch(x){ msg('Importazione fallita: '+x.message,1); } }; rd.readAsText(f); });
+async function avvia(){ try{ if(DEMO) document.getElementById('demo').classList.remove('hid'); document.getElementById('exit').classList.toggle('hid',DEMO); await ricarica(); S.dash=await call('apiDashboard'); render(); }catch(e){ if(!TOKEN&&!DEMO) mostraLogin(e.message); else document.getElementById('main').innerHTML='<div class="card ko">'+esc(e.message)+'</div>'; } }
+document.addEventListener('keydown',function(e){ if(e.key==='Enter'&&document.getElementById('l_p')===document.activeElement) azione('login'); });
+if (DEMO || TOKEN) avvia(); else { document.getElementById('exit').classList.add('hid'); mostraLogin(); }
+</script></body></html>
