@@ -80,7 +80,8 @@ button.l{background:none;border:1px solid var(--ln);color:var(--tx);padding:5px 
   ];
   var PARAMS_DEFAULT = {
     inizio: '2026-01', mesi: 12, ires: 24, irap: 3.9,
-    ivaPeriodo: 'mensile', includeAcquistiSrl: false, includeDashboard: true, includeRimanenze: true, rimanenzeConf: { '2026-10': 0 }
+    ivaPeriodo: 'mensile', includeAcquistiSrl: false, includeDashboard: true, includeRimanenze: true, rimanenzeConf: { '2026-01': 45289.74, '2026-02': 40983.61, '2026-03': 43042.62, '2026-04': 30686.09, '2026-05': 28811.92,
+      '2026-06': 23406.30, '2026-07': 23406.30, '2026-08': 22465.24, '2026-09': 22465.24, '2026-10': 0 }
   };
 
   function r2(x) { return Math.round((x + Number.EPSILON) * 100) / 100; }
@@ -128,12 +129,14 @@ button.l{background:none;border:1px solid var(--ln);color:var(--tx);padding:5px 
     mesi.forEach(function (m) { idx[m] = true; });
     var dash = daDashboard(P.includeDashboard === false ? {} : input.dash, P);
     var avvisi = [], rows = {};
-    var snap = snapshot(input.voci, cats), varRimMese = {}, prevRim = null, rimSer = {};
+    var snap = snapshot(input.voci, cats), varRimMese = {}, prevRim = null, rimSer = {}, rimTab = [];
     snap.forEach(function (s) { if (s.items.sp_rimanenze !== undefined) rimSer[s.m] = s.items.sp_rimanenze; });
     /* Saldi di magazzino confermati dall'utente (es. 31/10/2026 = 0): valgono solo dove non c'e' un saldo inserito. */
     Object.keys(P.rimanenzeConf || {}).forEach(function (m) { if (rimSer[m] === undefined) rimSer[m] = +P.rimanenzeConf[m] || 0; });
     Object.keys(rimSer).sort().forEach(function (m) {
-      if (prevRim !== null && m >= P.inizio && P.includeRimanenze !== false) varRimMese[m] = (varRimMese[m] || 0) + rimSer[m] - prevRim;
+      var vr = prevRim !== null && m >= P.inizio && P.includeRimanenze !== false ? rimSer[m] - prevRim : 0;
+      if (vr) varRimMese[m] = (varRimMese[m] || 0) + vr;
+      rimTab.push({ m: m, saldo: rimSer[m], variazione: r2(vr), reale: snap.some(function (x) { return x.m === m && x.items.sp_rimanenze !== undefined; }) });
       prevRim = rimSer[m];
     });
     mesi.forEach(function (m) {
@@ -193,7 +196,7 @@ button.l{background:none;border:1px solid var(--ln);color:var(--tx);padding:5px 
     tot.imposte = tot.ires + tot.irap; tot.utileNetto = tot.utile - tot.imposte;
     tot.ivaCreditoFinale = ult.ivaCreditoRiportato || 0;
     var memoAcq = Object.keys(dash.memoAcquisti).filter(function (m) { return idx[m]; }).reduce(function (s, m) { return s + dash.memoAcquisti[m]; }, 0);
-    var res = { params: P, mesi: lista, totali: tot, avvisi: avvisi, memoAcquistiSrl: memoAcq };
+    var res = { rimanenze: rimTab, params: P, mesi: lista, totali: tot, avvisi: avvisi, memoAcquistiSrl: memoAcq };
     res.controlli = controlli(res, input, dash);
     return res;
   }
@@ -517,8 +520,9 @@ function vPatrimonio(r){ var sp=E.statoPatrimoniale(r,S.voci), cats=E.CATEGORIE.
     if(pre&&!ult.apertura){ var manca=cats.filter(function(c){return !c.riporta&&pre.items[c.id]!==undefined&&ult.items[c.id]===undefined;}).map(function(c){return c.nome;});
       if(manca.length) h+='<div class="card wa">Voci presenti all\'apertura ma non nel saldo '+esc(ult.m)+': '+esc(manca.join('; '))+'.</div>'; }
   } else h='<div class="card">Nessun saldo patrimoniale inserito. Inserisci i valori del bilancio 2025 (mese 2025-12) e poi i saldi 2026.</div>';
-  var rim=r.mesi.filter(function(m){return Math.abs(m.varRim)>0.004;}).map(function(m){return etm(m.m)+': '+eur(m.varRim)+' €';});
-  h+='<div class="card"><b>Magazzino ↔ P&amp;L</b><div class="note">La variazione delle rimanenze (saldo di magazzino meno saldo precedente) entra nel P&amp;L al mese del saldo. '+(rim.length?'Attualmente: '+esc(rim.join('; ')):'Nessuna variazione: inserisci un saldo "Rimanenze" 2026 oltre a quello di apertura.')+'</div></div>';
+  var rt=(r.rimanenze||[]).map(function(x){ return '<tr><td style="text-align:left">'+etm(x.m)+'</td><td>'+eur(x.saldo)+'</td><td class="'+cls(x.variazione)+'">'+(x.variazione?eur(x.variazione):'–')+'</td><td style="text-align:left">'+(x.reale?'saldo inserito':'da report magazzino (parametro)')+'</td></tr>'; }).join('');
+  h+='<div class="card"><b>Magazzino mese per mese ↔ P&amp;L</b><div class="note">Valore del magazzino SRL (merce consegnata a Paysolution da recuperare con le fatture) a fine mese. La variazione rispetto al mese prima entra nel P&amp;L: calo = costo del venduto. Dal 01/03 i saldi seguono il report del commercialista (consegna 40.983,61 + acquisti +8% − recuperi fatturati nel mese di emissione); al 31/10 il magazzino è 0. Un saldo inserito a mano in "Voci manuali" prevale sul parametro.</div>'
+    +(rt?'<div class="tw"><table><tr><th style="text-align:left">Mese</th><th>Rimanenza fine mese €</th><th>Variazione (P&amp;L) €</th><th style="text-align:left">Fonte</th></tr>'+rt+'</table></div>':'')+'</div>';
   return h+formVoce(true)+elencoVoci(true); }
 /* ── Simulazione di fine anno e prelievo utili ── */
 function simS(){ if(!S.sim){ var raw=null; try{ raw=(S.config&&S.config.sim)?JSON.parse(S.config.sim):null; }catch(e){} S.sim=E.simNorm(raw); } return S.sim; }
@@ -534,7 +538,7 @@ function vSimulazione(){ var s=simS(), mesi=s.mesi.map(etm);
    +'<div class="g" style="margin-top:8px"><div><label>Contributi a carico società su compensi %</label>'+numIn('contribPerc',s.contribPerc,'0.1')+'</div>'
    +'<div><label>Quota netta dei compensi pagata in banca %</label>'+numIn('nettoPerc',s.nettoPerc,'0.1')+'</div>'
    +'<div><label>Ammortamenti / accantonamenti TFM 2026 €</label>'+numIn('altreRettifiche',s.altreRettifiche)+'</div></div>'
-   +'<div style="margin-top:10px"><b>Rimanenza di magazzino a fine mese</b><div class="note">Valore del magazzino (€) alla fine del mese. Al 31/10/2026 è 0 (stock venduto alla SRLS, dato confermato). Lascia vuoto per "invariata rispetto al mese prima". La variazione entra nel P&amp;L.</div>'
+   +'<div style="margin-top:10px"><b>Rimanenza di magazzino a fine mese</b><div class="note">Valore del magazzino (€) alla fine del mese. Al 31/10/2026 è 0 (stock ceduto alla SRLS e saldato con FE-00130, dato confermato); da novembre riparte da zero. Lascia vuoto per "invariata rispetto al mese prima". La variazione entra nel P&amp;L.</div>'
    +'<div class="g">'+s.mesi.map(function(m,i){ return '<div><label>Rimanenza al '+(m.slice(5)==='11'?'30/11':'31/12')+' €</label>'+numIn('rimanenze.'+i,s.rimanenze[i])+'</div>'; }).join('')+'</div></div>'
    +'<div style="margin-top:10px"><b>Macchina laser (bene strumentale in transito)</b><div class="note">Acquistata in Cina, sarà venduta alla SRLS al prezzo di acquisto + ricarico. Entra nella simulazione come ricavo (prezzo) e costo (valore del bene): resta la plusvalenza; l\'IVA è sul prezzo di vendita.</div>'
    +'<div class="g"><div><label>Includere la cessione</label><select data-sim="laser.attiva"><option value="1"'+(s.laser.attiva?' selected':'')+'>Sì</option><option value="0"'+(!s.laser.attiva?' selected':'')+'>No</option></select></div>'
