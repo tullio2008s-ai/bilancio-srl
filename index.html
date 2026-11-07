@@ -26,15 +26,28 @@ input,select,textarea{width:100%;padding:8px;border:1px solid var(--ln);border-r
 button.p{background:var(--ac);color:#fff;border:0;padding:9px 16px;border-radius:8px;font:inherit;cursor:pointer;margin:10px 6px 0 0}
 button.l{background:none;border:1px solid var(--ln);color:var(--tx);padding:5px 10px;border-radius:8px;cursor:pointer;font:inherit;font-size:12px}
 .ck{display:flex;gap:8px;padding:3px 0;font-size:13px}.ok{color:var(--ok)}.ko{color:var(--ko)}.wa{color:var(--wa)}
-table.fit{font-size:12px}table.fit th,table.fit td{padding:5px 5px}table.fit td:first-child,table.fit th:first-child{white-space:normal;min-width:150px;max-width:230px}
+table.fit{table-layout:fixed;width:100%;min-width:880px;font-size:clamp(9.5px,.8vw,12.5px);font-variant-numeric:tabular-nums}
+table.fit th,table.fit td{padding:4px 4px;overflow:hidden;text-overflow:clip}
+table.fit th:first-child,table.fit td:first-child{white-space:normal;width:21%;position:static;line-height:1.25}
+table.fit thead th{background:var(--bg);color:var(--mu);font-weight:600;text-transform:uppercase;font-size:.88em;letter-spacing:.02em;border-bottom:2px solid var(--ln)}
+table.fit th:last-child,table.fit td:last-child{width:7.4%;font-weight:700;background:color-mix(in srgb,var(--ac) 7%,transparent);border-left:1px solid var(--ln)}
+table.fit tr.t td{background:color-mix(in srgb,var(--ac) 10%,var(--card));border-top:1px solid var(--ln);border-bottom:2px solid var(--ln)}
+table.fit tbody tr:hover td{background:color-mix(in srgb,var(--ac) 6%,var(--card))}
+table.fit tr.s td{font-size:.95em}
+table.fit td.fonte{font-size:.82em;color:var(--mu);white-space:normal;line-height:1.15}
+.card.tw{overflow-x:auto;padding:10px}
 tr.tt td{font-weight:700;background:var(--bg);border-top:2px solid var(--ln)}
 .bar{display:flex;gap:8px;align-items:center;justify-content:flex-end;margin-bottom:8px}.bar .note{margin-right:auto}
 .pdfhead{display:none}
 body.pdfmode{background:#fff;color:#1b2433;--bg:#f4f6fa;--card:#fff;--tx:#1b2433;--mu:#66728a;--ln:#dde3ee;--ac:#1f4e9c;--ok:#1a7f4b;--ko:#b3261e;--wa:#a86400}
 body.pdfmode header,body.pdfmode nav,body.pdfmode .bar,body.pdfmode .demo{display:none!important}
-body.pdfmode main{max-width:none;width:1500px;margin:0;padding:10px}body.pdfmode .tw{overflow:visible}
+body.pdfmode main{max-width:none;width:1500px;margin:0;padding:10px}body.pdfmode .tw,body.pdfmode .card.tw{overflow:visible}
+body.pdfmode table.fit{min-width:0;font-size:12px}body.pdfmode table.fit th,body.pdfmode table.fit td{padding:3px 5px}body.pdfmode table.fit th:first-child,body.pdfmode table.fit td:first-child{width:20%}body.pdfmode .card{break-inside:avoid}body.pdfmode .pbk{break-before:page;page-break-before:always}
 body.pdfmode .pdfhead{display:block;margin-bottom:8px}body.pdfmode .pdfhead b{font-size:18px}
-@media print{header,nav,.bar,.demo{display:none!important}main{max-width:none;padding:0}.tw{overflow:visible}.pdfhead{display:block;margin-bottom:6px}@page{size:A4 landscape;margin:8mm}}
+@media print{header,nav,.bar,.demo{display:none!important}main{max-width:none;padding:0}.tw,.card.tw{overflow:visible}.pdfhead{display:block;margin-bottom:6px}@page{size:A4 landscape;margin:8mm}
+html,body{background:#fff!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}.card{border:0;border-radius:0;padding:0 0 6px;margin-bottom:6px;break-inside:avoid;page-break-inside:avoid}
+table.fit{min-width:0;font-size:9.4px}table.fit th,table.fit td{padding:2.5px 3px}table.fit th:first-child,table.fit td:first-child{width:19%}table.fit thead{display:table-header-group}table.fit tr{break-inside:avoid;page-break-inside:avoid}
+.pbk{break-before:page;page-break-before:always}}
 .note{font-size:12px;color:var(--mu)}.hid{display:none}
 </style></head><body>
 <header><h1>Bilancio SRL <small>Tullio Serci S.r.l. · gestionale riservato</small></h1><small id="utente"></small><button class="l" id="exit" data-a="logout" style="color:#fff;border-color:#fff8">Esci</button></header>
@@ -476,7 +489,7 @@ function vRiepilogo(r){ var t=r.totali, ok=r.controlli.every(function(c){return 
 function grafico(r){ var svg=document.getElementById('gr'); if(!svg) return; var v=r.mesi.map(function(m){return m.utileCum;}), mx=Math.max.apply(null,v.concat([1])), mn=Math.min.apply(null,v.concat([0])), W=640,H=180,pb=22,n=v.length,bw=W/n,sc=(H-pb-10)/(mx-mn||1),z=10+mx*sc,h='';
   v.forEach(function(x,i){ var hh=Math.abs(x)*sc, y=x>=0?z-hh:z; h+='<rect x="'+(i*bw+4)+'" y="'+y+'" width="'+(bw-8)+'" height="'+Math.max(hh,1)+'" fill="'+(x>=0?'#1a7f4b':'#b3261e')+'"/><text x="'+(i*bw+bw/2)+'" y="'+(H-6)+'" font-size="10" text-anchor="middle" fill="#888">'+etm(r.mesi[i].m).slice(0,3)+'</text>'; });
   svg.innerHTML=h+'<line x1="0" x2="'+W+'" y1="'+z+'" y2="'+z+'" stroke="#888" stroke-width=".5"/>'; }
-function tab(head,rows,lab){ return '<div class="card tw"><table class="fit"><tr><th style="text-align:left;font-size:11px;color:var(--mu)">'+(lab||'€ · IVA ESCLUSA')+'</th>'+head.map(function(h){return '<th>'+h+'</th>';}).join('')+'</tr>'+rows.join('')+'</table></div>'; }
+function tab(head,rows,lab){ return '<div class="card tw"><table class="fit"><thead><tr><th style="text-align:left">'+(lab||'€ · IVA ESCLUSA')+'</th>'+head.map(function(h){return '<th>'+h+'</th>';}).join('')+'</tr></thead><tbody>'+rows.join('')+'</tbody></table></div>'; }
 function rowM(l,r,f,o){ o=o||{}; return '<tr class="'+(o.t?'t':'')+(o.s?' s':'')+'"><td>'+l+'</td>'+r.mesi.map(function(m){var x=f(m);return '<td class="'+(o.c?cls(x):'')+'">'+eur(x)+'</td>';}).join('')+'<td class="'+(o.c?cls(o.tot):'')+'">'+eur(o.tot)+'</td></tr>'; }
 var pct=function(x,tot){ return tot>0.004 ? IT.format(Math.round(x/tot*1000)/10)+' %' : '–'; };
 function rowP(l,r,f,o){ o=o||{}; return '<tr class="s"><td>'+l+'</td>'+r.mesi.map(function(m){var x=f(m);return '<td class="'+(o.c?cls(x):'')+'">'+pct(x,m.ricavi)+'</td>';}).join('')+'<td class="'+(o.c?cls(o.tot):'')+'">'+pct(o.tot,r.totali.ricavi)+'</td></tr>'; }
@@ -493,8 +506,8 @@ function dettaglioCat(r){ var tot={}, tipo={};
   if(sum(r,function(m){return m.ricaviDash;})) rows.push(rowD('Ricavi da Dashboard V6 (IVA esclusa)',function(m){return m.ricaviDash;}));
   rows.push(rowT('TOTALE FATTURATO (IVA esclusa)',function(m){return m.ricavi;}));
   cosIds.forEach(function(k){ rows.push(rowC(k)); });
-  rows.push(rowD('Costi da Dashboard V6 (IVA esclusa)',function(m){return m.costiDash;})); rows.push(rowT('TOTALE COSTI (IVA esclusa)',function(m){return m.costi;}));
-  return '<div class="card"><b>Dettaglio per categoria e incidenza sul fatturato</b></div>'+tab(h,rows,'€ · IVA ESCLUSA (imponibili)')+'<div class="note">Importi IVA esclusa; fa eccezione l\'IVA indetraibile, che è un costo. Le voci "da Dashboard V6" non hanno dettaglio per categoria. % = importo / ricavi totali del periodo.</div>'; }
+  if(sum(r,function(m){return m.costiDash;})) rows.push(rowD('Costi da Dashboard V6 (IVA esclusa)',function(m){return m.costiDash;})); rows.push(rowT('TOTALE COSTI (IVA esclusa)',function(m){return m.costi;}));
+  return '<div class="card pbk"><b>Dettaglio per categoria e incidenza sul fatturato</b></div>'+tab(h,rows,'€ · IVA ESCLUSA (imponibili)')+'<div class="note">Importi IVA esclusa; fa eccezione l\'IVA indetraibile, che è un costo. Le voci "da Dashboard V6" non hanno dettaglio per categoria. % = importo / ricavi totali del periodo.</div>'; }
 function sum(r,f){ return r.mesi.reduce(function(s,m){return s+f(m);},0); }
 function vPL(r){ var h=r.mesi.map(function(m){return etm(m.m);}).concat(['Totale']);
   var ricRows=E.CATEGORIE.filter(function(c){return c.tipo==='ricavo'&&!c.finanziario;}).map(function(c){
@@ -502,7 +515,7 @@ function vPL(r){ var h=r.mesi.map(function(m){return etm(m.m);}).concat(['Totale
   if(sum(r,function(m){return m.ricaviDash;})) ricRows.push(rowM('Ricavi da Dashboard V6 (IVA esclusa)',r,function(m){return m.ricaviDash;},{tot:sum(r,function(m){return m.ricaviDash;})}));
   var rows=ricRows.concat([
    rowM('RICAVI = TOTALE FATTURATO (IVA esclusa)',r,function(m){return m.ricavi;},{t:1,tot:r.totali.ricavi}),
-   rowM('Costi da Dashboard V6 (IVA esclusa)',r,function(m){return m.costiDash;},{tot:sum(r,function(m){return m.costiDash;})}),
+   ].concat(sum(r,function(m){return m.costiDash;})?[rowM('Costi da Dashboard V6 (IVA esclusa)',r,function(m){return m.costiDash;},{tot:sum(r,function(m){return m.costiDash;})})]:[]).concat([
    rowM('Costi manuali — IVA esclusa (IVA indetraibile inclusa)',r,function(m){return m.costiMan;},{tot:sum(r,function(m){return m.costiMan;})}),
    rowM('COSTI (IVA esclusa)',r,function(m){return m.costi;},{t:1,tot:r.totali.costi}),
    rowP('% costi sul fatturato',r,function(m){return m.costi;},{tot:r.totali.costi}),
@@ -511,9 +524,9 @@ function vPL(r){ var h=r.mesi.map(function(m){return etm(m.m);}).concat(['Totale
    rowM('UTILE / PERDITA (al netto IVA)',r,function(m){return m.utile;},{t:1,c:1,tot:r.totali.utile}),
    rowP('% utile sul fatturato',r,function(m){return m.utile;},{c:1,tot:r.totali.utile}),
    rowM('Utile cumulato',r,function(m){return m.utileCum;},{c:1,tot:r.totali.utile}),
-   rowM('Fonte Dashboard',r,function(){return 0;},{s:1,tot:0}).replace(/<td class="">0,00<\/td>/g,'<td></td>')]);
-  rows[rows.length-1]='<tr class="s"><td>Fonte Dashboard</td>'+r.mesi.map(function(m){return '<td>'+esc(m.fonte)+'</td>';}).join('')+'<td></td></tr>';
-  return tab(h,rows)+dettaglioCat(r)+'<div class="note">F24 ritenute e simili versamenti non sono costi: '+eur(r.totali.uscitaNonCosto)+' € registrati fuori dal P&L.</div>'; }
+   rowM('Fonte Dashboard',r,function(){return 0;},{s:1,tot:0}).replace(/<td class="">0,00<\/td>/g,'<td></td>')]));
+  rows[rows.length-1]='<tr class="s"><td>Fonte Dashboard (legenda sotto)</td>'+r.mesi.map(function(m){ var f=m.fonte||'', sh=f.replace('fatture intercompany','fatt. IC').replace('chiusura','chius.').replace(/ - esclusa \(.*\)/,' ✗'); return '<td class="fonte" title="'+esc(f)+'">'+esc(sh)+'</td>'; }).join('')+'<td></td></tr>';
+  return tab(h,rows)+'<div class="note">Fonte Dashboard: chius. = chiusura mensile · fatt. IC = fatture intercompany approvate · ✗ = Dashboard esclusa perché le fatture Paysolution sono già nelle voci manuali (passa il mouse sulla cella per il dettaglio).</div>'+dettaglioCat(r)+'<div class="note">F24 ritenute e simili versamenti non sono costi: '+eur(r.totali.uscitaNonCosto)+' € registrati fuori dal P&L.</div>'; }
 function vIva(r){ var h=r.mesi.map(function(m){return etm(m.m);}).concat(['Totale']);
   return '<div class="note">Questa pagina mostra l\'IVA (l\'imposta), non gli imponibili.</div>'+tab(h,[rowM('IVA a debito (vendite)',r,function(m){return m.ivaDeb;},{tot:r.totali.ivaDeb}),
    rowM('IVA a credito (acquisti detraibili)',r,function(m){return m.ivaCred;},{tot:r.totali.ivaCred}),
