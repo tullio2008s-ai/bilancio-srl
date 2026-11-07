@@ -651,7 +651,7 @@ function simKpi(){ var o=simRun(), t=o.res.totali, ok=t.utile>=0;
   return '<div class="kpis"><div class="kpi card"><span>Risultato ante imposte a fine anno (con la previsione)</span><b class="'+cls(t.utile)+'">'+eur(t.utile)+' €</b></div>'
    +'<div class="kpi card"><span>'+(ok?'Costi ancora sostenibili in più, restando in utile':'Mancano per arrivare in utile (meno costi o più ricavi)')+'</span><b class="'+(ok?'pos':'neg')+'">'+eur(Math.abs(t.utile))+' €</b></div>'
    +'<div class="kpi card"><span>Utile dopo imposte stimate</span><b class="'+cls(t.utileNetto)+'">'+eur(t.utileNetto)+' €</b></div></div>'; }
-function simSalva(){ return '<button class="l" data-a="simreset" style="margin-right:8px">Ripristina scenario concordato 07/11</button><button class="p" data-a="salvasim">Salva previsione</button><span id="msg" class="note"></span>'; }
+function simSalva(){ return '<button class="l" data-a="simreset" style="margin-right:8px">Ripristina scenario concordato 07/11</button><button class="l" data-a="simzero" style="margin-right:8px">Azzera previsione (dopo aver importato le voci)</button><button class="p" data-a="salvasim">Salva previsione</button><span id="msg" class="note"></span>'; }
 function vSimulazione(){ var s=simS(), mesi=s.mesi.map(etm);
   var reg=function(rg,m){ if(!rg.cat) return null; return S.voci.filter(function(v){ return !v.eliminata&&v.categoria===rg.cat&&String(v.competenza).slice(0,7)===m; }).reduce(function(t,v){return t+(+v.imponibile||0);},0); };
   var rows='', gr='';
@@ -753,6 +753,7 @@ async function azione(a,id){
     else if(a==='salvaparam'){ S.config=await call('apiSalvaConfig',{inizio:val('p_inizio'),mesi:val('p_mesi'),ires:val('p_ires'),irap:val('p_irap'),ivaPeriodo:val('p_ivaPeriodo'),includeAcquistiSrl:val('p_inc'),includeDashboard:val('p_dash'),includeRimanenze:val('p_rim')}); msg('Parametri salvati'); render(); }
     else if(a==='login'){ var rr=await call('apiLogin',val('l_u'),val('l_p')); TOKEN=rr.token; try{sessionStorage.setItem('bsrl_t',TOKEN);}catch(e){} await avvia(); }
     else if(a==='logout'){ try{await call('apiLogout');}catch(e){} esci(); }
+    else if(a==='simzero'){ var z=simS(); Object.keys(z.righe).forEach(function(k){ z.righe[k]=z.righe[k].map(function(){return 0;}); }); render(); msg('Previsione azzerata: premi "Salva previsione" per conservarla'); }
     else if(a==='simreset'){ S.sim=E.simNorm(null); render(); msg('Scenario ripristinato: premi "Salva previsione" per conservarlo'); }
     else if(a==='salvasim'){ S.config=await call('apiSalvaConfig',{sim:JSON.stringify(simS())}); msg('Previsione salvata'); }
     else if(a==='pdf'){ await salvaPdf(); }
