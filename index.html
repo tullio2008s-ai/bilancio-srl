@@ -80,7 +80,7 @@ button.l{background:none;border:1px solid var(--ln);color:var(--tx);padding:5px 
   ];
   var PARAMS_DEFAULT = {
     inizio: '2026-01', mesi: 12, ires: 24, irap: 3.9,
-    ivaPeriodo: 'mensile', includeAcquistiSrl: false, includeDashboard: true, includeRimanenze: true
+    ivaPeriodo: 'mensile', includeAcquistiSrl: false, includeDashboard: true, includeRimanenze: true, rimanenzeConf: { '2026-10': 0 }
   };
 
   function r2(x) { return Math.round((x + Number.EPSILON) * 100) / 100; }
@@ -128,11 +128,13 @@ button.l{background:none;border:1px solid var(--ln);color:var(--tx);padding:5px 
     mesi.forEach(function (m) { idx[m] = true; });
     var dash = daDashboard(P.includeDashboard === false ? {} : input.dash, P);
     var avvisi = [], rows = {};
-    var snap = snapshot(input.voci, cats), varRimMese = {}, prevRim = null;
-    snap.forEach(function (s) {
-      if (s.items.sp_rimanenze === undefined) return;
-      if (prevRim !== null && s.m >= P.inizio && P.includeRimanenze !== false) varRimMese[s.m] = (varRimMese[s.m] || 0) + s.items.sp_rimanenze - prevRim;
-      prevRim = s.items.sp_rimanenze;
+    var snap = snapshot(input.voci, cats), varRimMese = {}, prevRim = null, rimSer = {};
+    snap.forEach(function (s) { if (s.items.sp_rimanenze !== undefined) rimSer[s.m] = s.items.sp_rimanenze; });
+    /* Saldi di magazzino confermati dall'utente (es. 31/10/2026 = 0): valgono solo dove non c'e' un saldo inserito. */
+    Object.keys(P.rimanenzeConf || {}).forEach(function (m) { if (rimSer[m] === undefined) rimSer[m] = +P.rimanenzeConf[m] || 0; });
+    Object.keys(rimSer).sort().forEach(function (m) {
+      if (prevRim !== null && m >= P.inizio && P.includeRimanenze !== false) varRimMese[m] = (varRimMese[m] || 0) + rimSer[m] - prevRim;
+      prevRim = rimSer[m];
     });
     mesi.forEach(function (m) {
       var d = dash.mesi[m] || vuoto();
@@ -272,7 +274,8 @@ button.l{background:none;border:1px solid var(--ln);color:var(--tx);padding:5px 
     mesi: ['2026-11', '2026-12'],
     righe: { serviziFatt: [0, 0], venditeGett: [0, 0], acqMateriali: [0, 0], acqServizi: [0, 0], compensi: [0, 0], f24: [0, 0] },
     iva: { serviziFatt: 22, venditeGett: 22, acqMateriali: 22, acqServizi: 22 },
-    contribPerc: 17, nettoPerc: 60, rimanenzeFinali: '', altreRettifiche: 0,
+    contribPerc: 17, nettoPerc: 60, rimanenze: ['', ''], altreRettifiche: 0,
+    laser: { attiva: true, costo: 4642.22, ricarico: 8, iva: 22, mese: '2026-12' },
     dividendo: 0, ritenuta: 26, usaRiserve: true,
     soci: [{ nome: 'Tullio Serci', cap: 60, div: 10 }, { nome: 'Rosanna Garaguso', cap: 30, div: 50 },
            { nome: 'Matteo Serci', cap: 5, div: 20 }, { nome: 'Francesca Maria Serci', cap: 5, div: 20 }]
@@ -284,6 +287,8 @@ button.l{background:none;border:1px solid var(--ln);color:var(--tx);padding:5px 
       if (k === 'righe' || k === 'iva') Object.keys(o[k]).forEach(function (j) { if (s[k][j] !== undefined) o[k][j] = s[k][j]; });
       else o[k] = s[k];
     });
+    if (s.rimanenzeFinali !== undefined && String(s.rimanenzeFinali) !== '' && !(s.rimanenze && s.rimanenze.some(function (x) { return String(x) !== ''; }))) o.rimanenze[o.rimanenze.length - 1] = s.rimanenzeFinali;
+    o.laser = Object.assign({}, SIM_DEFAULT.laser, s.laser || {});
     return o;
   }
   function num(x) { var n = parseFloat(x); return isFinite(n) ? n : 0; }
@@ -305,13 +310,28 @@ button.l{background:none;border:1px solid var(--ln);color:var(--tx);padding:5px 
       });
     });
     if (num(S.altreRettifiche)) voci.push({ id: 'sim-rett', categoria: 'ammortamenti', data: S.mesi[S.mesi.length - 1] + '-28', competenza: S.mesi[S.mesi.length - 1], descrizione: 'SIMULAZIONE ammortamenti/accantonamenti (non monetari)', imponibile: num(S.altreRettifiche), iva: 0, detraibile: false, simulata: true });
-    var ultimo = S.mesi[S.mesi.length - 1];
-    var haRimFin = voci.some(function (v) { return v.categoria === 'sp_rimanenze' && !v.eliminata && String(v.competenza).slice(0, 7) === ultimo; });
-    if (String(S.rimanenzeFinali) !== '' && !haRimFin) voci.push({ id: 'sim-rim', categoria: 'sp_rimanenze', data: ultimo + '-31', competenza: ultimo, descrizione: 'SIMULAZIONE rimanenze finali', imponibile: num(S.rimanenzeFinali), iva: 0, simulata: true });
+    S.mesi.forEach(function (m, i) {
+      var haRim = voci.some(function (v) { return v.categoria === 'sp_rimanenze' && !v.eliminata && String(v.competenza).slice(0, 7) === m; });
+      if (String(S.rimanenze[i]) !== '' && S.rimanenze[i] !== null && !haRim) voci.push({ id: 'sim-rim-' + m, categoria: 'sp_rimanenze', data: m + '-31', competenza: m, descrizione: 'SIMULAZIONE rimanenza a fine mese', imponibile: num(S.rimanenze[i]), iva: 0, simulata: true });
+    });
+    /* Macchina laser (bene strumentale in transito) venduta alla SRLS a costo + ricarico: ricavo = prezzo, costo = valore del bene ceduto
+       (resta la plusvalenza), IVA sul prezzo, incasso a cassa, bene tolto dalle immobilizzazioni. */
+    var L = S.laser, laser = null;
+    if (L && L.attiva && num(L.costo) > 0 && S.mesi.indexOf(L.mese) >= 0) {
+      var prezzo = r2(num(L.costo) * (1 + num(L.ricarico) / 100)), ivaL = r2(prezzo * num(L.iva) / 100), dL = L.mese + '-28';
+      voci.push({ id: 'sim-laser-ricavo', categoria: 'intercompany_ricavo', data: dL, competenza: L.mese, descrizione: 'SIMULAZIONE cessione macchina laser a SRLS', imponibile: prezzo, iva: ivaL, detraibile: true, simulata: true });
+      voci.push({ id: 'sim-laser-costo', categoria: 'altri', data: dL, competenza: L.mese, descrizione: 'SIMULAZIONE valore residuo macchina laser ceduta', imponibile: num(L.costo), iva: 0, detraibile: false, simulata: true });
+      cassa.incassi += prezzo + ivaL;
+      var immPrima = null;
+      snapshot(input.voci, (function () { var c = {}; (input.categorie || CATEGORIE).forEach(function (x) { c[x.id] = x; }); return c; })()).forEach(function (x) { if (x.m < L.mese && x.items.sp_immob_mat !== undefined) immPrima = x.items.sp_immob_mat; });
+      if (immPrima !== null && !voci.some(function (v) { return v.categoria === 'sp_immob_mat' && !v.eliminata && String(v.competenza).slice(0, 7) === L.mese; }))
+        voci.push({ id: 'sim-laser-imm', categoria: 'sp_immob_mat', data: L.mese + '-31', competenza: L.mese, descrizione: 'SIMULAZIONE immobilizzazioni dopo cessione laser', imponibile: r2(immPrima - num(L.costo)), iva: 0, simulata: true });
+      laser = { prezzo: prezzo, iva: ivaL, plusvalenza: r2(prezzo - num(L.costo)), mese: L.mese };
+    }
     var res = calcola(Object.assign({}, input, { voci: voci }));
     var sp = statoPatrimoniale(res, input.voci, input.categorie).filter(function (s) { return !s.apertura; });
     var ultSp = sp.length ? sp[sp.length - 1] : null, cassaIniz = ultSp && ultSp.items.sp_disponibilita !== undefined ? ultSp.items.sp_disponibilita : 0;
-    var out = { sim: S, res: res, cassa: { iniziale: cassaIniz, data: ultSp ? ultSp.m : '', incassi: r2(cassa.incassi), pagamenti: r2(cassa.pagamenti), finale: r2(cassaIniz + cassa.incassi - cassa.pagamenti) } };
+    var out = { sim: S, laser: laser, res: res, cassa: { iniziale: cassaIniz, data: ultSp ? ultSp.m : '', incassi: r2(cassa.incassi), pagamenti: r2(cassa.pagamenti), finale: r2(cassaIniz + cassa.incassi - cassa.pagamenti) } };
     out.utili = dividendi(res, S, input.voci, input.categorie, out.cassa);
     return out;
   }
@@ -513,8 +533,15 @@ function vSimulazione(){ var s=simS(), mesi=s.mesi.map(etm);
    +'<div class="tw"><table><tr><th style="text-align:left">Voce</th>'+mesi.map(function(m){return '<th>'+m+' €</th>';}).join('')+'<th>IVA %</th></tr>'+rows+'</table></div>'
    +'<div class="g" style="margin-top:8px"><div><label>Contributi a carico società su compensi %</label>'+numIn('contribPerc',s.contribPerc,'0.1')+'</div>'
    +'<div><label>Quota netta dei compensi pagata in banca %</label>'+numIn('nettoPerc',s.nettoPerc,'0.1')+'</div>'
-   +'<div><label>Magazzino finale previsto al 31/12 € (vuoto = non simulare)</label>'+numIn('rimanenzeFinali',s.rimanenzeFinali)+'</div>'
-   +'<div><label>Ammortamenti / accantonamenti TFM 2026 €</label>'+numIn('altreRettifiche',s.altreRettifiche)+'</div></div>'+simSalva()+'</div><div id="simres">'+simRes('simulazione')+'</div>'; }
+   +'<div><label>Ammortamenti / accantonamenti TFM 2026 €</label>'+numIn('altreRettifiche',s.altreRettifiche)+'</div></div>'
+   +'<div style="margin-top:10px"><b>Rimanenza di magazzino a fine mese</b><div class="note">Valore del magazzino (€) alla fine del mese. Al 31/10/2026 è 0 (stock venduto alla SRLS, dato confermato). Lascia vuoto per "invariata rispetto al mese prima". La variazione entra nel P&amp;L.</div>'
+   +'<div class="g">'+s.mesi.map(function(m,i){ return '<div><label>Rimanenza al '+(m.slice(5)==='11'?'30/11':'31/12')+' €</label>'+numIn('rimanenze.'+i,s.rimanenze[i])+'</div>'; }).join('')+'</div></div>'
+   +'<div style="margin-top:10px"><b>Macchina laser (bene strumentale in transito)</b><div class="note">Acquistata in Cina, sarà venduta alla SRLS al prezzo di acquisto + ricarico. Entra nella simulazione come ricavo (prezzo) e costo (valore del bene): resta la plusvalenza; l\'IVA è sul prezzo di vendita.</div>'
+   +'<div class="g"><div><label>Includere la cessione</label><select data-sim="laser.attiva"><option value="1"'+(s.laser.attiva?' selected':'')+'>Sì</option><option value="0"'+(!s.laser.attiva?' selected':'')+'>No</option></select></div>'
+   +'<div><label>Costo di acquisto € (con dogana)</label>'+numIn('laser.costo',s.laser.costo)+'</div>'
+   +'<div><label>Ricarico %</label>'+numIn('laser.ricarico',s.laser.ricarico,'0.1')+'</div>'
+   +'<div><label>IVA sulla vendita %</label>'+numIn('laser.iva',s.laser.iva,'0.1')+'</div>'
+   +'<div><label>Mese della vendita</label><select data-sim="laser.mese">'+s.mesi.map(function(m){return '<option value="'+m+'"'+(s.laser.mese===m?' selected':'')+'>'+etm(m)+'</option>';}).join('')+'</select></div></div></div>'+simSalva()+'</div><div id="simres">'+simRes('simulazione')+'</div>'; }
 function simRes(tab){ var o=simRun(), r=S.__base||calc(), b=r.totali, t=o.res.totali, c=o.cassa;
   if(tab==='utili') return utiliRes(o);
   var riga=function(l,x,y,cl){ return '<tr><td style="text-align:left">'+l+'</td><td>'+eur(x)+'</td><td>'+eur(y)+'</td><td class="'+(cl?cls(y-x):'')+'">'+eur(y-x)+'</td></tr>'; };
@@ -523,6 +550,7 @@ function simRes(tab){ var o=simRun(), r=S.__base||calc(), b=r.totali, t=o.res.to
    +'<tr class="t"><td style="text-align:left">UTILE ANTE IMPOSTE</td><td class="'+cls(b.utile)+'">'+eur(b.utile)+'</td><td class="'+cls(t.utile)+'">'+eur(t.utile)+'</td><td>'+eur(t.utile-b.utile)+'</td></tr>'
    +riga('Imposte stimate (IRES + IRAP)',b.imposte,t.imposte)+'<tr class="t"><td style="text-align:left">UTILE DOPO IMPOSTE</td><td class="'+cls(b.utileNetto)+'">'+eur(b.utileNetto)+'</td><td class="'+cls(t.utileNetto)+'">'+eur(t.utileNetto)+'</td><td>'+eur(t.utileNetto-b.utileNetto)+'</td></tr>'
    +riga('IVA da versare nel periodo',b.ivaVersare,t.ivaVersare)+riga('% utile ante imposte sul fatturato',b.ricavi?b.utile/b.ricavi*100:0,t.ricavi?t.utile/t.ricavi*100:0)+'</table></div>'
+   +(o.laser?'<div class="card"><b>Cessione macchina laser alla SRLS</b><div class="note">Prezzo '+eur(o.laser.prezzo)+' € + IVA '+eur(o.laser.iva)+' € · plusvalenza (utile) '+eur(o.laser.plusvalenza)+' € · mese: '+etm(o.laser.mese)+'</div></div>':'')
    +'<div class="card"><b>Cassa prevista</b><div class="note">Indicativa: parte dal saldo di banche e cassa del '+esc(c.data||'—')+' e considera incassi e pagamenti simulati (IVA inclusa) e gli F24 inseriti. Non include gli F24 già maturati e non pagati né le fatture da saldare.</div>'
    +'<div class="tw"><table><tr><td style="text-align:left">Saldo iniziale</td><td>'+eur(c.iniziale)+'</td></tr><tr><td style="text-align:left">+ Incassi simulati (con IVA)</td><td>'+eur(c.incassi)+'</td></tr><tr><td style="text-align:left">− Pagamenti simulati (acquisti con IVA, compensi netti, F24)</td><td>'+eur(c.pagamenti)+'</td></tr><tr class="t"><td style="text-align:left">Cassa prevista a fine anno</td><td class="'+cls(c.finale)+'">'+eur(c.finale)+'</td></tr></table></div></div>'
    +'<div class="card"><b>P&amp;L mensile simulato</b></div>'+vPL(o.res); }
@@ -585,7 +613,7 @@ async function azione(a,id){
 async function ricarica(){ var st=await call('apiStato'); S.voci=st.voci; S.config=st.config||{}; document.getElementById('utente').textContent=st.utente||''; if(S.tab==='storico') S.storico=await call('apiStorico'); render(); }
 document.addEventListener('click',function(e){ var t=e.target.closest('[data-t]'); if(t){ S.tab=t.dataset.t; if(S.tab==='storico') call('apiStorico').then(function(x){S.storico=x;render();}); else render(); return; }
   var a=e.target.closest('[data-a]'); if(a) azione(a.dataset.a,a.dataset.id); });
-function simAgg(e){ var p=e.target.dataset&&e.target.dataset.sim; if(!p) return; var v=e.target.value; if(p==='usaRiserve') v=(v==='1'); else if(!/\.nome$/.test(p)) v=v===''?'':v; simPath(p,v); var d=document.getElementById('simres'); if(d) d.innerHTML=simRes(S.tab); }
+function simAgg(e){ var p=e.target.dataset&&e.target.dataset.sim; if(!p) return; var v=e.target.value; if(p==='usaRiserve'||p==='laser.attiva') v=(v==='1'); else if(!/\.nome$/.test(p)) v=v===''?'':v; simPath(p,v); var d=document.getElementById('simres'); if(d) d.innerHTML=simRes(S.tab); }
 document.addEventListener('input',simAgg); document.addEventListener('change',simAgg);
 document.addEventListener('change',function(e){ if(e.target.id!=='imp'||!e.target.files[0]) return; var f=e.target.files[0], rd=new FileReader();
   rd.onload=async function(){ try{ var l=JSON.parse(rd.result); if(!Array.isArray(l)) throw new Error('Il file deve contenere un elenco di voci'); var n=await call('apiImportaVoci',l); await ricarica(); render(); msg(typeof n==='object'?('Importate '+n.importate+' voci; '+n.saltate+' gia\' presenti e saltate (anti-duplicati)'):('Importate '+n+' voci')); }catch(x){ msg('Importazione fallita: '+x.message,1); } }; rd.readAsText(f); });
