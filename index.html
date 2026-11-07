@@ -257,7 +257,95 @@ button.l{background:none;border:1px solid var(--ln);color:var(--tx);padding:5px 
     return c;
   }
 
-  var api = { CATEGORIE: CATEGORIE, PARAMS_DEFAULT: PARAMS_DEFAULT, calcola: calcola, statoPatrimoniale: statoPatrimoniale, daDashboard: daDashboard, elencoMesi: elencoMesi, r2: r2 };
+  /* ── Simulazione di fine anno e prelievo utili ──
+     La simulazione aggiunge voci "sim-*" ai dati reali e rilancia calcola(): nessun numero e' calcolato due volte.
+     Gli importi inseriti sono IMPONIBILI per mese (da novembre a dicembre). */
+  var SIM_RIGHE = [
+    { id: 'serviziFatt', nome: 'Fatture servizi (ricavi)', cat: 'servizi', ricavo: true },
+    { id: 'venditeGett', nome: 'Vendite gettoniere (ricavi)', cat: 'vendite', ricavo: true },
+    { id: 'acqMateriali', nome: 'Acquisto materiali', cat: 'acquisti_materiali' },
+    { id: 'acqServizi', nome: 'Acquisto servizi', cat: 'servizi_prof' },
+    { id: 'compensi', nome: 'Compensi amministratori (lordo)', cat: 'compensi_amm', noIva: true },
+    { id: 'f24', nome: 'Pagamento F24 (solo cassa)', noIva: true, soloCassa: true }
+  ];
+  var SIM_DEFAULT = {
+    mesi: ['2026-11', '2026-12'],
+    righe: { serviziFatt: [0, 0], venditeGett: [0, 0], acqMateriali: [0, 0], acqServizi: [0, 0], compensi: [0, 0], f24: [0, 0] },
+    iva: { serviziFatt: 22, venditeGett: 22, acqMateriali: 22, acqServizi: 22 },
+    contribPerc: 17, nettoPerc: 60, rimanenzeFinali: '', altreRettifiche: 0,
+    dividendo: 0, ritenuta: 26, usaRiserve: true,
+    soci: [{ nome: 'Tullio Serci', cap: 60, div: 10 }, { nome: 'Rosanna Garaguso', cap: 30, div: 50 },
+           { nome: 'Matteo Serci', cap: 5, div: 20 }, { nome: 'Francesca Maria Serci', cap: 5, div: 20 }]
+  };
+  function simNorm(s) {
+    var o = JSON.parse(JSON.stringify(SIM_DEFAULT)); s = s || {};
+    Object.keys(o).forEach(function (k) {
+      if (s[k] === undefined || s[k] === null) return;
+      if (k === 'righe' || k === 'iva') Object.keys(o[k]).forEach(function (j) { if (s[k][j] !== undefined) o[k][j] = s[k][j]; });
+      else o[k] = s[k];
+    });
+    return o;
+  }
+  function num(x) { var n = parseFloat(x); return isFinite(n) ? n : 0; }
+
+  function simula(input, simIn) {
+    var S = simNorm(simIn), voci = (input.voci || []).slice(), cassa = { incassi: 0, pagamenti: 0 };
+    SIM_RIGHE.forEach(function (rg) {
+      S.mesi.forEach(function (m, i) {
+        var imp = num(S.righe[rg.id][i]); if (!imp) return;
+        var iva = rg.noIva ? 0 : r2(imp * num(S.iva[rg.id]) / 100), data = m + '-28';
+        if (rg.soloCassa) { cassa.pagamenti += imp; return; }
+        voci.push({ id: 'sim-' + rg.id + '-' + m, categoria: rg.cat, data: data, competenza: m, descrizione: 'SIMULAZIONE ' + rg.nome, imponibile: imp, iva: iva, detraibile: true, simulata: true });
+        if (rg.ricavo) cassa.incassi += imp + iva;
+        else if (rg.id === 'compensi') {
+          var contr = r2(imp * num(S.contribPerc) / 100);
+          voci.push({ id: 'sim-contributi-' + m, categoria: 'contributi', data: data, competenza: m, descrizione: 'SIMULAZIONE contributi su compensi', imponibile: contr, iva: 0, detraibile: false, simulata: true });
+          cassa.pagamenti += imp * num(S.nettoPerc) / 100;       // il resto (ritenute e INPS) esce con l'F24 inserito a parte
+        } else cassa.pagamenti += imp + iva;
+      });
+    });
+    if (num(S.altreRettifiche)) voci.push({ id: 'sim-rett', categoria: 'ammortamenti', data: S.mesi[S.mesi.length - 1] + '-28', competenza: S.mesi[S.mesi.length - 1], descrizione: 'SIMULAZIONE ammortamenti/accantonamenti (non monetari)', imponibile: num(S.altreRettifiche), iva: 0, detraibile: false, simulata: true });
+    var ultimo = S.mesi[S.mesi.length - 1];
+    var haRimFin = voci.some(function (v) { return v.categoria === 'sp_rimanenze' && !v.eliminata && String(v.competenza).slice(0, 7) === ultimo; });
+    if (String(S.rimanenzeFinali) !== '' && !haRimFin) voci.push({ id: 'sim-rim', categoria: 'sp_rimanenze', data: ultimo + '-31', competenza: ultimo, descrizione: 'SIMULAZIONE rimanenze finali', imponibile: num(S.rimanenzeFinali), iva: 0, simulata: true });
+    var res = calcola(Object.assign({}, input, { voci: voci }));
+    var sp = statoPatrimoniale(res, input.voci, input.categorie).filter(function (s) { return !s.apertura; });
+    var ultSp = sp.length ? sp[sp.length - 1] : null, cassaIniz = ultSp && ultSp.items.sp_disponibilita !== undefined ? ultSp.items.sp_disponibilita : 0;
+    var out = { sim: S, res: res, cassa: { iniziale: cassaIniz, data: ultSp ? ultSp.m : '', incassi: r2(cassa.incassi), pagamenti: r2(cassa.pagamenti), finale: r2(cassaIniz + cassa.incassi - cassa.pagamenti) } };
+    out.utili = dividendi(res, S, input.voci, input.categorie, out.cassa);
+    return out;
+  }
+
+  /* Prelievo utili: tetto distribuibile = utile dopo imposte - 5% a riserva legale (fino al 20% del capitale) + riserve libere.
+     I soci sono persone fisiche: dividendi con ritenuta a titolo d'imposta (26%) versata dalla societa' con F24 entro il 16 del mese dopo. */
+  function dividendi(res, S, voci, categorie, cassa) {
+    var cats = {}; (categorie || CATEGORIE).forEach(function (c) { cats[c.id] = c; });
+    var snaps = snapshot(voci, cats), items = {};
+    snaps.forEach(function (s) { Object.keys(s.items).forEach(function (k) { if (cats[k].riporta) items[k] = s.items[k]; }); });
+    var T = res.totali, capitale = items.sp_capitale || 0, legale = items.sp_riserva_legale || 0;
+    var tettoLegale = Math.max(0, capitale * 0.2 - legale), accLegale = Math.min(Math.max(T.utileNetto, 0) * 0.05, tettoLegale);
+    var riserve = S.usaRiserve ? (items.sp_altre_riserve || 0) + (items.sp_utile_prec || 0) : 0;
+    var distribuibile = Math.max(0, Math.max(T.utileNetto, 0) - accLegale) + riserve;
+    var D = num(S.dividendo), rit = num(S.ritenuta), sd = 0, sc = 0;
+    var soci = S.soci.map(function (x) {
+      sd += num(x.div); sc += num(x.cap);
+      var lordo = r2(D * num(x.div) / 100), r = r2(lordo * rit / 100);
+      return { nome: x.nome, cap: num(x.cap), div: num(x.div), lordo: lordo, ritenuta: r, netto: r2(lordo - r) };
+    });
+    var totRit = r2(soci.reduce(function (a, x) { return a + x.ritenuta; }, 0)), totNetto = r2(soci.reduce(function (a, x) { return a + x.netto; }, 0));
+    var avv = [];
+    if (Math.abs(sd - 100) > 0.001) avv.push('Le quote del dividendo sommano ' + r2(sd) + '%, non 100%.');
+    if (Math.abs(sc - 100) > 0.001) avv.push('Le quote di capitale sommano ' + r2(sc) + '%, non 100%.');
+    if (D > distribuibile + 0.005) avv.push('Il dividendo supera il massimo distribuibile (' + r2(distribuibile) + ' €).');
+    if (T.utileNetto < 0 && !riserve) avv.push('Nessun utile di esercizio da distribuire.');
+    var cassaDopo = r2(cassa.finale - totNetto);
+    if (cassaDopo < 0) avv.push('La cassa prevista non copre il dividendo netto: mancano ' + r2(-cassaDopo) + ' €.');
+    return { capitale: capitale, riservaLegale: legale, accantonamentoLegale: r2(accLegale), riserveLibere: r2(riserve), utileNetto: r2(T.utileNetto), distribuibile: r2(distribuibile),
+      dividendo: D, ritenutaPerc: rit, soci: soci, totRitenuta: totRit, totNetto: totNetto, cassaDopoDividendo: cassaDopo, cassaDopoRitenuta: r2(cassaDopo - totRit),
+      impostePatrimoniali: r2(T.imposte), caricoFiscale: r2(T.imposte + totRit), avvisi: avv };
+  }
+
+  var api = { CATEGORIE: CATEGORIE, PARAMS_DEFAULT: PARAMS_DEFAULT, calcola: calcola, simula: simula, dividendi: dividendi, SIM_RIGHE: SIM_RIGHE, SIM_DEFAULT: SIM_DEFAULT, simNorm: simNorm, statoPatrimoniale: statoPatrimoniale, daDashboard: daDashboard, elencoMesi: elencoMesi, r2: r2 };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.Engine = api;
 })(typeof window !== 'undefined' ? window : this);
 
@@ -317,9 +405,9 @@ function calc(){ return E.calcola({voci:S.voci,dash:S.dash||{},params:params()})
 function cls(x){ return x<-0.004?'neg':(x>0.004?'pos':''); }
 
 /* ── Viste ── */
-var TABS=[['riepilogo','Riepilogo'],['pl','P&L mensile'],['iva','IVA'],['imposte','Imposte (stima)'],['patrimonio','Stato patrimoniale'],['voci','Voci manuali'],['dashboard','Da Dashboard V6'],['param','Parametri'],['controlli','Controlli'],['storico','Storico']];
+var TABS=[['riepilogo','Riepilogo'],['pl','P&L mensile'],['iva','IVA'],['imposte','Imposte (stima)'],['patrimonio','Stato patrimoniale'],['simulazione','Simulazione fine anno'],['utili','Prelievo utili'],['voci','Voci manuali'],['dashboard','Da Dashboard V6'],['param','Parametri'],['controlli','Controlli'],['storico','Storico']];
 function nav(){ document.getElementById('nav').innerHTML=TABS.map(function(t){return '<button class="'+(S.tab===t[0]?'on':'')+'" data-t="'+t[0]+'">'+t[1]+'</button>';}).join(''); }
-function render(){ nav(); var r=calc(); var f={riepilogo:vRiepilogo,pl:vPL,iva:vIva,imposte:vImposte,patrimonio:vPatrimonio,voci:vVoci,dashboard:vDash,param:vParam,controlli:vControlli,storico:vStorico}[S.tab]; document.getElementById('main').innerHTML=f(r);
+function render(){ nav(); var r=calc(); var f={riepilogo:vRiepilogo,pl:vPL,iva:vIva,imposte:vImposte,patrimonio:vPatrimonio,simulazione:vSimulazione,utili:vUtili,voci:vVoci,dashboard:vDash,param:vParam,controlli:vControlli,storico:vStorico}[S.tab]; document.getElementById('main').innerHTML=f(r);
   if(S.tab==='riepilogo') grafico(r); }
 function kpi(l,v,c){ return '<div class="kpi card"><span>'+l+'</span><b class="'+(c||'')+'">'+v+' €</b></div>'; }
 function vRiepilogo(r){ var t=r.totali, ok=r.controlli.every(function(c){return c.ok;});
@@ -412,6 +500,54 @@ function vPatrimonio(r){ var sp=E.statoPatrimoniale(r,S.voci), cats=E.CATEGORIE.
   var rim=r.mesi.filter(function(m){return Math.abs(m.varRim)>0.004;}).map(function(m){return etm(m.m)+': '+eur(m.varRim)+' €';});
   h+='<div class="card"><b>Magazzino ↔ P&amp;L</b><div class="note">La variazione delle rimanenze (saldo di magazzino meno saldo precedente) entra nel P&amp;L al mese del saldo. '+(rim.length?'Attualmente: '+esc(rim.join('; ')):'Nessuna variazione: inserisci un saldo "Rimanenze" 2026 oltre a quello di apertura.')+'</div></div>';
   return h+formVoce(true)+elencoVoci(true); }
+/* ── Simulazione di fine anno e prelievo utili ── */
+function simS(){ if(!S.sim){ var raw=null; try{ raw=(S.config&&S.config.sim)?JSON.parse(S.config.sim):null; }catch(e){} S.sim=E.simNorm(raw); } return S.sim; }
+function simRun(){ return E.simula({voci:S.voci,dash:S.dash||{},params:params()},simS()); }
+function numIn(path,val,step){ return '<input type="number" step="'+(step||'0.01')+'" data-sim="'+path+'" value="'+esc(val)+'">'; }
+function simPath(path,val){ var p=path.split('.'), o=simS(); for(var i=0;i<p.length-1;i++) o=o[p[i]]; o[p[p.length-1]]=val; }
+function simSalva(){ return '<button class="p" data-a="salvasim">Salva simulazione</button><span id="msg" class="note"></span>'; }
+function vSimulazione(){ var s=simS(), mesi=s.mesi.map(etm);
+  var rows=E.SIM_RIGHE.map(function(rg){ return '<tr><td style="text-align:left">'+esc(rg.nome)+'</td>'+s.mesi.map(function(m,i){return '<td>'+numIn('righe.'+rg.id+'.'+i,s.righe[rg.id][i])+'</td>';}).join('')
+    +'<td>'+(rg.noIva?'–':numIn('iva.'+rg.id,s.iva[rg.id],'0.1'))+'</td></tr>'; }).join('');
+  return '<div class="card"><b>Simulazione del bilancio a fine anno</b><div class="note">Importi IMPONIBILI previsti da qui a dicembre, che si sommano ai dati reali. Non modificano nessuna voce: sono ipotesi che puoi salvare e cambiare quando vuoi.</div>'
+   +'<div class="tw"><table><tr><th style="text-align:left">Voce</th>'+mesi.map(function(m){return '<th>'+m+' €</th>';}).join('')+'<th>IVA %</th></tr>'+rows+'</table></div>'
+   +'<div class="g" style="margin-top:8px"><div><label>Contributi a carico società su compensi %</label>'+numIn('contribPerc',s.contribPerc,'0.1')+'</div>'
+   +'<div><label>Quota netta dei compensi pagata in banca %</label>'+numIn('nettoPerc',s.nettoPerc,'0.1')+'</div>'
+   +'<div><label>Magazzino finale previsto al 31/12 € (vuoto = non simulare)</label>'+numIn('rimanenzeFinali',s.rimanenzeFinali)+'</div>'
+   +'<div><label>Ammortamenti / accantonamenti TFM 2026 €</label>'+numIn('altreRettifiche',s.altreRettifiche)+'</div></div>'+simSalva()+'</div><div id="simres">'+simRes('simulazione')+'</div>'; }
+function simRes(tab){ var o=simRun(), r=S.__base||calc(), b=r.totali, t=o.res.totali, c=o.cassa;
+  if(tab==='utili') return utiliRes(o);
+  var riga=function(l,x,y,cl){ return '<tr><td style="text-align:left">'+l+'</td><td>'+eur(x)+'</td><td>'+eur(y)+'</td><td class="'+(cl?cls(y-x):'')+'">'+eur(y-x)+'</td></tr>'; };
+  return '<div class="card tw"><table><tr><th style="text-align:left"></th><th>Reale a oggi</th><th>Simulato a fine anno</th><th>Differenza</th></tr>'
+   +riga('Ricavi',b.ricavi,t.ricavi)+riga('Costi',b.costi,t.costi)+riga('Variazione rimanenze',b.varRim,t.varRim)
+   +'<tr class="t"><td style="text-align:left">UTILE ANTE IMPOSTE</td><td class="'+cls(b.utile)+'">'+eur(b.utile)+'</td><td class="'+cls(t.utile)+'">'+eur(t.utile)+'</td><td>'+eur(t.utile-b.utile)+'</td></tr>'
+   +riga('Imposte stimate (IRES + IRAP)',b.imposte,t.imposte)+'<tr class="t"><td style="text-align:left">UTILE DOPO IMPOSTE</td><td class="'+cls(b.utileNetto)+'">'+eur(b.utileNetto)+'</td><td class="'+cls(t.utileNetto)+'">'+eur(t.utileNetto)+'</td><td>'+eur(t.utileNetto-b.utileNetto)+'</td></tr>'
+   +riga('IVA da versare nel periodo',b.ivaVersare,t.ivaVersare)+riga('% utile ante imposte sul fatturato',b.ricavi?b.utile/b.ricavi*100:0,t.ricavi?t.utile/t.ricavi*100:0)+'</table></div>'
+   +'<div class="card"><b>Cassa prevista</b><div class="note">Indicativa: parte dal saldo di banche e cassa del '+esc(c.data||'—')+' e considera incassi e pagamenti simulati (IVA inclusa) e gli F24 inseriti. Non include gli F24 già maturati e non pagati né le fatture da saldare.</div>'
+   +'<div class="tw"><table><tr><td style="text-align:left">Saldo iniziale</td><td>'+eur(c.iniziale)+'</td></tr><tr><td style="text-align:left">+ Incassi simulati (con IVA)</td><td>'+eur(c.incassi)+'</td></tr><tr><td style="text-align:left">− Pagamenti simulati (acquisti con IVA, compensi netti, F24)</td><td>'+eur(c.pagamenti)+'</td></tr><tr class="t"><td style="text-align:left">Cassa prevista a fine anno</td><td class="'+cls(c.finale)+'">'+eur(c.finale)+'</td></tr></table></div></div>'
+   +'<div class="card"><b>P&amp;L mensile simulato</b></div>'+vPL(o.res); }
+function vUtili(){ var s=simS();
+  var soci=s.soci.map(function(x,i){ return '<tr><td style="text-align:left"><input data-sim="soci.'+i+'.nome" value="'+esc(x.nome)+'" type="text"></td><td>'+numIn('soci.'+i+'.cap',x.cap,'0.01')+'</td><td>'+numIn('soci.'+i+'.div',x.div,'0.01')+'</td></tr>'; }).join('');
+  return '<div class="card"><b>Prelievo utili (dividendi ai soci)</b><div class="note">Parte dal risultato della simulazione di fine anno. Le quote del dividendo seguono la tabella dei soci (diverse dal capitale: serve che lo statuto lo preveda).</div>'
+   +'<div class="g"><div><label>Dividendo lordo da distribuire €</label>'+numIn('dividendo',s.dividendo)+'</div><div><label>Ritenuta sui dividendi % (persone fisiche)</label>'+numIn('ritenuta',s.ritenuta,'0.1')+'</div>'
+   +'<div><label>Includere le riserve disponibili (altre riserve + utile 2025)</label><select data-sim="usaRiserve"><option value="1"'+(s.usaRiserve?' selected':'')+'>Sì</option><option value="0"'+(!s.usaRiserve?' selected':'')+'>No, solo utile 2026</option></select></div></div>'
+   +'<div class="tw"><table><tr><th style="text-align:left">Socio</th><th>Quota di capitale %</th><th>Quota del dividendo %</th></tr>'+soci+'</table></div>'+simSalva()+'</div><div id="simres">'+simRes('utili')+'</div>'; }
+function utiliRes(o){ var u=o.utili, t=o.res.totali;
+  var tab=u.soci.map(function(x){ return '<tr><td style="text-align:left">'+esc(x.nome)+'</td><td>'+eur(x.cap)+' %</td><td>'+eur(x.div)+' %</td><td>'+eur(x.lordo)+'</td><td>'+eur(x.ritenuta)+'</td><td><b>'+eur(x.netto)+'</b></td></tr>'; }).join('');
+  var eff=t.utile>0?u.caricoFiscale/t.utile*100:0, nettoSoci=t.utile>0?(t.utile-u.impostePatrimoniali)/t.utile*(1-u.ritenutaPerc/100)*100:0;
+  return (u.avvisi.length?'<div class="card wa">'+u.avvisi.map(esc).join('<br>')+'</div>':'')
+   +'<div class="card tw"><table><tr><th style="text-align:left">Socio</th><th>Capitale</th><th>Dividendo</th><th>Lordo €</th><th>Ritenuta €</th><th>Netto al socio €</th></tr>'+tab
+   +'<tr class="t"><td style="text-align:left">Totale</td><td></td><td></td><td>'+eur(u.dividendo)+'</td><td>'+eur(u.totRitenuta)+'</td><td>'+eur(u.totNetto)+'</td></tr></table></div>'
+   +'<div class="card tw"><table><tr><td style="text-align:left">Utile dopo imposte (simulato)</td><td>'+eur(u.utileNetto)+'</td></tr>'
+   +'<tr><td style="text-align:left">− a riserva legale (5%, fino al 20% del capitale; oggi '+eur(u.riservaLegale)+' su '+eur(u.capitale)+')</td><td>'+eur(u.accantonamentoLegale)+'</td></tr>'
+   +'<tr><td style="text-align:left">+ riserve disponibili (altre riserve + utile 2025)</td><td>'+eur(u.riserveLibere)+'</td></tr>'
+   +'<tr class="t"><td style="text-align:left">Massimo distribuibile</td><td>'+eur(u.distribuibile)+'</td></tr>'
+   +'<tr><td style="text-align:left">Cassa prevista a fine anno (simulazione)</td><td>'+eur(o.cassa.finale)+'</td></tr>'
+   +'<tr><td style="text-align:left">Cassa dopo il pagamento del dividendo netto</td><td class="'+cls(u.cassaDopoDividendo)+'">'+eur(u.cassaDopoDividendo)+'</td></tr>'
+   +'<tr><td style="text-align:left">Cassa dopo anche il versamento della ritenuta (F24 entro il 16 del mese dopo)</td><td class="'+cls(u.cassaDopoRitenuta)+'">'+eur(u.cassaDopoRitenuta)+'</td></tr></table></div>'
+   +'<div class="card"><b>Tasse complessive sugli utili</b><div class="tw"><table><tr><td style="text-align:left">IRES + IRAP della società (stima)</td><td>'+eur(u.impostePatrimoniali)+'</td></tr><tr><td style="text-align:left">Ritenute sui dividendi (a titolo d\'imposta)</td><td>'+eur(u.totRitenuta)+'</td></tr><tr class="t"><td style="text-align:left">Totale tasse</td><td>'+eur(u.caricoFiscale)+'</td></tr>'
+   +'<tr><td style="text-align:left">Su 100 € di utile ante imposte, se distribuiti tutti, restano ai soci</td><td>'+eur(nettoSoci)+' €</td></tr></table></div>'
+   +'<div class="note">Stime a ipotesi: IRES/IRAP come nella scheda Imposte; ritenuta 26% sui dividendi alle persone fisiche, versata dalla società con F24. Compensi, royalties e mutuo ai soci non sono inclusi. Da confermare con il commercialista prima di deliberare.'+(eff?' Incidenza delle tasse societarie e personali: '+eur(eff)+' % dell\'utile ante imposte (a distribuzione completa solo se il dividendo = utile dopo imposte).':'')+'</div></div>'; }
 function vDash(r){ var d=S.dash||{}, ch=Object.keys(d.chiusure||{}).sort();
   return '<div class="card"><b>Dati letti dalla Dashboard V6 (sola lettura)</b><div class="note">Letti il '+esc(d.letto_il||'—')+'. Mese con chiusura = valori della chiusura (immutabili); mesi senza chiusura = fatture intercompany approvate.</div></div>'
   +'<div class="card tw"><table><tr><th>Mese</th><th>Ricavi (TS→PS)</th><th>IVA debito</th><th>Costi (PS→TS)</th><th>IVA credito</th><th>Fonte</th></tr>'
@@ -442,12 +578,15 @@ async function azione(a,id){
     else if(a==='salvaparam'){ S.config=await call('apiSalvaConfig',{inizio:val('p_inizio'),mesi:val('p_mesi'),ires:val('p_ires'),irap:val('p_irap'),ivaPeriodo:val('p_ivaPeriodo'),includeAcquistiSrl:val('p_inc'),includeDashboard:val('p_dash'),includeRimanenze:val('p_rim')}); msg('Parametri salvati'); render(); }
     else if(a==='login'){ var rr=await call('apiLogin',val('l_u'),val('l_p')); TOKEN=rr.token; try{sessionStorage.setItem('bsrl_t',TOKEN);}catch(e){} await avvia(); }
     else if(a==='logout'){ try{await call('apiLogout');}catch(e){} esci(); }
+    else if(a==='salvasim'){ S.config=await call('apiSalvaConfig',{sim:JSON.stringify(simS())}); msg('Simulazione salvata'); }
     else if(a==='importa'){ document.getElementById('imp').click(); }
   }catch(e){ msg(e.message,1); }
 }
 async function ricarica(){ var st=await call('apiStato'); S.voci=st.voci; S.config=st.config||{}; document.getElementById('utente').textContent=st.utente||''; if(S.tab==='storico') S.storico=await call('apiStorico'); render(); }
 document.addEventListener('click',function(e){ var t=e.target.closest('[data-t]'); if(t){ S.tab=t.dataset.t; if(S.tab==='storico') call('apiStorico').then(function(x){S.storico=x;render();}); else render(); return; }
   var a=e.target.closest('[data-a]'); if(a) azione(a.dataset.a,a.dataset.id); });
+function simAgg(e){ var p=e.target.dataset&&e.target.dataset.sim; if(!p) return; var v=e.target.value; if(p==='usaRiserve') v=(v==='1'); else if(!/\.nome$/.test(p)) v=v===''?'':v; simPath(p,v); var d=document.getElementById('simres'); if(d) d.innerHTML=simRes(S.tab); }
+document.addEventListener('input',simAgg); document.addEventListener('change',simAgg);
 document.addEventListener('change',function(e){ if(e.target.id!=='imp'||!e.target.files[0]) return; var f=e.target.files[0], rd=new FileReader();
   rd.onload=async function(){ try{ var l=JSON.parse(rd.result); if(!Array.isArray(l)) throw new Error('Il file deve contenere un elenco di voci'); var n=await call('apiImportaVoci',l); await ricarica(); render(); msg(typeof n==='object'?('Importate '+n.importate+' voci; '+n.saltate+' gia\' presenti e saltate (anti-duplicati)'):('Importate '+n+' voci')); }catch(x){ msg('Importazione fallita: '+x.message,1); } }; rd.readAsText(f); });
 async function avvia(){ try{ if(DEMO) document.getElementById('demo').classList.remove('hid'); document.getElementById('exit').classList.toggle('hid',DEMO); await ricarica(); S.dash=await call('apiDashboard'); render(); }catch(e){ if(!TOKEN&&!DEMO) mostraLogin(e.message); else document.getElementById('main').innerHTML='<div class="card ko">'+esc(e.message)+'</div>'; } }
