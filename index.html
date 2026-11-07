@@ -321,17 +321,34 @@ table.fit{min-width:0;font-size:9.4px}table.fit th,table.fit td{padding:2.5px 3p
      La simulazione aggiunge voci "sim-*" ai dati reali e rilancia calcola(): nessun numero e' calcolato due volte.
      Gli importi inseriti sono IMPONIBILI per mese (da novembre a dicembre). */
   var SIM_RIGHE = [
-    { id: 'serviziFatt', nome: 'Fatture servizi (ricavi)', cat: 'servizi', ricavo: true },
-    { id: 'venditeGett', nome: 'Vendite gettoniere (ricavi)', cat: 'vendite', ricavo: true },
-    { id: 'acqMateriali', nome: 'Acquisto materiali', cat: 'acquisti_materiali' },
-    { id: 'acqServizi', nome: 'Acquisto servizi', cat: 'servizi_prof' },
-    { id: 'compensi', nome: 'Compensi amministratori (lordo)', cat: 'compensi_amm', noIva: true },
-    { id: 'f24', nome: 'Pagamento F24 (solo cassa)', noIva: true, soloCassa: true }
+    { id: 'serviziFatt', gruppo: 'RICAVI', nome: 'Fatture ad Adler', cat: 'servizi', ricavo: true },
+    { id: 'paysRicavo', gruppo: 'RICAVI', nome: 'Fatture a Paysolution', cat: 'intercompany_ricavo', ricavo: true },
+    { id: 'venditeGett', gruppo: 'RICAVI', nome: 'Vendita gettoniere', cat: 'vendite', ricavo: true },
+    { id: 'amazon', gruppo: 'RICAVI', nome: 'Vendite su Amazon', cat: 'vendite_amazon', ricavo: true },
+    { id: 'corrisp', gruppo: 'RICAVI', nome: 'Vendite per corrispettivi', cat: 'corrispettivi', ricavo: true },
+    { id: 'interessi', gruppo: 'RICAVI', nome: 'Interessi attivi (fuori dal fatturato)', cat: 'interessi_attivi', ricavo: true, noIva: true },
+    { id: 'compensi', gruppo: 'COSTI', nome: 'Compensi amministratori (lordo)', cat: 'compensi_amm', noIva: true },
+    { id: 'contributi', gruppo: 'COSTI', nome: 'Contributi (INPS ecc.) inseriti a mano', cat: 'contributi', noIva: true },
+    { id: 'stipendi', gruppo: 'COSTI', nome: 'Stipendi', cat: 'stipendi', noIva: true },
+    { id: 'royalties', gruppo: 'COSTI', nome: 'Royalties (a Tullio Serci)', cat: 'royalties', noIva: true },
+    { id: 'paysCosto', gruppo: 'COSTI', nome: 'Fatture da Paysolution', cat: 'intercompany_costo' },
+    { id: 'acqServizi', gruppo: 'COSTI', nome: 'Commercialista, consulenti e servizi', cat: 'servizi_prof' },
+    { id: 'acqMateriali', gruppo: 'COSTI', nome: 'Acquisti materiali e merci', cat: 'acquisti_materiali' },
+    { id: 'pubblicita', gruppo: 'COSTI', nome: 'Pubblicita', cat: 'pubblicita' },
+    { id: 'trasferte', gruppo: 'COSTI', nome: 'Trasferte, welfare e rappresentanza', cat: 'trasferte_welfare' },
+    { id: 'abbonamenti', gruppo: 'COSTI', nome: 'Abbonamenti, utenze, sicurezza, assicurazioni', cat: 'abbonamenti_utenze' },
+    { id: 'trasporti', gruppo: 'COSTI', nome: 'Trasporti e spedizioni', cat: 'trasporti' },
+    { id: 'oneri', gruppo: 'COSTI', nome: 'Commissioni e oneri bancari', cat: 'oneri_bancari', noIva: true },
+    { id: 'oneriFin', gruppo: 'COSTI', nome: 'Interessi e oneri finanziari', cat: 'oneri_finanziari', noIva: true },
+    { id: 'altri', gruppo: 'COSTI', nome: 'Altri costi generali', cat: 'altri' },
+    { id: 'f24', gruppo: 'COSTI', nome: 'Pagamento F24 (solo cassa, non e\' un costo)', noIva: true, soloCassa: true }
   ];
   var SIM_DEFAULT = {
     mesi: ['2026-11', '2026-12'],
-    righe: { serviziFatt: [0, 0], venditeGett: [0, 0], acqMateriali: [0, 0], acqServizi: [0, 0], compensi: [0, 0], f24: [0, 0] },
-    iva: { serviziFatt: 22, venditeGett: 22, acqMateriali: 22, acqServizi: 22 },
+    righe: { serviziFatt: [0, 0], paysRicavo: [0, 0], venditeGett: [0, 0], amazon: [0, 0], corrisp: [0, 0], interessi: [0, 0],
+      compensi: [0, 0], contributi: [0, 0], stipendi: [0, 0], royalties: [0, 0], paysCosto: [0, 0], acqServizi: [0, 0], acqMateriali: [0, 0], pubblicita: [0, 0],
+      trasferte: [0, 0], abbonamenti: [0, 0], trasporti: [0, 0], oneri: [0, 0], oneriFin: [0, 0], altri: [0, 0], f24: [0, 0] },
+    iva: { serviziFatt: 0, paysRicavo: 22, venditeGett: 22, amazon: 22, corrisp: 22, paysCosto: 22, acqServizi: 22, acqMateriali: 22, pubblicita: 22, trasferte: 0, abbonamenti: 22, trasporti: 22, altri: 22 },
     contribPerc: 17, nettoPerc: 60, rimanenze: ['', ''], altreRettifiche: 0,
     laser: { attiva: true, costo: 4642.22, ricarico: 8, iva: 22, mese: '2026-12' },
     dividendo: 0, ritenuta: 26, usaRiserve: true,
@@ -483,7 +500,7 @@ function calc(){ return E.calcola({voci:S.voci,dash:S.dash||{},params:params()})
 function cls(x){ return x<-0.004?'neg':(x>0.004?'pos':''); }
 
 /* ── Viste ── */
-var TABS=[['riepilogo','Riepilogo'],['pl','P&L mensile'],['iva','IVA'],['imposte','Imposte (stima)'],['patrimonio','Stato patrimoniale'],['simulazione','Simulazione fine anno'],['utili','Prelievo utili'],['voci','Voci manuali'],['dashboard','Da Dashboard V6'],['param','Parametri'],['controlli','Controlli'],['storico','Storico']];
+var TABS=[['riepilogo','Riepilogo'],['pl','P&L mensile'],['iva','IVA'],['imposte','Imposte (stima)'],['patrimonio','Stato patrimoniale'],['simulazione','Previsione nov-dic'],['utili','Prelievo utili'],['voci','Voci manuali'],['dashboard','Da Dashboard V6'],['param','Parametri'],['controlli','Controlli'],['storico','Storico']];
 function nav(){ document.getElementById('nav').innerHTML=TABS.map(function(t){return '<button class="'+(S.tab===t[0]?'on':'')+'" data-t="'+t[0]+'">'+t[1]+'</button>';}).join(''); }
 function render(){ nav(); var r=calc(); var f={riepilogo:vRiepilogo,pl:vPL,iva:vIva,imposte:vImposte,patrimonio:vPatrimonio,simulazione:vSimulazione,utili:vUtili,voci:vVoci,dashboard:vDash,param:vParam,controlli:vControlli,storico:vStorico}[S.tab]; document.getElementById('main').innerHTML='<div class="bar"><span id="pdfmsg" class="note"></span><button class="p" data-a="pdf" style="margin:0">⬇ Salva PDF</button></div><div class="pdfhead"><b>Bilancio SRL — '+esc(TABS.filter(function(t){return t[0]===S.tab;})[0][1])+'</b><div class="note">Tullio Serci S.r.l. · generato il '+new Date().toLocaleDateString('it-IT')+' · importi in euro, IVA esclusa salvo dove indicato</div></div>'+f(r);
   if(S.tab==='riepilogo') grafico(r); if(S.tab==='voci') bulkInfo(); }
@@ -601,13 +618,23 @@ function simS(){ if(!S.sim){ var raw=null; try{ raw=(S.config&&S.config.sim)?JSO
 function simRun(){ return E.simula({voci:S.voci,dash:S.dash||{},params:params()},simS()); }
 function numIn(path,val,step){ return '<input type="number" step="'+(step||'0.01')+'" data-sim="'+path+'" value="'+esc(val)+'">'; }
 function simPath(path,val){ var p=path.split('.'), o=simS(); for(var i=0;i<p.length-1;i++) o=o[p[i]]; o[p[p.length-1]]=val; }
-function simSalva(){ return '<button class="p" data-a="salvasim">Salva simulazione</button><span id="msg" class="note"></span>'; }
+function simKpi(){ var o=simRun(), t=o.res.totali, ok=t.utile>=0;
+  return '<div class="kpis"><div class="kpi card"><span>Risultato ante imposte a fine anno (con la previsione)</span><b class="'+cls(t.utile)+'">'+eur(t.utile)+' €</b></div>'
+   +'<div class="kpi card"><span>'+(ok?'Costi ancora sostenibili in più, restando in utile':'Mancano per arrivare in utile (meno costi o più ricavi)')+'</span><b class="'+(ok?'pos':'neg')+'">'+eur(Math.abs(t.utile))+' €</b></div>'
+   +'<div class="kpi card"><span>Utile dopo imposte stimate</span><b class="'+cls(t.utileNetto)+'">'+eur(t.utileNetto)+' €</b></div></div>'; }
+function simSalva(){ return '<button class="p" data-a="salvasim">Salva previsione</button><span id="msg" class="note"></span>'; }
 function vSimulazione(){ var s=simS(), mesi=s.mesi.map(etm);
-  var rows=E.SIM_RIGHE.map(function(rg){ return '<tr><td style="text-align:left">'+esc(rg.nome)+'</td>'+s.mesi.map(function(m,i){return '<td>'+numIn('righe.'+rg.id+'.'+i,s.righe[rg.id][i])+'</td>';}).join('')
-    +'<td>'+(rg.noIva?'–':numIn('iva.'+rg.id,s.iva[rg.id],'0.1'))+'</td></tr>'; }).join('');
-  return '<div class="card"><b>Simulazione del bilancio a fine anno</b><div class="note">Importi IMPONIBILI previsti da qui a dicembre, che si sommano ai dati reali. Non modificano nessuna voce: sono ipotesi che puoi salvare e cambiare quando vuoi.</div>'
-   +'<div class="tw"><table><tr><th style="text-align:left">Voce · importi IVA ESCLUSA</th>'+mesi.map(function(m){return '<th>'+m+' € (imponibile)</th>';}).join('')+'<th>IVA %</th></tr>'+rows+'</table></div>'
-   +'<div class="g" style="margin-top:8px"><div><label>Contributi a carico società su compensi %</label>'+numIn('contribPerc',s.contribPerc,'0.1')+'</div>'
+  var reg=function(rg,m){ if(!rg.cat) return null; return S.voci.filter(function(v){ return !v.eliminata&&v.categoria===rg.cat&&String(v.competenza).slice(0,7)===m; }).reduce(function(t,v){return t+(+v.imponibile||0);},0); };
+  var rows='', gr='';
+  E.SIM_RIGHE.forEach(function(rg){
+    if(rg.gruppo!==gr){ gr=rg.gruppo; rows+='<tr class="t"><td colspan="'+(1+s.mesi.length*2+1)+'" style="text-align:left">'+gr+'</td></tr>'; }
+    rows+='<tr><td style="text-align:left;white-space:normal">'+esc(rg.nome)+'</td>'+s.mesi.map(function(m,i){ var rv=reg(rg,m);
+      return '<td class="note">'+(rv===null?'–':(rv?eur(rv):'0,00'))+'</td><td>'+numIn('righe.'+rg.id+'.'+i,s.righe[rg.id][i])+'</td>'; }).join('')
+      +'<td>'+(rg.noIva?'–':numIn('iva.'+rg.id,s.iva[rg.id],'0.1'))+'</td></tr>'; });
+  var thm=s.mesi.map(function(m){ return '<th>'+etm(m)+' già registrato</th><th>'+etm(m)+' PREVISIONE €</th>'; }).join('');
+  return '<div id="simkpi" style="position:sticky;top:0;z-index:5;background:var(--bg);padding-top:4px">'+simKpi()+'</div><div class="card"><b>Previsione di novembre e dicembre (inserimento manuale)</b><div class="note">Compila a mano gli importi IMPONIBILI (IVA esclusa) di ricavi e costi dei due mesi. Si SOMMANO a quanto è già registrato (colonna grigia): non ripetere ciò che hai già inserito nelle voci. Non modificano nessuna voce: sono ipotesi, le salvi e le cambi quando vuoi. Il risultato a fine anno si aggiorna subito qui sotto.</div>'
+   +'<div class="tw"><table><tr><th style="text-align:left">Voce · importi IVA ESCLUSA</th>'+thm+'<th>IVA %</th></tr>'+rows+'</table></div>'
+   +'<div class="g" style="margin-top:8px"><div><label>Contributi su compensi calcolati in automatico % (metti 0 se li inserisci a mano nella riga Contributi)</label>'+numIn('contribPerc',s.contribPerc,'0.1')+'</div>'
    +'<div><label>Quota netta dei compensi pagata in banca %</label>'+numIn('nettoPerc',s.nettoPerc,'0.1')+'</div>'
    +'<div><label>Ammortamenti / accantonamenti TFM 2026 €</label>'+numIn('altreRettifiche',s.altreRettifiche)+'</div></div>'
    +'<div style="margin-top:10px"><b>Rimanenza di magazzino a fine mese</b><div class="note">Valore del magazzino (€) alla fine del mese. Al 31/10/2026 è 0 (stock ceduto alla SRLS e saldato con FE-00130, dato confermato); da novembre riparte da zero. Lascia vuoto per "invariata rispetto al mese prima". La variazione entra nel P&amp;L.</div>'
@@ -697,7 +724,7 @@ async function azione(a,id){
     else if(a==='salvaparam'){ S.config=await call('apiSalvaConfig',{inizio:val('p_inizio'),mesi:val('p_mesi'),ires:val('p_ires'),irap:val('p_irap'),ivaPeriodo:val('p_ivaPeriodo'),includeAcquistiSrl:val('p_inc'),includeDashboard:val('p_dash'),includeRimanenze:val('p_rim')}); msg('Parametri salvati'); render(); }
     else if(a==='login'){ var rr=await call('apiLogin',val('l_u'),val('l_p')); TOKEN=rr.token; try{sessionStorage.setItem('bsrl_t',TOKEN);}catch(e){} await avvia(); }
     else if(a==='logout'){ try{await call('apiLogout');}catch(e){} esci(); }
-    else if(a==='salvasim'){ S.config=await call('apiSalvaConfig',{sim:JSON.stringify(simS())}); msg('Simulazione salvata'); }
+    else if(a==='salvasim'){ S.config=await call('apiSalvaConfig',{sim:JSON.stringify(simS())}); msg('Previsione salvata'); }
     else if(a==='pdf'){ await salvaPdf(); }
     else if(a==='importa'){ document.getElementById('imp').click(); }
   }catch(e){ msg(e.message,1); }
@@ -705,7 +732,7 @@ async function azione(a,id){
 async function ricarica(){ var st=await call('apiStato'); S.voci=st.voci; S.config=st.config||{}; document.getElementById('utente').textContent=st.utente||''; if(S.tab==='storico') S.storico=await call('apiStorico'); render(); }
 document.addEventListener('click',function(e){ var t=e.target.closest('[data-t]'); if(t){ S.tab=t.dataset.t; if(S.tab==='storico') call('apiStorico').then(function(x){S.storico=x;render();}); else render(); return; }
   var a=e.target.closest('[data-a]'); if(a) azione(a.dataset.a,a.dataset.id); });
-function simAgg(e){ var p=e.target.dataset&&e.target.dataset.sim; if(!p) return; var v=e.target.value; if(p==='usaRiserve'||p==='laser.attiva') v=(v==='1'); else if(!/\.nome$/.test(p)) v=v===''?'':v; simPath(p,v); var d=document.getElementById('simres'); if(d) d.innerHTML=simRes(S.tab); }
+function simAgg(e){ var p=e.target.dataset&&e.target.dataset.sim; if(!p) return; var v=e.target.value; if(p==='usaRiserve'||p==='laser.attiva') v=(v==='1'); else if(!/\.nome$/.test(p)) v=v===''?'':v; simPath(p,v); var d=document.getElementById('simres'); if(d) d.innerHTML=simRes(S.tab); var k=document.getElementById('simkpi'); if(k) k.innerHTML=simKpi(); }
 document.addEventListener('input',simAgg); document.addEventListener('change',simAgg);
 document.addEventListener('change',function(e){ if(e.target.id&&e.target.id.indexOf('b_')===0) bulkInfo(); });
 document.addEventListener('change',function(e){ if(e.target.id!=='imp'||!e.target.files[0]) return; var f=e.target.files[0], rd=new FileReader();
