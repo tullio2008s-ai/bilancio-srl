@@ -151,7 +151,7 @@ body.pdfmode .pdfhead{display:block;margin-bottom:8px}body.pdfmode .pdfhead b{fo
     mesi.forEach(function (m) {
       var d = dash.mesi[m] || vuoto();
       rows[m] = { m: m, fonte: dash.fonte[m] || '', ricaviDash: d.ricavi, costiDash: d.costi,
-        ricaviMan: 0, costiMan: 0, ivaDeb: d.ivaDeb, ivaCred: d.ivaCred, irapInded: 0, uscitaNonCosto: 0, cat: {}, varRim: varRimMese[m] || 0 };
+        ricaviMan: 0, costiMan: 0, ivaDeb: d.ivaDeb, ivaCred: d.ivaCred, dashIvaDeb: d.ivaDeb, dashIvaCred: d.ivaCred, dashEscluso: '', irapInded: 0, uscitaNonCosto: 0, cat: {}, varRim: varRimMese[m] || 0 };
     });
     Object.keys(dash.mesi).forEach(function (m) {
       if (!idx[m] && (dash.mesi[m].ricavi || dash.mesi[m].costi)) avvisi.push('Dati Dashboard fuori periodo (' + m + ') non conteggiati');
@@ -171,6 +171,21 @@ body.pdfmode .pdfhead{display:block;margin-bottom:8px}body.pdfmode .pdfhead b{fo
         if (detr) r.ivaCred += iva;
         if (c.irapIndeducibile) r.irapInded += imp;
       }
+    });
+    /* Anti doppio conteggio: se nel mese le fatture Paysolution sono gia' nelle voci manuali (categorie intercompany),
+       i valori Dashboard dello stesso lato (ricavi o costi, con la relativa IVA) vengono esclusi.
+       Le voci manuali prevalgono: sono i documenti reali e trattano le note di credito, la Dashboard no. */
+    mesi.forEach(function (m) {
+      var r = rows[m], es = [];
+      if ((r.cat.intercompany_ricavo || 0) !== 0 && (r.ricaviDash || r.dashIvaDeb)) {
+        avvisi.push('Mese ' + m + ': ricavi Dashboard V6 (' + r2(r.ricaviDash) + ' €) esclusi perche\' le fatture a Paysolution sono gia\' nelle voci manuali');
+        r.ricaviDash = 0; r.ivaDeb -= r.dashIvaDeb; es.push('ricavi');
+      }
+      if ((r.cat.intercompany_costo || 0) !== 0 && (r.costiDash || r.dashIvaCred)) {
+        avvisi.push('Mese ' + m + ': costi Dashboard V6 (' + r2(r.costiDash) + ' €) esclusi perche\' le fatture da Paysolution sono gia\' nelle voci manuali');
+        r.costiDash = 0; r.ivaCred -= r.dashIvaCred; es.push('costi');
+      }
+      if (es.length) { r.dashEscluso = es.join('+'); r.fonte = (r.fonte ? r.fonte + ' - ' : '') + 'esclusa (' + es.join('+') + ' gia\' in voci manuali)'; }
     });
     // P&L, IVA, imposte (stime cumulative)
     var cum = { ricavi: 0, costi: 0, utile: 0, ivaSaldo: 0, inded: 0 }, riporto = 0, accP = 0, prevIres = 0, prevIrap = 0;
@@ -263,6 +278,9 @@ body.pdfmode .pdfhead{display:block;margin-bottom:8px}body.pdfmode .pdfhead b{fo
       if (cc.tipo === 'ricavo') man.r += imp; else man.c += imp + (v.detraibile === false ? iva : 0);
     });
     var sr = L.reduce(function (s, r) { return s + r.ricaviMan; }, 0), sc = L.reduce(function (s, r) { return s + r.costiMan; }, 0);
+    var dup = L.filter(function (r) { return (r.cat.intercompany_ricavo && r.ricaviDash) || (r.cat.intercompany_costo && r.costiDash); }).map(function (r) { return r.m; });
+    var esclusi = L.filter(function (r) { return r.dashEscluso; }).map(function (r) { return r.m; });
+    add('Nessun doppio conteggio Paysolution (Dashboard V6 + voci manuali)', dup.length === 0, dup.length ? 'Mesi con le due fonti insieme: ' + dup.join(', ') : (esclusi.length ? 'Dashboard esclusa automaticamente nei mesi: ' + esclusi.join(', ') : ''));
     add('Ricavi manuali del P&L = somma voci inserite', eq(sr, man.r));
     add('Costi manuali del P&L = somma voci inserite', eq(sc, man.c));
     statoPatrimoniale(res, input.voci, input.categorie).filter(function (s) { return s.apertura; }).forEach(function (s) {
