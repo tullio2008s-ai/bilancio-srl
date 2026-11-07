@@ -471,6 +471,12 @@ var S = {voci:[], config:{}, dash:null, tab:'riepilogo', edit:null, storico:[]};
 /* ── Backend: Apps Script reale oppure demo locale ── */
 var API = window.BILANCIO_API || '', DEMO = !API, TOKEN = '';
 try { TOKEN = sessionStorage.getItem('bsrl_t') || ''; } catch (e) {}
+/* Il server (Apps Script) accetta solo le categorie originali. Le categorie nuove viaggiano con una categoria di base valida
+   e un'etichetta [[cat:...]] nelle note; la pagina le ricompone quando legge le voci. */
+var CAT_BASE={vendite_amazon:'vendite',corrispettivi:'vendite',interessi_attivi:'vendite',f24_iva2025:'f24_ritenute',f24_acconto_iva:'f24_ritenute',f24_saldo_iva:'f24_ritenute',f24_irpef_stipendi:'f24_ritenute',f24_irpef_compensi:'f24_ritenute',f24_inps:'f24_ritenute',f24_gs_inps:'f24_ritenute',f24_altre:'f24_ritenute'};
+var TOKCAT=/\s*\[\[cat:([a-z0-9_]+)\]\]/;
+function voceDaServer(v){ var m=TOKCAT.exec(String(v.note||'')); if(m&&CAT_BASE[m[1]]){ v=Object.assign({},v); v.categoria=m[1]; v.note=String(v.note||'').replace(TOKCAT,''); } return v; }
+function voceVersoServer(v){ var b=CAT_BASE[v.categoria]; if(!b) return v; v=Object.assign({},v); v.note=(String(v.note||'').replace(TOKCAT,'')+' [[cat:'+v.categoria+']]').trim(); v.categoria=b; return v; }
 async function call(fn){
   var args = [].slice.call(arguments,1);
   if (DEMO) return demoApi(fn,args);
@@ -740,7 +746,7 @@ async function azione(a,id){
   try{
     if(a==='salva'){ var v={id:(S.edit&&S.edit.id)||'',categoria:val('f_categoria'),data:val('f_data'),competenza:val('f_competenza'),imponibile:+val('f_imponibile'),iva:+val('f_iva')||0,detraibile:val('f_detraibile')==='1',descrizione:val('f_descrizione'),riferimento:val('f_riferimento'),note:val('f_note')};
       if(!v.data||!v.competenza||isNaN(v.imponibile)||val('f_imponibile')===''){ msg('Compila data, competenza e imponibile',1); return; }
-      await call('apiSalvaVoce',v); S.edit=null; await ricarica(); }
+      await call('apiSalvaVoce',voceVersoServer(v)); S.edit=null; await ricarica(); }
     else if(a==='mod'){ S.edit=S.voci.filter(function(x){return x.id===id;})[0]; render(); }
     else if(a==='annulla'){ S.edit=null; render(); }
     else if(a==='del'){ if(confirm('Eliminare la voce? Resta nello storico e si può ripristinare.')){ await call('apiEliminaVoce',id,false); await ricarica(); } }
@@ -760,14 +766,14 @@ async function azione(a,id){
     else if(a==='importa'){ document.getElementById('imp').click(); }
   }catch(e){ msg(e.message,1); }
 }
-async function ricarica(){ var st=await call('apiStato'); S.voci=st.voci; S.config=st.config||{}; document.getElementById('utente').textContent=st.utente||''; if(S.tab==='storico') S.storico=await call('apiStorico'); render(); }
+async function ricarica(){ var st=await call('apiStato'); S.voci=(st.voci||[]).map(voceDaServer); S.config=st.config||{}; document.getElementById('utente').textContent=st.utente||''; if(S.tab==='storico') S.storico=await call('apiStorico'); render(); }
 document.addEventListener('click',function(e){ var t=e.target.closest('[data-t]'); if(t){ S.tab=t.dataset.t; if(S.tab==='storico') call('apiStorico').then(function(x){S.storico=x;render();}); else render(); return; }
   var a=e.target.closest('[data-a]'); if(a) azione(a.dataset.a,a.dataset.id); });
 function simAgg(e){ var p=e.target.dataset&&e.target.dataset.sim; if(!p) return; var v=e.target.value; if(p==='usaRiserve'||p==='laser.attiva') v=(v==='1'); else if(!/\.nome$/.test(p)) v=v===''?'':v; simPath(p,v); var d=document.getElementById('simres'); if(d) d.innerHTML=simRes(S.tab); var k=document.getElementById('simkpi'); if(k) k.innerHTML=simKpi(); }
 document.addEventListener('input',simAgg); document.addEventListener('change',simAgg);
 document.addEventListener('change',function(e){ if(e.target.id&&e.target.id.indexOf('b_')===0) bulkInfo(); });
 document.addEventListener('change',function(e){ if(e.target.id!=='imp'||!e.target.files[0]) return; var f=e.target.files[0], rd=new FileReader();
-  rd.onload=async function(){ try{ var l=JSON.parse(rd.result); if(!Array.isArray(l)) throw new Error('Il file deve contenere un elenco di voci'); var n=await call('apiImportaVoci',l); await ricarica(); render(); msg(typeof n==='object'?('Importate '+n.importate+' voci; '+n.saltate+' gia\' presenti e saltate (anti-duplicati)'):('Importate '+n+' voci')); }catch(x){ msg('Importazione fallita: '+x.message,1); } }; rd.readAsText(f); });
+  rd.onload=async function(){ try{ var l=JSON.parse(rd.result); if(!Array.isArray(l)) throw new Error('Il file deve contenere un elenco di voci'); var n=await call('apiImportaVoci',l.map(voceVersoServer)); await ricarica(); render(); msg(typeof n==='object'?('Importate '+n.importate+' voci; '+n.saltate+' gia\' presenti e saltate (anti-duplicati)'):('Importate '+n+' voci')); }catch(x){ msg('Importazione fallita: '+x.message,1); } }; rd.readAsText(f); });
 async function avvia(){ try{ if(DEMO) document.getElementById('demo').classList.remove('hid'); document.getElementById('exit').classList.toggle('hid',DEMO); await ricarica(); S.dash=await call('apiDashboard'); render(); }catch(e){ if(!TOKEN&&!DEMO) mostraLogin(e.message); else document.getElementById('main').innerHTML='<div class="card ko">'+esc(e.message)+'</div>'; } }
 document.addEventListener('keydown',function(e){ if(e.key==='Enter'&&document.getElementById('l_p')===document.activeElement) azione('login'); });
 if (DEMO || TOKEN) avvia(); else { document.getElementById('exit').classList.add('hid'); mostraLogin(); }
