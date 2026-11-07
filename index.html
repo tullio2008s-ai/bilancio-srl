@@ -523,10 +523,8 @@ function vPL(r){ var h=r.mesi.map(function(m){return etm(m.m);}).concat(['Totale
    rowM('Interessi attivi (mutuo a socio) — fuori dal fatturato',r,function(m){return m.interessi;},{c:1,tot:r.totali.interessi}),
    rowM('UTILE / PERDITA (al netto IVA)',r,function(m){return m.utile;},{t:1,c:1,tot:r.totali.utile}),
    rowP('% utile sul fatturato',r,function(m){return m.utile;},{c:1,tot:r.totali.utile}),
-   rowM('Utile cumulato',r,function(m){return m.utileCum;},{c:1,tot:r.totali.utile}),
-   rowM('Fonte Dashboard',r,function(){return 0;},{s:1,tot:0}).replace(/<td class="">0,00<\/td>/g,'<td></td>')]));
-  rows[rows.length-1]='<tr class="s"><td>Fonte Dashboard (legenda sotto)</td>'+r.mesi.map(function(m){ var f=m.fonte||'', sh=f.replace('fatture intercompany','fatt. IC').replace('chiusura','chius.').replace(/ - esclusa \(.*\)/,' ✗'); return '<td class="fonte" title="'+esc(f)+'">'+esc(sh)+'</td>'; }).join('')+'<td></td></tr>';
-  return tab(h,rows)+'<div class="note">Fonte Dashboard: chius. = chiusura mensile · fatt. IC = fatture intercompany approvate · ✗ = Dashboard esclusa perché le fatture Paysolution sono già nelle voci manuali (passa il mouse sulla cella per il dettaglio).</div>'+dettaglioCat(r)+'<div class="note">F24 ritenute e simili versamenti non sono costi: '+eur(r.totali.uscitaNonCosto)+' € registrati fuori dal P&L.</div>'; }
+   rowM('Utile cumulato',r,function(m){return m.utileCum;},{c:1,tot:r.totali.utile})]));
+  return tab(h,rows)+(function(){ var e=r.mesi.filter(function(m){return m.dashEscluso;}).map(function(m){return etm(m.m);}); return e.length?'<div class="note">Dashboard V6 non conteggiata in '+e.join(', ')+': le fatture Paysolution sono già nelle voci manuali (nessun doppio conteggio).</div>':''; })()+dettaglioCat(r)+'<div class="note">F24 ritenute e simili versamenti non sono costi: '+eur(r.totali.uscitaNonCosto)+' € registrati fuori dal P&L.</div>'; }
 function vIva(r){ var h=r.mesi.map(function(m){return etm(m.m);}).concat(['Totale']);
   return '<div class="note">Questa pagina mostra l\'IVA (l\'imposta), non gli imponibili.</div>'+tab(h,[rowM('IVA a debito (vendite)',r,function(m){return m.ivaDeb;},{tot:r.totali.ivaDeb}),
    rowM('IVA a credito (acquisti detraibili)',r,function(m){return m.ivaCred;},{tot:r.totali.ivaCred}),
