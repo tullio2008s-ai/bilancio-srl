@@ -167,7 +167,7 @@ table.fit{min-width:0;font-size:9.4px}table.fit th,table.fit td{padding:2.5px 3p
     mesi.forEach(function (m) {
       var d = dash.mesi[m] || vuoto();
       rows[m] = { m: m, fonte: dash.fonte[m] || '', ricaviDash: d.ricavi, costiDash: d.costi,
-        ricaviMan: 0, costiMan: 0, ivaDeb: d.ivaDeb, ivaCred: d.ivaCred, dashIvaDeb: d.ivaDeb, dashIvaCred: d.ivaCred, dashEscluso: '', irapInded: 0, uscitaNonCosto: 0, interessi: 0, cat: {}, varRim: varRimMese[m] || 0 };
+        ricaviMan: 0, costiMan: 0, ivaDeb: d.ivaDeb, ivaCred: d.ivaCred, dashIvaDeb: d.ivaDeb, dashIvaCred: d.ivaCred, dashEscluso: '', irapInded: 0, uscitaNonCosto: 0, interessi: 0, ncRicavi: 0, cat: {}, varRim: varRimMese[m] || 0 };
     });
     Object.keys(dash.mesi).forEach(function (m) {
       if (!idx[m] && (dash.mesi[m].ricavi || dash.mesi[m].costi)) avvisi.push('Dati Dashboard fuori periodo (' + m + ') non conteggiati');
@@ -181,6 +181,7 @@ table.fit{min-width:0;font-size:9.4px}table.fit th,table.fit td{padding:2.5px 3p
       var imp = +v.imponibile || 0, iva = +v.iva || 0, r = rows[m];
       if (c.nonCosto) { r.uscitaNonCosto += imp + iva; return; }
       if (c.finanziario) { r.interessi += imp; return; }
+      if (c.tipo === 'ricavo' && imp < 0) r.ncRicavi += imp;
       if (c.tipo === 'ricavo') { r.ricaviMan += imp; r.ivaDeb += iva; r.cat[v.categoria] = (r.cat[v.categoria] || 0) + imp; }
       else {
         var detr = v.detraibile !== false;
@@ -230,7 +231,7 @@ table.fit{min-width:0;font-size:9.4px}table.fit th,table.fit td{padding:2.5px 3p
       return r;
     });
     var tot = lista.reduce(function (a, r) {
-      ['ricavi', 'costi', 'varRim', 'interessi', 'utile', 'ivaDeb', 'ivaCred', 'ivaSaldo', 'ivaVersare', 'ires', 'irap', 'uscitaNonCosto'].forEach(function (k) { a[k] = (a[k] || 0) + r[k]; });
+      ['ricavi', 'costi', 'varRim', 'interessi', 'ncRicavi', 'utile', 'ivaDeb', 'ivaCred', 'ivaSaldo', 'ivaVersare', 'ires', 'irap', 'uscitaNonCosto'].forEach(function (k) { a[k] = (a[k] || 0) + r[k]; });
       return a;
     }, {});
     var ult = lista[lista.length - 1] || {};
@@ -515,7 +516,7 @@ function vPL(r){ var h=r.mesi.map(function(m){return etm(m.m);}).concat(['Totale
   if(sum(r,function(m){return m.ricaviDash;})) ricRows.push(rowM('Ricavi da Dashboard V6 (IVA esclusa)',r,function(m){return m.ricaviDash;},{tot:sum(r,function(m){return m.ricaviDash;})}));
   var rows=ricRows.concat([
    rowM('RICAVI = TOTALE FATTURATO (IVA esclusa)',r,function(m){return m.ricavi;},{t:1,tot:r.totali.ricavi}),
-   ].concat(sum(r,function(m){return m.costiDash;})?[rowM('Costi da Dashboard V6 (IVA esclusa)',r,function(m){return m.costiDash;},{tot:sum(r,function(m){return m.costiDash;})})]:[]).concat([
+   ].concat(r.totali.ncRicavi?[rowM('di cui note di credito e storni, già dedotti dai ricavi (memo)',r,function(m){return m.ncRicavi;},{s:1,c:1,tot:r.totali.ncRicavi})]:[]).concat(sum(r,function(m){return m.costiDash;})?[rowM('Costi da Dashboard V6 (IVA esclusa)',r,function(m){return m.costiDash;},{tot:sum(r,function(m){return m.costiDash;})})]:[]).concat([
    rowM('Costi manuali — IVA esclusa (IVA indetraibile inclusa)',r,function(m){return m.costiMan;},{tot:sum(r,function(m){return m.costiMan;})}),
    rowM('COSTI (IVA esclusa)',r,function(m){return m.costi;},{t:1,tot:r.totali.costi}),
    rowP('% costi sul fatturato',r,function(m){return m.costi;},{tot:r.totali.costi}),
