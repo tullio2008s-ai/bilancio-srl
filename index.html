@@ -41,10 +41,14 @@ td.mod.neg input{color:var(--ko)}td.mod.pos input{color:var(--ok)}
 tr.tt td{font-weight:700;background:var(--bg);border-top:2px solid var(--ln)}
 .bar{display:flex;gap:8px;align-items:center;justify-content:flex-end;margin-bottom:8px}.bar .note{margin-right:auto}
 .pdfhead{display:none}
+.norep{}body.pdfmode .norep{display:none!important}@media print{.norep{display:none!important}}.rsec{margin-bottom:18px}.rsec h2{font-size:15px;margin:0 0 8px;padding-bottom:4px;border-bottom:2px solid var(--ac);color:var(--ac)}.rsec .rg{display:grid;grid-template-columns:1fr 1fr;gap:12px}.rsec .rg .card{margin-bottom:8px;padding:10px}.rsec ul{margin:4px 0 0;padding-left:18px;font-size:12.5px}.rsec li{margin-bottom:3px}.rsec .rh{font-size:17px;margin-bottom:2px}
 body.pdfmode{background:#fff;color:#1b2433;--bg:#f4f6fa;--card:#fff;--tx:#1b2433;--mu:#66728a;--ln:#dde3ee;--ac:#1f4e9c;--ok:#1a7f4b;--ko:#b3261e;--wa:#a86400}
 body.pdfmode header,body.pdfmode nav,body.pdfmode .bar,body.pdfmode .demo{display:none!important}
 body.pdfmode main{max-width:none;width:1500px;margin:0;padding:10px}body.pdfmode .tw,body.pdfmode .card.tw{overflow:visible}
 body.pdfmode table.fit{min-width:0;font-size:12px}body.pdfmode td.mod input{border:0;background:none;padding:0}body.pdfmode table.fit th,body.pdfmode table.fit td{padding:3px 5px}body.pdfmode table.fit th:first-child,body.pdfmode table.fit td:first-child{width:20%}body.pdfmode .card{break-inside:avoid}body.pdfmode .pbk{break-before:page;page-break-before:always}
+/* html2canvas non legge color-mix(): in modalita' PDF colori fissi */
+body.pdfmode table.fit th:last-child,body.pdfmode table.fit td:last-child{background:#f1f4fa}body.pdfmode table.fit tr.t td{background:#e8edf7}body.pdfmode table.fit tbody tr:hover td{background:#fff}body.pdfmode td.mod input{background:#f1f4fa}
+body.pdfmode .rsec{width:1440px;box-sizing:border-box}body.pdfmode .rsec .rg{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
 body.pdfmode .pdfhead{display:block;margin-bottom:8px}body.pdfmode .pdfhead b{font-size:18px}
 @media print{header,nav,.bar,.demo{display:none!important}main{max-width:none;padding:0}.tw,.card.tw{overflow:visible}.pdfhead{display:block;margin-bottom:6px}@page{size:A4 landscape;margin:8mm}
 html,body{background:#fff!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}.card{border:0;border-radius:0;padding:0 0 6px;margin-bottom:6px;break-inside:avoid;page-break-inside:avoid}
@@ -521,7 +525,7 @@ table.fit{min-width:0;font-size:9.4px}td.mod input{border:0;background:none;padd
     if (T.utileNetto < 0 && !riserve) avv.push('Nessun utile di esercizio da distribuire.');
     return { capitale: capitale, riservaLegale: legale, accantonamentoLegale: r2(accLegale), riserveLibere: r2(riserve), utileNetto: r2(T.utileNetto), distribuibile: r2(distribuibile),
       dividendo: D, ritenutaPerc: rit, soci: soci, prelievi: prelievi, piano: piano, totRitenuta: totRit, totNetto: totNetto, cassaDopoDividendo: 0, cassaDopoRitenuta: 0,
-      impostePatrimoniali: r2(T.imposte), caricoFiscale: r2(T.imposte + totRit), avvisi: avv };
+      acc25: r2(acc25), impostePatrimoniali: r2(T.imposte), caricoFiscale: r2(T.imposte + totRit), avvisi: avv };
   }
 
   var api = { SCENARIO: SCENARIO, CATEGORIE: CATEGORIE, PARAMS_DEFAULT: PARAMS_DEFAULT, calcola: calcola, simula: simula, dividendi: dividendi, SIM_RIGHE: SIM_RIGHE, SIM_DEFAULT: SIM_DEFAULT, simNorm: simNorm, statoPatrimoniale: statoPatrimoniale, daDashboard: daDashboard, elencoMesi: elencoMesi, r2: r2 };
@@ -590,9 +594,9 @@ function calc(){ return E.calcola({voci:S.voci,dash:S.dash||{},params:params()})
 function cls(x){ return x<-0.004?'neg':(x>0.004?'pos':''); }
 
 /* ── Viste ── */
-var TABS=[['riepilogo','Riepilogo'],['pl','P&L mensile'],['iva','IVA'],['imposte','Imposte (stima)'],['patrimonio','Stato patrimoniale'],['simulazione','Previsione nov-dic'],['utili','Prelievo utili'],['voci','Voci manuali'],['dashboard','Da Dashboard V6'],['param','Parametri'],['controlli','Controlli'],['storico','Storico']];
+var TABS=[['riepilogo','Riepilogo'],['pl','P&L mensile'],['iva','IVA'],['imposte','Imposte (stima)'],['patrimonio','Stato patrimoniale'],['simulazione','Previsione nov-dic'],['utili','Prelievo utili'],['commercialista','Per il commercialista'],['voci','Voci manuali'],['dashboard','Da Dashboard V6'],['param','Parametri'],['controlli','Controlli'],['storico','Storico']];
 function nav(){ document.getElementById('nav').innerHTML=TABS.map(function(t){return '<button class="'+(S.tab===t[0]?'on':'')+'" data-t="'+t[0]+'">'+t[1]+'</button>';}).join(''); }
-function render(){ nav(); var reg=calc(); S.__reg=reg; var r=reg, SIMO=null; if(S.tab==='pl'&&S.plPrev!==false){ try{ SIMO=simRun(); r=SIMO.res; }catch(e){ r=reg; SIMO=null; } } var f={riepilogo:vRiepilogo,pl:vPL,iva:vIva,imposte:vImposte,patrimonio:vPatrimonio,simulazione:vSimulazione,utili:vUtili,voci:vVoci,dashboard:vDash,param:vParam,controlli:vControlli,storico:vStorico}[S.tab]; document.getElementById('main').innerHTML='<div class="bar"><span id="pdfmsg" class="note"></span><button class="p" data-a="pdf" style="margin:0">⬇ Salva PDF</button></div><div class="pdfhead"><b>Bilancio SRL — '+esc(TABS.filter(function(t){return t[0]===S.tab;})[0][1])+'</b><div class="note">Tullio Serci S.r.l. · generato il '+new Date().toLocaleDateString('it-IT')+' · importi in euro, IVA esclusa salvo dove indicato</div></div>'+f(r)+(SIMO?cashFlowHtml(SIMO):'');
+function render(){ nav(); var reg=calc(); S.__reg=reg; var r=reg, SIMO=null; if(S.tab==='pl'&&S.plPrev!==false){ try{ SIMO=simRun(); r=SIMO.res; }catch(e){ r=reg; SIMO=null; } } var f={riepilogo:vRiepilogo,pl:vPL,iva:vIva,imposte:vImposte,patrimonio:vPatrimonio,simulazione:vSimulazione,utili:vUtili,commercialista:vReport,voci:vVoci,dashboard:vDash,param:vParam,controlli:vControlli,storico:vStorico}[S.tab]; document.getElementById('main').innerHTML='<div class="bar"><span id="pdfmsg" class="note"></span><button class="p" data-a="pdf" style="margin:0">⬇ Salva PDF</button></div><div class="pdfhead"'+(S.tab==='commercialista'?' style="display:none!important"':'')+'><b>Bilancio SRL — '+esc(TABS.filter(function(t){return t[0]===S.tab;})[0][1])+'</b><div class="note">Tullio Serci S.r.l. · generato il '+new Date().toLocaleDateString('it-IT')+' · importi in euro, IVA esclusa salvo dove indicato</div></div>'+f(r)+(SIMO?cashFlowHtml(SIMO):'');
   if(S.tab==='riepilogo') grafico(r); if(S.tab==='voci') bulkInfo(); }
 function kpi(l,v,c){ return '<div class="kpi card"><span>'+l+'</span><b class="'+(c||'')+'">'+v+' €</b></div>'; }
 function vRiepilogo(r){ var t=r.totali, ok=r.controlli.every(function(c){return c.ok;});
@@ -715,7 +719,7 @@ function bulkCard(){ var cs=E.CATEGORIE.filter(function(c){return c.tipo!=='sp';
    +'<div><label>Da competenza</label><input type="month" id="b_da" value="2026-01"></div><div><label>A competenza</label><input type="month" id="b_a" value="2026-12"></div></div>'
    +'<div id="b_info" class="note" style="margin-top:6px"></div><button class="l" data-a="bulkdel" style="margin-top:8px;color:var(--ko)">Elimina in blocco</button></div>'; }
 function vVoci(){ return formVoce(false)+bulkCard()+elencoVoci(false); }
-function vPatrimonio(r){ var sp=E.statoPatrimoniale(r,S.voci), cats=E.CATEGORIE.filter(function(c){return c.tipo==='sp';});
+function vPatrimonio(r,noform){ var sp=E.statoPatrimoniale(r,S.voci), cats=E.CATEGORIE.filter(function(c){return c.tipo==='sp';});
   var h='';
   if(sp.length){
     var head='<tr><th style="text-align:left;font-size:11px;color:var(--mu)">€ · valori di bilancio (crediti/debiti al lordo IVA)</th>'+sp.map(function(s){return '<th>'+(s.apertura?'Apertura ':'')+esc(s.m)+'</th>';}).join('')+'</tr>';
@@ -735,7 +739,7 @@ function vPatrimonio(r){ var sp=E.statoPatrimoniale(r,S.voci), cats=E.CATEGORIE.
   var rt=(r.rimanenze||[]).map(function(x){ return '<tr><td style="text-align:left">'+etm(x.m)+'</td><td>'+eur(x.saldo)+'</td><td class="'+cls(x.variazione)+'">'+(x.variazione?eur(x.variazione):'–')+'</td><td style="text-align:left">'+(x.reale?'saldo inserito':'da report magazzino (parametro)')+'</td></tr>'; }).join('');
   h+='<div class="card"><b>Magazzino mese per mese ↔ P&amp;L</b><div class="note">Valore del magazzino SRL (merce consegnata a Paysolution da recuperare con le fatture) a fine mese. La variazione rispetto al mese prima entra nel P&amp;L: calo = costo del venduto. Dal 01/03 i saldi seguono il report del commercialista (consegna 40.983,61 + acquisti +8% − recuperi fatturati nel mese di emissione); al 31/10 il magazzino è 0. Un saldo inserito a mano in "Voci manuali" prevale sul parametro.</div>'
     +(rt?'<div class="tw"><table><tr><th style="text-align:left">Mese</th><th>Rimanenza fine mese €</th><th>Variazione (P&amp;L) €</th><th style="text-align:left">Fonte</th></tr>'+rt+'</table></div>':'')+'</div>';
-  return h+formVoce(true)+elencoVoci(true); }
+  return h+(noform?'':formVoce(true)+elencoVoci(true)); }
 /* ── Simulazione di fine anno e prelievo utili ── */
 function simS(){ if(!S.sim){ var raw=null; try{ raw=(S.config&&S.config.sim)?JSON.parse(S.config.sim):null; }catch(e){} S.sim=E.simNorm(raw); } return S.sim; }
 function simRun(){ return E.simula({voci:S.voci,dash:S.dash||{},params:params()},simS()); }
@@ -873,6 +877,87 @@ function utiliRes(o){ var u=o.utili, t=o.res.totali, P=u.piano;
    +'<div class="note">Stime a ipotesi: IRES/IRAP come nella scheda Imposte; ritenuta sui dividendi alle persone fisiche versata dalla società con F24. Compensi, royalties e mutuo ai soci non sono inclusi. Da confermare con il commercialista prima di deliberare.'+(eff?' Incidenza delle tasse societarie e personali: '+eur(eff)+' % dell\'utile ante imposte (a distribuzione completa solo se il dividendo = utile dopo imposte).':'')+'</div></div>'
    +cashFlowHtml(o); }
 function r2x(P,k){ return Math.round(P.reduce(function(a,x){return a+(x[k]||0);},0)*100)/100; }
+/* ── Report per il commercialista: pagina 1 riepilogo, poi i dettagli ── */
+function repMesi(){ var p=params(), all=[], y=+p.inizio.slice(0,4), k=+p.inizio.slice(5,7);
+  for(var i=0;i<p.mesi;i++){ all.push(y+'-'+(k<10?'0':'')+k); k++; if(k>12){ k=1; y++; } }
+  var d=new Date(), pm=d.getMonth()===0?(d.getFullYear()-1)+'-12':d.getFullYear()+'-'+(d.getMonth()<10?'0':'')+d.getMonth();
+  var m=S.repMese&&all.indexOf(S.repMese)>=0?S.repMese:(all.indexOf(pm)>=0?pm:all[Math.max(0,all.length-3)]);
+  return {all:all,m:m,n:all.indexOf(m)+1}; }
+function fineMese(m){ var y=+m.slice(0,4), k=+m.slice(5,7); var g=new Date(y,k,0).getDate(); return m+'-'+(g<10?'0':'')+g; }
+function vReport(){
+  var R=repMesi(), p=params(), s=simS(), rOct=E.calcola({voci:S.voci,dash:S.dash||{},params:Object.assign({},p,{mesi:R.n})}),
+      o=simRun(), rf=o.res, u=o.utili, fl=o.flusso, a=rOct.totali, t=rf.totali, fine=fineMese(R.m), anno=R.all[R.all.length-1].slice(0,4), ultimo=rOct.mesi[rOct.mesi.length-1]||{};
+  var oggi=new Date().toLocaleDateString('it-IT');
+  var cc=function(x){ return '<td class="'+cls(x)+'">'+eur(x)+'</td>'; };
+  var rr=function(l,x,y,bold){ var z=y-x; return '<tr'+(bold?' class="t"':'')+'><td style="text-align:left">'+l+'</td><td>'+eur(x)+'</td><td>'+eur(z)+'</td><td>'+eur(y)+'</td></tr>'; };
+  var perc=function(x,y){ return y>0.004?IT.format(Math.round(x/y*1000)/10)+' %':'–'; };
+  var f24Pag=rOct.mesi.reduce(function(sm,m){ return sm+Object.keys(m.f24||{}).reduce(function(q,k){ return q+m.f24[k]; },0); },0);
+  var futuri=(S.voci||[]).filter(function(v){ var c=E.CATEGORIE.filter(function(x){return x.id===v.categoria;})[0]; return !v.eliminata&&c&&c.f24&&String(v.data).slice(0,10)>fine; }).sort(function(x,y){ return String(x.data).localeCompare(String(y.data)); });
+  var futTot=futuri.reduce(function(q,v){ return q+(+v.imponibile||0); },0), ko=rOct.controlli.filter(function(c){return !c.ok;});
+  var pre=u.prelievi.map(function(x){ return '<tr><td style="text-align:left">'+dmy(x.data)+'</td><td>'+eur(x.lordo)+'</td><td>'+eur(x.ritenuta)+'</td><td>'+eur(x.netto)+'</td><td>'+dmy(x.f24Data)+'</td></tr>'; }).join('');
+  var riep='<div class="rsec"><div class="rh"><b>Tullio Serci S.r.l.</b> — Situazione al '+dmy(fine)+' e previsionale al 31/12/'+anno+'</div>'
+   +'<div class="note">Documento gestionale preparato per il commercialista il '+oggi+'. Non è un bilancio: importi per competenza, IVA esclusa salvo dove indicato. Le colonne “previsione” sono ipotesi, non dati contabili. Contabilità ordinaria.</div>'
+   +'<div class="rg" style="margin-top:10px"><div>'
+   +'<div class="card tw"><b>1. Conto economico (€, IVA esclusa)</b><table><tr><th style="text-align:left"></th><th>Consuntivo gen–'+etm(R.m).slice(0,3).toLowerCase()+'</th><th>Previsione fino a dicembre</th><th>Totale anno previsto</th></tr>'
+   +rr('Ricavi',a.ricavi,t.ricavi)+rr('Costi',a.costi,t.costi)+rr('Variazione rimanenze',a.varRim,t.varRim)
+   +rr('UTILE ANTE IMPOSTE',a.utile,t.utile,1)+rr('Imposte stimate (IRES + IRAP)',a.imposte,t.imposte)+rr('UTILE DOPO IMPOSTE',a.utileNetto,t.utileNetto,1)
+   +'<tr><td style="text-align:left">Utile ante imposte / ricavi</td><td>'+perc(a.utile,a.ricavi)+'</td><td></td><td>'+perc(t.utile,t.ricavi)+'</td></tr></table></div>'
+   +'<div class="card tw"><b>2. IVA e F24</b><table>'
+   +'<tr><td style="text-align:left">IVA maturata (saldo debito−credito) gen–'+etm(R.m).slice(0,3).toLowerCase()+'</td><td>'+eur(a.ivaSaldo)+'</td></tr>'
+   +'<tr><td style="text-align:left">IVA versata con F24 (saldo + acconto)</td><td>'+eur(a.ivaVersata)+'</td></tr>'
+   +'<tr class="t"><td style="text-align:left">IVA ancora da versare al '+dmy(fine)+' (stima)</td><td class="'+(ultimo.ivaDaVersare>0.5?'neg':'')+'">'+eur(ultimo.ivaDaVersare||0)+'</td></tr>'
+   +'<tr><td style="text-align:left">Totale F24 pagati gen–'+etm(R.m).slice(0,3).toLowerCase()+'</td><td>'+eur(f24Pag)+'</td></tr>'
+   +'<tr><td style="text-align:left">F24 registrati con scadenza successiva ('+futuri.length+')</td><td>'+eur(futTot)+'</td></tr></table></div>'
+   +'</div><div>'
+   +'<div class="card tw"><b>3. Patrimonio netto e riserve (bilancio 2025 e assemblea 09/03/2026)</b><table>'
+   +'<tr><td style="text-align:left">Capitale sociale</td><td>'+eur(u.capitale)+'</td></tr>'
+   +'<tr><td style="text-align:left">Riserva legale (774 + 112 dalla destinazione utile 2025)</td><td>'+eur(u.riservaLegale+u.acc25)+'</td></tr>'
+   +'<tr><td style="text-align:left">Riserve libere (straordinaria + utili SAS + utile 2025 residuo)</td><td>'+eur(u.riserveLibere)+'</td></tr>'
+   +'<tr><td style="text-align:left">Utile 2026 dopo imposte (previsione)</td><td>'+eur(u.utileNetto)+'</td></tr>'
+   +'<tr class="t"><td style="text-align:left">Massimo distribuibile a fine anno (incl. riserve)</td><td>'+eur(u.distribuibile)+'</td></tr></table></div>'
+   +'<div class="card tw"><b>4. Prelievo utili previsto</b>'+(pre?'<table><tr><th style="text-align:left">Data</th><th>Lordo €</th><th>Ritenuta €</th><th>Netto soci €</th><th>F24 entro</th></tr>'+pre
+     +'<tr class="t"><td style="text-align:left">Totale</td><td>'+eur(u.dividendo)+'</td><td>'+eur(u.totRitenuta)+'</td><td>'+eur(u.totNetto)+'</td><td></td></tr></table>':'<div class="note">Nessun prelievo previsto.</div>')
+   +'<div class="note">Ripartizione tra i soci secondo art. 9 dello statuto (10/50/20/20 sugli utili e riserve da utili); ritenuta '+IT.format(u.ritenutaPerc)+'% con F24 entro il 16 del mese successivo.</div></div>'
+   +'<div class="card tw"><b>5. Cassa (indicativa)</b><table><tr><td style="text-align:left">Saldo iniziale '+(fl.manuale?'(inserito)':'('+esc(fl.aperturaData||'n.d.')+')')+'</td><td>'+eur(fl.apertura)+'</td></tr>'
+   +'<tr class="t"><td style="text-align:left">Saldo a fine '+etm(s.mesi[s.mesi.length-1])+' dopo prelievi</td>'+cc(fl.finale)+'</tr>'
+   +'<tr><td style="text-align:left">Ritenute sui dividendi da versare a gennaio</td><td>'+eur(fl.ritenuteOltre)+'</td></tr></table></div>'
+   +'</div></div>'
+   +'<div class="card"><b>6. Punti da discutere</b><ul>'
+   +'<li><b>Riserve e dividendi:</b> conferma che le riserve ('+eur(u.riserveLibere)+' € liberi) sono tutte di utili e distribuibili; trattamento dei 7.786 € di utili SAS già tassati per trasparenza; imputazione e F24 per il prelievo previsto di '+eur(u.dividendo)+' €.</li>'
+   +'<li><b>Prestito ai soci</b> di 10.000 € (maggio 2026, interessi attivi 7%, rate trimestrali, prima rata 02/10): contabilizzazione di credito e interessi.</li>'
+   +'<li><b>TFM 2026:</b> accantonamento previsto '+eur(s.altreRettifiche)+' € (2025: 18.000 €); ammortamenti 2026 non ancora contabilizzati.</li>'
+   +'<li><b>IVA 2026</b> ancora da versare (stima '+eur(ultimo.ivaDaVersare||0)+' €) e F24 registrati in scadenza ('+eur(futTot)+' €); ritenute versate in ritardo.</li>'
+   +'<li><b>Imposte:</b> la stima IRES/IRAP del gestionale ('+eur(t.imposte)+' € a fine anno) va confrontata con il calcolo dello studio.</li>'
+   +(ko.length?'<li><b>Controlli incrociati non superati ('+ko.length+'):</b> '+ko.map(function(c){return esc(c.nome);}).join('; ')+'.</li>':'<li>Controlli incrociati del gestionale tutti superati.</li>')
+   +'</ul></div></div>';
+  var sez=function(tit,html){ return '<div class="rsec pbk"><h2>'+tit+'</h2>'+html+'</div>'; };
+  var ip=E.SIM_RIGHE.filter(function(rg){ return s.righe[rg.id].some(function(x){return +x;}); }).map(function(rg){ return '<tr><td style="text-align:left">'+esc(rg.nome)+'</td>'+s.righe[rg.id].map(function(x){return '<td>'+eur(+x||0)+'</td>';}).join('')+'<td>'+(rg.noIva?'–':IT.format(+s.iva[rg.id]||0)+' %')+'</td></tr>'; }).join('');
+  var ipo='<div class="note">Importi IVA esclusa che si aggiungono a quanto già registrato nei mesi della previsione.</div><div class="card tw"><table><tr><th style="text-align:left">Voce</th>'+s.mesi.map(function(m){return '<th>'+etm(m)+' €</th>';}).join('')+'<th>IVA %</th></tr>'+(ip||'<tr><td colspan="4" class="note">Nessuna voce di previsione.</td></tr>')+'</table></div>'
+   +'<div class="card"><ul><li>Contributi su compensi calcolati al '+IT.format(+s.contribPerc||0)+'%; quota netta dei compensi pagata in banca '+IT.format(+s.nettoPerc||0)+'%.</li><li>Accantonamento TFM 2026: '+eur(s.altreRettifiche)+' € (non monetario, indeducibile IRAP).</li><li>Ripartizione dei dividendi: '+s.soci.map(function(x){ return esc(x.nome)+' '+IT.format(+x.div||0)+'% (capitale '+IT.format(+x.cap||0)+'%)'; }).join('; ')+'.</li><li>Aliquote usate: IRES '+IT.format(p.ires)+'%, IRAP '+IT.format(p.irap)+'% (stime).</li><li>Cash flow per data del movimento (IVA inclusa); non include debiti già maturati e non pagati.</li></ul></div>';
+  var sel='<select id="repmese">'+R.all.map(function(m){ return '<option value="'+m+'"'+(m===R.m?' selected':'')+'>'+etm(m)+'</option>'; }).join('')+'</select>';
+  var top='<div class="card norep" style="margin-bottom:12px"><b>Report per il commercialista</b><div class="note">Pagina 1 riepilogo, a seguire i dettagli: conto economico mensile consuntivo e previsionale, IVA, imposte, stato patrimoniale, prelievo utili e cash flow, ipotesi e controlli.</div>'
+   +'<div class="g" style="margin-top:8px"><div><label>Situazione chiusa al mese di</label>'+sel+'</div></div>'
+   +'<button class="p" data-a="pdfcomm" style="margin-top:8px">⬇ Genera PDF per il commercialista</button><span id="pdfmsg2" class="note" style="margin-left:8px"></span></div>';
+  return top+riep
+   +sez('Conto economico mensile — consuntivo al '+dmy(fine),vPL(rOct,true))
+   +sez('Conto economico mensile — previsionale a fine anno (consuntivo + previsione)',vPL(rf,true))
+   +sez('IVA — liquidazioni',vIva(rf))
+   +sez('Imposte — stima',vImposte(rf))
+   +sez('Stato patrimoniale — saldi inseriti',vPatrimonio(rOct,true))
+   +sez('Prelievo utili, ritenute e cash flow',utiliRes(o))
+   +sez('Ipotesi della previsione',ipo)
+   +sez('Controlli incrociati',vControlli(rOct)); }
+async function pdfCommercialista(){ var pm=document.getElementById('pdfmsg2'), nome='Bilancio_SRL_per_commercialista_'+new Date().toISOString().slice(0,10)+'.pdf';
+  try{
+    if(pm){ pm.textContent='Preparo il PDF…'; pm.className='note'; }
+    await caricaLib(); document.body.classList.add('pdfmode'); await new Promise(function(r){setTimeout(r,200);});
+    var secs=[].slice.call(document.querySelectorAll('#main .rsec')), opt={margin:[8,8,8,8],filename:nome,image:{type:'jpeg',quality:.95},html2canvas:{scale:1.6,backgroundColor:'#ffffff',windowWidth:1520},jsPDF:{unit:'px',format:[1500,1061],orientation:'landscape',hotfixes:['px_scaling']},pagebreak:{mode:['css','legacy'],avoid:['tr','.card']}};
+    var w=html2pdf().set(opt).from(secs[0]).toPdf();
+    for(var i=1;i<secs.length;i++){ (function(el){ w=w.get('pdf').then(function(pdf){ pdf.addPage(); }).from(el,'element').toContainer().toCanvas().toPdf(); })(secs[i]); }
+    await w.save();
+    document.body.classList.remove('pdfmode'); if(pm){ pm.textContent='PDF scaricato: '+nome; pm.className='note ok'; }
+  }catch(e){ document.body.classList.remove('pdfmode'); if(pm){ pm.textContent='Download diretto non riuscito ('+e.message+'): apro la stampa, scegli "Salva come PDF".'; pm.className='note ko'; } setTimeout(function(){ window.print(); },400); } }
+document.addEventListener('change',function(e){ if(e.target&&e.target.id==='repmese'){ S.repMese=e.target.value; render(); } });
 function vDash(r){ var d=S.dash||{}, ch=Object.keys(d.chiusure||{}).sort();
   return '<div class="card"><b>Dati letti dalla Dashboard V6 (sola lettura)</b><div class="note">Letti il '+esc(d.letto_il||'—')+'. Mese con chiusura = valori della chiusura (immutabili); mesi senza chiusura = fatture intercompany approvate.</div></div>'
   +'<div class="card tw"><table><tr><th>Mese</th><th>Ricavi TS→PS (imponibile)</th><th>IVA debito</th><th>Costi PS→TS (imponibile)</th><th>IVA credito</th><th>Fonte</th></tr>'
@@ -897,7 +982,7 @@ async function salvaPdf(){ var pm=document.getElementById('pdfmsg'), nome='Bilan
     if(pm){ pm.textContent='Preparo il PDF…'; pm.className='note'; }
     await caricaLib(); document.body.classList.add('pdfmode');
     var el=document.getElementById('main'); await new Promise(function(r){setTimeout(r,150);});
-    await html2pdf().set({margin:[6,6,6,6],filename:nome,image:{type:'jpeg',quality:.96},html2canvas:{scale:2,backgroundColor:'#ffffff',windowWidth:1520},jsPDF:{unit:'mm',format:'a4',orientation:'landscape'},pagebreak:{mode:['css','legacy'],avoid:['tr','.card']}}).from(el).save();
+    await html2pdf().set({margin:[8,8,8,8],filename:nome,image:{type:'jpeg',quality:.95},html2canvas:{scale:1.6,backgroundColor:'#ffffff',windowWidth:1520},jsPDF:{unit:'px',format:[1500,1061],orientation:'landscape',hotfixes:['px_scaling']},pagebreak:{mode:['css','legacy'],avoid:['tr','.card']}}).from(el).save();
     document.body.classList.remove('pdfmode'); if(pm){ pm.textContent=(S.tab==='simulazione'||S.tab==='utili'?'Simulazione salvata · ':'')+'PDF scaricato: '+nome; pm.className='note ok'; }
   }catch(e){ document.body.classList.remove('pdfmode'); if(pm){ pm.textContent='Download diretto non riuscito ('+e.message+'): apro la stampa, scegli "Salva come PDF".'; pm.className='note ko'; } setTimeout(function(){ window.print(); },400); } }
 function msg(t,ko){ var m=document.getElementById('msg'); if(m){ m.textContent=t; m.className='note '+(ko?'ko':'ok'); } }
@@ -925,6 +1010,7 @@ async function azione(a,id){
     else if(a==='simreset'){ S.sim=E.simNorm(E.SCENARIO); render(); msg('Scenario ripristinato: premi "Salva previsione" per conservarlo'); }
     else if(a==='salvasim'){ S.config=await call('apiSalvaConfig',{sim:JSON.stringify(simS())}); msg('Previsione salvata'); }
     else if(a==='pdf'){ await salvaPdf(); }
+    else if(a==='pdfcomm'){ await pdfCommercialista(); }
     else if(a==='importa'){ document.getElementById('imp').click(); }
   }catch(e){ msg(e.message,1); }
 }
