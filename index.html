@@ -356,13 +356,16 @@ table.fit{min-width:0;font-size:9.4px}table.fit th,table.fit td{padding:2.5px 3p
   ];
   var SIM_DEFAULT = {
     mesi: ['2026-11', '2026-12'],
+    /* Scenario concordato il 07/11/2026 (importi IVA esclusa; compensi LORDI = netti / 0,61, rapporto netto/lordo osservato nel 2026):
+       nov: Rosanna 6.000 netti + Tullio 200 netti = 6.200 netti; dic: Rosanna 500 netti + Tullio 200 netti = 700 netti.
+       Pubblicita' 1.600; Marini 375; Paysolution 1.800; altre voci (sicurezza e varie) 1.800 al mese. Dividendi lordi 5.000 (nov) + 15.000 (dic). */
     righe: { serviziFatt: [0, 0], paysRicavo: [0, 0], venditeGett: [0, 0], amazon: [0, 0], corrisp: [0, 0], interessi: [0, 0],
-      compensi: [0, 0], contributi: [0, 0], stipendi: [0, 0], royalties: [0, 0], paysCosto: [0, 0], acqServizi: [0, 0], acqMateriali: [0, 0], pubblicita: [0, 0],
-      trasferte: [0, 0], abbonamenti: [0, 0], trasporti: [0, 0], oneri: [0, 0], oneriFin: [0, 0], altri: [0, 0], f24: [0, 0] },
+      compensi: [10163.93, 1147.54], contributi: [0, 0], stipendi: [0, 0], royalties: [0, 0], paysCosto: [1800, 1800], acqServizi: [375, 375], acqMateriali: [0, 0], pubblicita: [1600, 1600],
+      trasferte: [0, 0], abbonamenti: [0, 0], trasporti: [0, 0], oneri: [0, 0], oneriFin: [0, 0], altri: [1800, 1800], f24: [0, 0] },
     iva: { serviziFatt: 0, paysRicavo: 22, venditeGett: 22, amazon: 22, corrisp: 22, paysCosto: 22, acqServizi: 22, acqMateriali: 22, pubblicita: 22, trasferte: 0, abbonamenti: 22, trasporti: 22, altri: 22 },
-    contribPerc: 17, nettoPerc: 60, rimanenze: ['', ''], altreRettifiche: 0,
-    laser: { attiva: true, costo: 4642.22, ricarico: 8, iva: 22, mese: '2026-12' },
-    dividendo: 0, ritenuta: 26, usaRiserve: true,
+    contribPerc: 17, nettoPerc: 61, rimanenze: ['', ''], altreRettifiche: 0,
+    laser: { attiva: false, costo: 4642.22, ricarico: 8, iva: 22, mese: '2026-12' },
+    dividendo: 20000, ritenuta: 26, usaRiserve: true,
     soci: [{ nome: 'Tullio Serci', cap: 60, div: 10 }, { nome: 'Rosanna Garaguso', cap: 30, div: 50 },
            { nome: 'Matteo Serci', cap: 5, div: 20 }, { nome: 'Francesca Maria Serci', cap: 5, div: 20 }]
   };
@@ -648,7 +651,7 @@ function simKpi(){ var o=simRun(), t=o.res.totali, ok=t.utile>=0;
   return '<div class="kpis"><div class="kpi card"><span>Risultato ante imposte a fine anno (con la previsione)</span><b class="'+cls(t.utile)+'">'+eur(t.utile)+' €</b></div>'
    +'<div class="kpi card"><span>'+(ok?'Costi ancora sostenibili in più, restando in utile':'Mancano per arrivare in utile (meno costi o più ricavi)')+'</span><b class="'+(ok?'pos':'neg')+'">'+eur(Math.abs(t.utile))+' €</b></div>'
    +'<div class="kpi card"><span>Utile dopo imposte stimate</span><b class="'+cls(t.utileNetto)+'">'+eur(t.utileNetto)+' €</b></div></div>'; }
-function simSalva(){ return '<button class="p" data-a="salvasim">Salva previsione</button><span id="msg" class="note"></span>'; }
+function simSalva(){ return '<button class="l" data-a="simreset" style="margin-right:8px">Ripristina scenario concordato 07/11</button><button class="p" data-a="salvasim">Salva previsione</button><span id="msg" class="note"></span>'; }
 function vSimulazione(){ var s=simS(), mesi=s.mesi.map(etm);
   var reg=function(rg,m){ if(!rg.cat) return null; return S.voci.filter(function(v){ return !v.eliminata&&v.categoria===rg.cat&&String(v.competenza).slice(0,7)===m; }).reduce(function(t,v){return t+(+v.imponibile||0);},0); };
   var rows='', gr='';
@@ -750,6 +753,7 @@ async function azione(a,id){
     else if(a==='salvaparam'){ S.config=await call('apiSalvaConfig',{inizio:val('p_inizio'),mesi:val('p_mesi'),ires:val('p_ires'),irap:val('p_irap'),ivaPeriodo:val('p_ivaPeriodo'),includeAcquistiSrl:val('p_inc'),includeDashboard:val('p_dash'),includeRimanenze:val('p_rim')}); msg('Parametri salvati'); render(); }
     else if(a==='login'){ var rr=await call('apiLogin',val('l_u'),val('l_p')); TOKEN=rr.token; try{sessionStorage.setItem('bsrl_t',TOKEN);}catch(e){} await avvia(); }
     else if(a==='logout'){ try{await call('apiLogout');}catch(e){} esci(); }
+    else if(a==='simreset'){ S.sim=E.simNorm(null); render(); msg('Scenario ripristinato: premi "Salva previsione" per conservarlo'); }
     else if(a==='salvasim'){ S.config=await call('apiSalvaConfig',{sim:JSON.stringify(simS())}); msg('Previsione salvata'); }
     else if(a==='pdf'){ await salvaPdf(); }
     else if(a==='importa'){ document.getElementById('imp').click(); }
