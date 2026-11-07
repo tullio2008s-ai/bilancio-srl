@@ -46,9 +46,11 @@ body.pdfmode .pdfhead{display:block;margin-bottom:8px}body.pdfmode .pdfhead b{fo
 /* Motore di calcolo Bilancio gestionale SRL. Funzioni pure: stesso file usato dalla pagina e dai test. */
 (function (root) {
   var CATEGORIE = [
-    { id: 'servizi', nome: 'Servizi a terzi (consulenze)', tipo: 'ricavo' },
-    { id: 'vendite', nome: 'Vendite gettoniere e abbonamenti clienti', tipo: 'ricavo' },
-    { id: 'intercompany_ricavo', nome: 'Fatture a Paysolution (intercompany)', tipo: 'ricavo' },
+    { id: 'servizi', nome: 'Fatture ad Adler', tipo: 'ricavo' },
+    { id: 'intercompany_ricavo', nome: 'Fatture a Paysolution', tipo: 'ricavo' },
+    { id: 'vendite', nome: 'Vendita gettoniere', tipo: 'ricavo' },
+    { id: 'vendite_amazon', nome: 'Vendite su Amazon', tipo: 'ricavo' },
+    { id: 'corrispettivi', nome: 'Vendite per corrispettivi', tipo: 'ricavo' },
     { id: 'acquisti_materiali', nome: 'Acquisti materiali e merci', tipo: 'costo' },
     { id: 'intercompany_costo', nome: 'Fatture da Paysolution (intercompany)', tipo: 'costo' },
     { id: 'trasporti', nome: 'Trasporti e spedizioni', tipo: 'costo' },
@@ -281,6 +283,8 @@ body.pdfmode .pdfhead{display:block;margin-bottom:8px}body.pdfmode .pdfhead b{fo
     var dup = L.filter(function (r) { return (r.cat.intercompany_ricavo && r.ricaviDash) || (r.cat.intercompany_costo && r.costiDash); }).map(function (r) { return r.m; });
     var esclusi = L.filter(function (r) { return r.dashEscluso; }).map(function (r) { return r.m; });
     add('Nessun doppio conteggio Paysolution (Dashboard V6 + voci manuali)', dup.length === 0, dup.length ? 'Mesi con le due fonti insieme: ' + dup.join(', ') : (esclusi.length ? 'Dashboard esclusa automaticamente nei mesi: ' + esclusi.join(', ') : ''));
+    var sumCat = L.reduce(function (t, r) { return t + Object.keys(r.cat).reduce(function (a, k) { return a + (cats[k] && cats[k].tipo === 'ricavo' ? r.cat[k] : 0); }, 0); }, 0);
+    add('Righe ricavi (Adler + Paysolution + gettoniere + Amazon + corrispettivi) = totale fatturato manuale', eq(sumCat, sr), 'Somma righe ' + r2(sumCat) + ' - totale ' + r2(sr));
     add('Ricavi manuali del P&L = somma voci inserite', eq(sr, man.r));
     add('Costi manuali del P&L = somma voci inserite', eq(sc, man.c));
     statoPatrimoniale(res, input.voci, input.categorie).filter(function (s) { return s.apertura; }).forEach(function (s) {
@@ -478,22 +482,24 @@ function dettaglioCat(r){ var tot={}, tipo={};
   E.CATEGORIE.forEach(function(c){ tipo[c.id]=c.tipo; });
   r.mesi.forEach(function(m){ Object.keys(m.cat||{}).forEach(function(k){ tot[k]=(tot[k]||0)+m.cat[k]; }); });
   var ids=Object.keys(tot).sort(function(a,b){ return (tipo[a]==='ricavo'?0:1)-(tipo[b]==='ricavo'?0:1) || Math.abs(tot[b])-Math.abs(tot[a]); });
-  if(!ids.length) return '';
   var h=r.mesi.map(function(m){return etm(m.m);}).concat(['Totale','% fatturato']);
   var rowC=function(k){ return '<tr><td>'+esc(catNome(k))+(tipo[k]==='ricavo'?' (ricavo)':'')+' — IVA escl.</td>'+r.mesi.map(function(m){return '<td>'+eur((m.cat||{})[k]||0)+'</td>';}).join('')+'<td>'+eur(tot[k])+'</td><td><b>'+pct(tot[k],r.totali.ricavi)+'</b></td></tr>'; };
   var rowT=function(l,f,cl){ var t=sum(r,f); return '<tr class="tt"><td>'+l+'</td>'+r.mesi.map(function(m){return '<td>'+eur(f(m))+'</td>';}).join('')+'<td>'+eur(t)+'</td><td>'+pct(t,r.totali.ricavi)+'</td></tr>'; };
   var rowD=function(l,f){ var t=sum(r,f); return '<tr class="s"><td>'+l+'</td>'+r.mesi.map(function(m){return '<td>'+eur(f(m))+'</td>';}).join('')+'<td>'+eur(t)+'</td><td>'+pct(t,r.totali.ricavi)+'</td></tr>'; };
-  var rows=[], ricIds=ids.filter(function(k){return tipo[k]==='ricavo';}), cosIds=ids.filter(function(k){return tipo[k]!=='ricavo';});
-  ricIds.forEach(function(k){ rows.push(rowC(k)); });
-  rows.push(rowD('Ricavi da Dashboard V6 (IVA esclusa)',function(m){return m.ricaviDash;})); rows.push(rowT('TOTALE RICAVI (IVA esclusa)',function(m){return m.ricavi;}));
+  var rows=[], ricIds=E.CATEGORIE.filter(function(c){return c.tipo==='ricavo';}).map(function(c){return c.id;}), cosIds=ids.filter(function(k){return tipo[k]!=='ricavo';});
+  ricIds.forEach(function(k){ if(tot[k]===undefined) tot[k]=0; rows.push(rowC(k)); });
+  if(sum(r,function(m){return m.ricaviDash;})) rows.push(rowD('Ricavi da Dashboard V6 (IVA esclusa)',function(m){return m.ricaviDash;}));
+  rows.push(rowT('TOTALE FATTURATO (IVA esclusa)',function(m){return m.ricavi;}));
   cosIds.forEach(function(k){ rows.push(rowC(k)); });
   rows.push(rowD('Costi da Dashboard V6 (IVA esclusa)',function(m){return m.costiDash;})); rows.push(rowT('TOTALE COSTI (IVA esclusa)',function(m){return m.costi;}));
   return '<div class="card"><b>Dettaglio per categoria e incidenza sul fatturato</b></div>'+tab(h,rows,'€ · IVA ESCLUSA (imponibili)')+'<div class="note">Importi IVA esclusa; fa eccezione l\'IVA indetraibile, che è un costo. Le voci "da Dashboard V6" non hanno dettaglio per categoria. % = importo / ricavi totali del periodo.</div>'; }
 function sum(r,f){ return r.mesi.reduce(function(s,m){return s+f(m);},0); }
 function vPL(r){ var h=r.mesi.map(function(m){return etm(m.m);}).concat(['Totale']);
-  var rows=[rowM('Ricavi da Dashboard V6 (IVA esclusa)',r,function(m){return m.ricaviDash;},{tot:sum(r,function(m){return m.ricaviDash;})}),
-   rowM('Ricavi manuali (servizi a terzi) — IVA esclusa',r,function(m){return m.ricaviMan;},{tot:sum(r,function(m){return m.ricaviMan;})}),
-   rowM('RICAVI (IVA esclusa)',r,function(m){return m.ricavi;},{t:1,tot:r.totali.ricavi}),
+  var ricRows=E.CATEGORIE.filter(function(c){return c.tipo==='ricavo';}).map(function(c){
+    return rowM(esc(c.nome)+' — IVA esclusa',r,function(m){return (m.cat||{})[c.id]||0;},{tot:sum(r,function(m){return (m.cat||{})[c.id]||0;})}); });
+  if(sum(r,function(m){return m.ricaviDash;})) ricRows.push(rowM('Ricavi da Dashboard V6 (IVA esclusa)',r,function(m){return m.ricaviDash;},{tot:sum(r,function(m){return m.ricaviDash;})}));
+  var rows=ricRows.concat([
+   rowM('RICAVI = TOTALE FATTURATO (IVA esclusa)',r,function(m){return m.ricavi;},{t:1,tot:r.totali.ricavi}),
    rowM('Costi da Dashboard V6 (IVA esclusa)',r,function(m){return m.costiDash;},{tot:sum(r,function(m){return m.costiDash;})}),
    rowM('Costi manuali — IVA esclusa (IVA indetraibile inclusa)',r,function(m){return m.costiMan;},{tot:sum(r,function(m){return m.costiMan;})}),
    rowM('COSTI (IVA esclusa)',r,function(m){return m.costi;},{t:1,tot:r.totali.costi}),
@@ -502,7 +508,7 @@ function vPL(r){ var h=r.mesi.map(function(m){return etm(m.m);}).concat(['Totale
    rowM('UTILE / PERDITA (al netto IVA)',r,function(m){return m.utile;},{t:1,c:1,tot:r.totali.utile}),
    rowP('% utile sul fatturato',r,function(m){return m.utile;},{c:1,tot:r.totali.utile}),
    rowM('Utile cumulato',r,function(m){return m.utileCum;},{c:1,tot:r.totali.utile}),
-   rowM('Fonte Dashboard',r,function(){return 0;},{s:1,tot:0}).replace(/<td class="">0,00<\/td>/g,'<td></td>')];
+   rowM('Fonte Dashboard',r,function(){return 0;},{s:1,tot:0}).replace(/<td class="">0,00<\/td>/g,'<td></td>')]);
   rows[rows.length-1]='<tr class="s"><td>Fonte Dashboard</td>'+r.mesi.map(function(m){return '<td>'+esc(m.fonte)+'</td>';}).join('')+'<td></td></tr>';
   return tab(h,rows)+dettaglioCat(r)+'<div class="note">F24 ritenute e simili versamenti non sono costi: '+eur(r.totali.uscitaNonCosto)+' € registrati fuori dal P&L.</div>'; }
 function vIva(r){ var h=r.mesi.map(function(m){return etm(m.m);}).concat(['Totale']);
