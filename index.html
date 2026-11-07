@@ -11,7 +11,7 @@ header h1{font-size:18px;margin:0;flex:1}header small{opacity:.85}
 nav{display:flex;gap:4px;padding:8px 12px;overflow:auto;background:var(--card);border-bottom:1px solid var(--ln)}
 nav button{border:0;background:none;color:var(--mu);padding:8px 12px;border-radius:8px;font:inherit;cursor:pointer;white-space:nowrap}
 nav button.on{background:var(--ac);color:#fff}
-main{padding:12px 16px;max-width:1200px;margin:auto}
+main{padding:12px 16px;max-width:1760px;margin:auto}
 .card{background:var(--card);border:1px solid var(--ln);border-radius:12px;padding:14px;margin-bottom:12px}
 .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
 .kpi b{display:block;font-size:20px}.kpi span{color:var(--mu);font-size:12px}
@@ -26,6 +26,15 @@ input,select,textarea{width:100%;padding:8px;border:1px solid var(--ln);border-r
 button.p{background:var(--ac);color:#fff;border:0;padding:9px 16px;border-radius:8px;font:inherit;cursor:pointer;margin:10px 6px 0 0}
 button.l{background:none;border:1px solid var(--ln);color:var(--tx);padding:5px 10px;border-radius:8px;cursor:pointer;font:inherit;font-size:12px}
 .ck{display:flex;gap:8px;padding:3px 0;font-size:13px}.ok{color:var(--ok)}.ko{color:var(--ko)}.wa{color:var(--wa)}
+table.fit{font-size:12px}table.fit th,table.fit td{padding:5px 5px}table.fit td:first-child,table.fit th:first-child{white-space:normal;min-width:150px;max-width:230px}
+tr.tt td{font-weight:700;background:var(--bg);border-top:2px solid var(--ln)}
+.bar{display:flex;gap:8px;align-items:center;justify-content:flex-end;margin-bottom:8px}.bar .note{margin-right:auto}
+.pdfhead{display:none}
+body.pdfmode{background:#fff;color:#1b2433;--bg:#f4f6fa;--card:#fff;--tx:#1b2433;--mu:#66728a;--ln:#dde3ee;--ac:#1f4e9c;--ok:#1a7f4b;--ko:#b3261e;--wa:#a86400}
+body.pdfmode header,body.pdfmode nav,body.pdfmode .bar,body.pdfmode .demo{display:none!important}
+body.pdfmode main{max-width:none;width:1500px;margin:0;padding:10px}body.pdfmode .tw{overflow:visible}
+body.pdfmode .pdfhead{display:block;margin-bottom:8px}body.pdfmode .pdfhead b{font-size:18px}
+@media print{header,nav,.bar,.demo{display:none!important}main{max-width:none;padding:0}.tw{overflow:visible}.pdfhead{display:block;margin-bottom:6px}@page{size:A4 landscape;margin:8mm}}
 .note{font-size:12px;color:var(--mu)}.hid{display:none}
 </style></head><body>
 <header><h1>Bilancio SRL <small>Tullio Serci S.r.l. · gestionale riservato</small></h1><small id="utente"></small><button class="l" id="exit" data-a="logout" style="color:#fff;border-color:#fff8">Esci</button></header>
@@ -430,11 +439,11 @@ function cls(x){ return x<-0.004?'neg':(x>0.004?'pos':''); }
 /* ── Viste ── */
 var TABS=[['riepilogo','Riepilogo'],['pl','P&L mensile'],['iva','IVA'],['imposte','Imposte (stima)'],['patrimonio','Stato patrimoniale'],['simulazione','Simulazione fine anno'],['utili','Prelievo utili'],['voci','Voci manuali'],['dashboard','Da Dashboard V6'],['param','Parametri'],['controlli','Controlli'],['storico','Storico']];
 function nav(){ document.getElementById('nav').innerHTML=TABS.map(function(t){return '<button class="'+(S.tab===t[0]?'on':'')+'" data-t="'+t[0]+'">'+t[1]+'</button>';}).join(''); }
-function render(){ nav(); var r=calc(); var f={riepilogo:vRiepilogo,pl:vPL,iva:vIva,imposte:vImposte,patrimonio:vPatrimonio,simulazione:vSimulazione,utili:vUtili,voci:vVoci,dashboard:vDash,param:vParam,controlli:vControlli,storico:vStorico}[S.tab]; document.getElementById('main').innerHTML=f(r);
+function render(){ nav(); var r=calc(); var f={riepilogo:vRiepilogo,pl:vPL,iva:vIva,imposte:vImposte,patrimonio:vPatrimonio,simulazione:vSimulazione,utili:vUtili,voci:vVoci,dashboard:vDash,param:vParam,controlli:vControlli,storico:vStorico}[S.tab]; document.getElementById('main').innerHTML='<div class="bar"><span id="pdfmsg" class="note"></span><button class="p" data-a="pdf" style="margin:0">⬇ Salva PDF</button></div><div class="pdfhead"><b>Bilancio SRL — '+esc(TABS.filter(function(t){return t[0]===S.tab;})[0][1])+'</b><div class="note">Tullio Serci S.r.l. · generato il '+new Date().toLocaleDateString('it-IT')+' · importi in euro, IVA esclusa salvo dove indicato</div></div>'+f(r);
   if(S.tab==='riepilogo') grafico(r); }
 function kpi(l,v,c){ return '<div class="kpi card"><span>'+l+'</span><b class="'+(c||'')+'">'+v+' €</b></div>'; }
 function vRiepilogo(r){ var t=r.totali, ok=r.controlli.every(function(c){return c.ok;});
-  return '<div class="kpis">'+kpi('Ricavi',eur(t.ricavi))+kpi('Costi',eur(t.costi))+kpi('Utile ante imposte',eur(t.utile),cls(t.utile))+'<div class="kpi card"><span>Margine utile sul fatturato</span><b class="'+cls(t.utile)+'">'+pct(t.utile,t.ricavi)+'</b></div>'+kpi('Imposte stimate',eur(t.imposte))+kpi('Utile stimato dopo imposte',eur(t.utileNetto),cls(t.utileNetto))+kpi('IVA da versare nel periodo',eur(t.ivaVersare))+kpi('Credito IVA residuo',eur(t.ivaCreditoFinale))+'</div>'
+  return '<div class="note" style="margin-bottom:6px">Tutti gli importi sono in € e IVA ESCLUSA, salvo dove indicato (IVA, cassa e crediti/debiti).</div><div class="kpis">'+kpi('Ricavi (IVA esclusa)',eur(t.ricavi))+kpi('Costi (IVA esclusa)',eur(t.costi))+kpi('Utile ante imposte',eur(t.utile),cls(t.utile))+'<div class="kpi card"><span>Margine utile sul fatturato</span><b class="'+cls(t.utile)+'">'+pct(t.utile,t.ricavi)+'</b></div>'+kpi('Imposte stimate',eur(t.imposte))+kpi('Utile stimato dopo imposte',eur(t.utileNetto),cls(t.utileNetto))+kpi('IVA da versare nel periodo',eur(t.ivaVersare))+kpi('Credito IVA residuo',eur(t.ivaCreditoFinale))+'</div>'
   +'<div class="card"><b>Utile cumulato per mese</b><svg id="gr" viewBox="0 0 640 180" width="100%"></svg></div>'
   +'<div class="card"><span class="'+(ok?'ok':'ko')+'">'+(ok?'✔ Tutti i controlli incrociati tornano':'✖ Controlli incrociati falliti: vedi scheda Controlli')+'</span>'
   +(r.avvisi.length?'<div class="wa note">'+r.avvisi.map(esc).join('<br>')+'</div>':'')
@@ -443,7 +452,7 @@ function vRiepilogo(r){ var t=r.totali, ok=r.controlli.every(function(c){return 
 function grafico(r){ var svg=document.getElementById('gr'); if(!svg) return; var v=r.mesi.map(function(m){return m.utileCum;}), mx=Math.max.apply(null,v.concat([1])), mn=Math.min.apply(null,v.concat([0])), W=640,H=180,pb=22,n=v.length,bw=W/n,sc=(H-pb-10)/(mx-mn||1),z=10+mx*sc,h='';
   v.forEach(function(x,i){ var hh=Math.abs(x)*sc, y=x>=0?z-hh:z; h+='<rect x="'+(i*bw+4)+'" y="'+y+'" width="'+(bw-8)+'" height="'+Math.max(hh,1)+'" fill="'+(x>=0?'#1a7f4b':'#b3261e')+'"/><text x="'+(i*bw+bw/2)+'" y="'+(H-6)+'" font-size="10" text-anchor="middle" fill="#888">'+etm(r.mesi[i].m).slice(0,3)+'</text>'; });
   svg.innerHTML=h+'<line x1="0" x2="'+W+'" y1="'+z+'" y2="'+z+'" stroke="#888" stroke-width=".5"/>'; }
-function tab(head,rows){ return '<div class="card tw"><table><tr><th></th>'+head.map(function(h){return '<th>'+h+'</th>';}).join('')+'</tr>'+rows.join('')+'</table></div>'; }
+function tab(head,rows,lab){ return '<div class="card tw"><table class="fit"><tr><th style="text-align:left;font-size:11px;color:var(--mu)">'+(lab||'€ · IVA ESCLUSA')+'</th>'+head.map(function(h){return '<th>'+h+'</th>';}).join('')+'</tr>'+rows.join('')+'</table></div>'; }
 function rowM(l,r,f,o){ o=o||{}; return '<tr class="'+(o.t?'t':'')+(o.s?' s':'')+'"><td>'+l+'</td>'+r.mesi.map(function(m){var x=f(m);return '<td class="'+(o.c?cls(x):'')+'">'+eur(x)+'</td>';}).join('')+'<td class="'+(o.c?cls(o.tot):'')+'">'+eur(o.tot)+'</td></tr>'; }
 var pct=function(x,tot){ return tot>0.004 ? IT.format(Math.round(x/tot*1000)/10)+' %' : '–'; };
 function rowP(l,r,f,o){ o=o||{}; return '<tr class="s"><td>'+l+'</td>'+r.mesi.map(function(m){var x=f(m);return '<td class="'+(o.c?cls(x):'')+'">'+pct(x,m.ricavi)+'</td>';}).join('')+'<td class="'+(o.c?cls(o.tot):'')+'">'+pct(o.tot,r.totali.ricavi)+'</td></tr>'; }
@@ -453,38 +462,45 @@ function dettaglioCat(r){ var tot={}, tipo={};
   var ids=Object.keys(tot).sort(function(a,b){ return (tipo[a]==='ricavo'?0:1)-(tipo[b]==='ricavo'?0:1) || Math.abs(tot[b])-Math.abs(tot[a]); });
   if(!ids.length) return '';
   var h=r.mesi.map(function(m){return etm(m.m);}).concat(['Totale','% fatturato']);
-  var rows=ids.map(function(k){ return '<tr><td>'+esc(catNome(k))+(tipo[k]==='ricavo'?' (ricavo)':'')+'</td>'+r.mesi.map(function(m){return '<td>'+eur((m.cat||{})[k]||0)+'</td>';}).join('')+'<td>'+eur(tot[k])+'</td><td><b>'+pct(tot[k],r.totali.ricavi)+'</b></td></tr>'; });
-  return '<div class="card"><b>Dettaglio per categoria e incidenza sul fatturato</b></div>'+tab(h,rows)+'<div class="note">Le voci "da Dashboard V6" non hanno dettaglio per categoria. % = importo / ricavi totali del periodo.</div>'; }
+  var rowC=function(k){ return '<tr><td>'+esc(catNome(k))+(tipo[k]==='ricavo'?' (ricavo)':'')+' — IVA escl.</td>'+r.mesi.map(function(m){return '<td>'+eur((m.cat||{})[k]||0)+'</td>';}).join('')+'<td>'+eur(tot[k])+'</td><td><b>'+pct(tot[k],r.totali.ricavi)+'</b></td></tr>'; };
+  var rowT=function(l,f,cl){ var t=sum(r,f); return '<tr class="tt"><td>'+l+'</td>'+r.mesi.map(function(m){return '<td>'+eur(f(m))+'</td>';}).join('')+'<td>'+eur(t)+'</td><td>'+pct(t,r.totali.ricavi)+'</td></tr>'; };
+  var rowD=function(l,f){ var t=sum(r,f); return '<tr class="s"><td>'+l+'</td>'+r.mesi.map(function(m){return '<td>'+eur(f(m))+'</td>';}).join('')+'<td>'+eur(t)+'</td><td>'+pct(t,r.totali.ricavi)+'</td></tr>'; };
+  var rows=[], ricIds=ids.filter(function(k){return tipo[k]==='ricavo';}), cosIds=ids.filter(function(k){return tipo[k]!=='ricavo';});
+  ricIds.forEach(function(k){ rows.push(rowC(k)); });
+  rows.push(rowD('Ricavi da Dashboard V6 (IVA esclusa)',function(m){return m.ricaviDash;})); rows.push(rowT('TOTALE RICAVI (IVA esclusa)',function(m){return m.ricavi;}));
+  cosIds.forEach(function(k){ rows.push(rowC(k)); });
+  rows.push(rowD('Costi da Dashboard V6 (IVA esclusa)',function(m){return m.costiDash;})); rows.push(rowT('TOTALE COSTI (IVA esclusa)',function(m){return m.costi;}));
+  return '<div class="card"><b>Dettaglio per categoria e incidenza sul fatturato</b></div>'+tab(h,rows,'€ · IVA ESCLUSA (imponibili)')+'<div class="note">Importi IVA esclusa; fa eccezione l\'IVA indetraibile, che è un costo. Le voci "da Dashboard V6" non hanno dettaglio per categoria. % = importo / ricavi totali del periodo.</div>'; }
 function sum(r,f){ return r.mesi.reduce(function(s,m){return s+f(m);},0); }
 function vPL(r){ var h=r.mesi.map(function(m){return etm(m.m);}).concat(['Totale']);
-  var rows=[rowM('Ricavi da Dashboard V6',r,function(m){return m.ricaviDash;},{tot:sum(r,function(m){return m.ricaviDash;})}),
-   rowM('Ricavi manuali (servizi a terzi)',r,function(m){return m.ricaviMan;},{tot:sum(r,function(m){return m.ricaviMan;})}),
-   rowM('RICAVI',r,function(m){return m.ricavi;},{t:1,tot:r.totali.ricavi}),
-   rowM('Costi da Dashboard V6',r,function(m){return m.costiDash;},{tot:sum(r,function(m){return m.costiDash;})}),
-   rowM('Costi manuali',r,function(m){return m.costiMan;},{tot:sum(r,function(m){return m.costiMan;})}),
-   rowM('COSTI',r,function(m){return m.costi;},{t:1,tot:r.totali.costi}),
+  var rows=[rowM('Ricavi da Dashboard V6 (IVA esclusa)',r,function(m){return m.ricaviDash;},{tot:sum(r,function(m){return m.ricaviDash;})}),
+   rowM('Ricavi manuali (servizi a terzi) — IVA esclusa',r,function(m){return m.ricaviMan;},{tot:sum(r,function(m){return m.ricaviMan;})}),
+   rowM('RICAVI (IVA esclusa)',r,function(m){return m.ricavi;},{t:1,tot:r.totali.ricavi}),
+   rowM('Costi da Dashboard V6 (IVA esclusa)',r,function(m){return m.costiDash;},{tot:sum(r,function(m){return m.costiDash;})}),
+   rowM('Costi manuali — IVA esclusa (IVA indetraibile inclusa)',r,function(m){return m.costiMan;},{tot:sum(r,function(m){return m.costiMan;})}),
+   rowM('COSTI (IVA esclusa)',r,function(m){return m.costi;},{t:1,tot:r.totali.costi}),
    rowP('% costi sul fatturato',r,function(m){return m.costi;},{tot:r.totali.costi}),
    rowM('Variazione rimanenze (da Stato patrimoniale)',r,function(m){return m.varRim;},{c:1,tot:r.totali.varRim}),
-   rowM('UTILE / PERDITA',r,function(m){return m.utile;},{t:1,c:1,tot:r.totali.utile}),
+   rowM('UTILE / PERDITA (al netto IVA)',r,function(m){return m.utile;},{t:1,c:1,tot:r.totali.utile}),
    rowP('% utile sul fatturato',r,function(m){return m.utile;},{c:1,tot:r.totali.utile}),
    rowM('Utile cumulato',r,function(m){return m.utileCum;},{c:1,tot:r.totali.utile}),
    rowM('Fonte Dashboard',r,function(){return 0;},{s:1,tot:0}).replace(/<td class="">0,00<\/td>/g,'<td></td>')];
   rows[rows.length-1]='<tr class="s"><td>Fonte Dashboard</td>'+r.mesi.map(function(m){return '<td>'+esc(m.fonte)+'</td>';}).join('')+'<td></td></tr>';
   return tab(h,rows)+dettaglioCat(r)+'<div class="note">F24 ritenute e simili versamenti non sono costi: '+eur(r.totali.uscitaNonCosto)+' € registrati fuori dal P&L.</div>'; }
 function vIva(r){ var h=r.mesi.map(function(m){return etm(m.m);}).concat(['Totale']);
-  return tab(h,[rowM('IVA a debito (vendite)',r,function(m){return m.ivaDeb;},{tot:r.totali.ivaDeb}),
+  return '<div class="note">Questa pagina mostra l\'IVA (l\'imposta), non gli imponibili.</div>'+tab(h,[rowM('IVA a debito (vendite)',r,function(m){return m.ivaDeb;},{tot:r.totali.ivaDeb}),
    rowM('IVA a credito (acquisti detraibili)',r,function(m){return m.ivaCred;},{tot:r.totali.ivaCred}),
    rowM('Saldo del mese (+debito / -credito)',r,function(m){return m.ivaSaldo;},{t:1,tot:r.totali.ivaSaldo}),
    rowM('Saldo cumulato',r,function(m){return m.ivaCum;},{tot:r.totali.ivaSaldo}),
    rowM('IVA da versare ('+r.params.ivaPeriodo+')',r,function(m){return m.ivaVersare;},{t:1,tot:r.totali.ivaVersare}),
-   rowM('Credito riportato a fine periodo',r,function(m){return m.ivaCreditoRiportato;},{tot:r.totali.ivaCreditoFinale})])+'<div class="note">Calcolo per competenza. Non considera acconto di dicembre, interessi trimestrali (1%) né versamenti effettivi.</div>'; }
+   rowM('Credito riportato a fine periodo',r,function(m){return m.ivaCreditoRiportato;},{tot:r.totali.ivaCreditoFinale})],'€ · SOLO IVA (imposta)')+'<div class="note">Calcolo per competenza. Non considera acconto di dicembre, interessi trimestrali (1%) né versamenti effettivi.</div>'; }
 function vImposte(r){ var h=r.mesi.map(function(m){return etm(m.m);}).concat(['Totale']);
   return '<div class="card wa">STIME: IRES '+r.params.ires+'% sull\'utile cumulato; IRAP '+r.params.irap+'% su utile + compensi amministratori, stipendi e contributi (base semplificata, senza deduzioni). Da confermare con il commercialista. Nessun riporto perdite.</div>'+
   tab(h,[rowM('Utile cumulato',r,function(m){return m.utileCum;},{c:1,tot:r.totali.utile}),
    rowM('Base IRAP cumulata',r,function(m){return m.irapBaseCum;},{tot:r.mesi.length?r.mesi[r.mesi.length-1].irapBaseCum:0}),
    rowM('IRES del mese',r,function(m){return m.ires;},{tot:r.totali.ires}),rowM('IRAP del mese',r,function(m){return m.irap;},{tot:r.totali.irap}),
    rowM('Imposte cumulate',r,function(m){return m.imposteCum;},{t:1,tot:r.totali.imposte}),
-   rowM('Utile cumulato dopo imposte',r,function(m){return m.utileNettoCum;},{t:1,c:1,tot:r.totali.utileNetto})]); }
+   rowM('Utile cumulato dopo imposte',r,function(m){return m.utileNettoCum;},{t:1,c:1,tot:r.totali.utileNetto})],'€ · IVA ESCLUSA (utile e imposte stimate)'); }
 function catNome(id){ var c=E.CATEGORIE.filter(function(x){return x.id===id;})[0]; return c?c.nome:id; }
 function formVoce(sp){ var oggi=new Date().toISOString(), e=S.edit||(sp?{categoria:'sp_disponibilita',data:oggi.slice(0,10),competenza:oggi.slice(0,7),imponibile:'',iva:0,detraibile:true}:{categoria:'servizi',data:oggi.slice(0,10),competenza:oggi.slice(0,7),imponibile:'',iva:'',detraibile:true});
   var cs=E.CATEGORIE.filter(function(c){return (c.tipo==='sp')===!!sp;});
@@ -506,7 +522,7 @@ function vVoci(){ return formVoce(false)+elencoVoci(false); }
 function vPatrimonio(r){ var sp=E.statoPatrimoniale(r,S.voci), cats=E.CATEGORIE.filter(function(c){return c.tipo==='sp';});
   var h='';
   if(sp.length){
-    var head='<tr><th></th>'+sp.map(function(s){return '<th>'+(s.apertura?'Apertura ':'')+esc(s.m)+'</th>';}).join('')+'</tr>';
+    var head='<tr><th style="text-align:left;font-size:11px;color:var(--mu)">€ · valori di bilancio (crediti/debiti al lordo IVA)</th>'+sp.map(function(s){return '<th>'+(s.apertura?'Apertura ':'')+esc(s.m)+'</th>';}).join('')+'</tr>';
     var cella=function(s,k){ var x=s.items[k]; return '<td'+(s.riportate[k]?' class="note" title="Riportato dal saldo precedente"':'')+'>'+(x===undefined?'–':eur(x)+(s.riportate[k]?' (r)':''))+'</td>'; };
     var sezione=function(id,tit,totF){ var ks=cats.filter(function(c){return c.sezione===id;});
       return '<tr class="t"><td colspan="'+(sp.length+1)+'" style="text-align:left">'+tit+'</td></tr>'+ks.map(function(c){ return '<tr><td style="text-align:left">'+esc(c.nome)+'</td>'+sp.map(function(s){return cella(s,c.id);}).join('')+'</tr>'; }).join('')
@@ -534,7 +550,7 @@ function vSimulazione(){ var s=simS(), mesi=s.mesi.map(etm);
   var rows=E.SIM_RIGHE.map(function(rg){ return '<tr><td style="text-align:left">'+esc(rg.nome)+'</td>'+s.mesi.map(function(m,i){return '<td>'+numIn('righe.'+rg.id+'.'+i,s.righe[rg.id][i])+'</td>';}).join('')
     +'<td>'+(rg.noIva?'–':numIn('iva.'+rg.id,s.iva[rg.id],'0.1'))+'</td></tr>'; }).join('');
   return '<div class="card"><b>Simulazione del bilancio a fine anno</b><div class="note">Importi IMPONIBILI previsti da qui a dicembre, che si sommano ai dati reali. Non modificano nessuna voce: sono ipotesi che puoi salvare e cambiare quando vuoi.</div>'
-   +'<div class="tw"><table><tr><th style="text-align:left">Voce</th>'+mesi.map(function(m){return '<th>'+m+' €</th>';}).join('')+'<th>IVA %</th></tr>'+rows+'</table></div>'
+   +'<div class="tw"><table><tr><th style="text-align:left">Voce · importi IVA ESCLUSA</th>'+mesi.map(function(m){return '<th>'+m+' € (imponibile)</th>';}).join('')+'<th>IVA %</th></tr>'+rows+'</table></div>'
    +'<div class="g" style="margin-top:8px"><div><label>Contributi a carico società su compensi %</label>'+numIn('contribPerc',s.contribPerc,'0.1')+'</div>'
    +'<div><label>Quota netta dei compensi pagata in banca %</label>'+numIn('nettoPerc',s.nettoPerc,'0.1')+'</div>'
    +'<div><label>Ammortamenti / accantonamenti TFM 2026 €</label>'+numIn('altreRettifiche',s.altreRettifiche)+'</div></div>'
@@ -549,7 +565,7 @@ function vSimulazione(){ var s=simS(), mesi=s.mesi.map(etm);
 function simRes(tab){ var o=simRun(), r=S.__base||calc(), b=r.totali, t=o.res.totali, c=o.cassa;
   if(tab==='utili') return utiliRes(o);
   var riga=function(l,x,y,cl){ return '<tr><td style="text-align:left">'+l+'</td><td>'+eur(x)+'</td><td>'+eur(y)+'</td><td class="'+(cl?cls(y-x):'')+'">'+eur(y-x)+'</td></tr>'; };
-  return '<div class="card tw"><table><tr><th style="text-align:left"></th><th>Reale a oggi</th><th>Simulato a fine anno</th><th>Differenza</th></tr>'
+  return '<div class="card tw"><table><tr><th style="text-align:left;font-size:11px;color:var(--mu)">€ · IVA ESCLUSA</th><th>Reale a oggi</th><th>Simulato a fine anno</th><th>Differenza</th></tr>'
    +riga('Ricavi',b.ricavi,t.ricavi)+riga('Costi',b.costi,t.costi)+riga('Variazione rimanenze',b.varRim,t.varRim)
    +'<tr class="t"><td style="text-align:left">UTILE ANTE IMPOSTE</td><td class="'+cls(b.utile)+'">'+eur(b.utile)+'</td><td class="'+cls(t.utile)+'">'+eur(t.utile)+'</td><td>'+eur(t.utile-b.utile)+'</td></tr>'
    +riga('Imposte stimate (IRES + IRAP)',b.imposte,t.imposte)+'<tr class="t"><td style="text-align:left">UTILE DOPO IMPOSTE</td><td class="'+cls(b.utileNetto)+'">'+eur(b.utileNetto)+'</td><td class="'+cls(t.utileNetto)+'">'+eur(t.utileNetto)+'</td><td>'+eur(t.utileNetto-b.utileNetto)+'</td></tr>'
@@ -582,7 +598,7 @@ function utiliRes(o){ var u=o.utili, t=o.res.totali;
    +'<div class="note">Stime a ipotesi: IRES/IRAP come nella scheda Imposte; ritenuta 26% sui dividendi alle persone fisiche, versata dalla società con F24. Compensi, royalties e mutuo ai soci non sono inclusi. Da confermare con il commercialista prima di deliberare.'+(eff?' Incidenza delle tasse societarie e personali: '+eur(eff)+' % dell\'utile ante imposte (a distribuzione completa solo se il dividendo = utile dopo imposte).':'')+'</div></div>'; }
 function vDash(r){ var d=S.dash||{}, ch=Object.keys(d.chiusure||{}).sort();
   return '<div class="card"><b>Dati letti dalla Dashboard V6 (sola lettura)</b><div class="note">Letti il '+esc(d.letto_il||'—')+'. Mese con chiusura = valori della chiusura (immutabili); mesi senza chiusura = fatture intercompany approvate.</div></div>'
-  +'<div class="card tw"><table><tr><th>Mese</th><th>Ricavi (TS→PS)</th><th>IVA debito</th><th>Costi (PS→TS)</th><th>IVA credito</th><th>Fonte</th></tr>'
+  +'<div class="card tw"><table><tr><th>Mese</th><th>Ricavi TS→PS (imponibile)</th><th>IVA debito</th><th>Costi PS→TS (imponibile)</th><th>IVA credito</th><th>Fonte</th></tr>'
   +r.mesi.map(function(m){return '<tr><td>'+etm(m.m)+'</td><td>'+eur(m.ricaviDash)+'</td><td>'+eur(m.ivaDeb)+'</td><td>'+eur(m.costiDash)+'</td><td>'+eur(m.ivaCred)+'</td><td>'+esc(m.fonte)+'</td></tr>';}).join('')+'</table></div>'
   +'<div class="note">Chiusure disponibili: '+(ch.join(', ')||'nessuna')+'. Nota: nei mesi con fatture manuali di ricavo/IVA, i valori Dashboard e manuali si sommano (colonne distinte nel P&L).</div>'; }
 function vParam(){ var p=params();
@@ -597,6 +613,16 @@ function vStorico(){ return '<div class="card tw"><table><tr><th>Quando</th><th>
 
 /* ── Azioni ── */
 function val(id){ return document.getElementById(id).value; }
+function caricaLib(){ return new Promise(function(ok,ko){ if(window.html2pdf) return ok(); var sc=document.createElement('script'); sc.src='https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js'; sc.onload=ok; sc.onerror=function(){ko(new Error('libreria PDF non raggiungibile'));}; document.head.appendChild(sc); }); }
+async function salvaPdf(){ var pm=document.getElementById('pdfmsg'), nome='Bilancio_SRL_'+S.tab+'_'+new Date().toISOString().slice(0,10)+'.pdf';
+  try{
+    if((S.tab==='simulazione'||S.tab==='utili')&&!DEMO){ S.config=await call('apiSalvaConfig',{sim:JSON.stringify(simS())}); }
+    if(pm){ pm.textContent='Preparo il PDF…'; pm.className='note'; }
+    await caricaLib(); document.body.classList.add('pdfmode');
+    var el=document.getElementById('main'); await new Promise(function(r){setTimeout(r,150);});
+    await html2pdf().set({margin:[6,6,6,6],filename:nome,image:{type:'jpeg',quality:.96},html2canvas:{scale:2,backgroundColor:'#ffffff',windowWidth:1520},jsPDF:{unit:'mm',format:'a4',orientation:'landscape'},pagebreak:{mode:['css','legacy'],avoid:['tr','.card']}}).from(el).save();
+    document.body.classList.remove('pdfmode'); if(pm){ pm.textContent=(S.tab==='simulazione'||S.tab==='utili'?'Simulazione salvata · ':'')+'PDF scaricato: '+nome; pm.className='note ok'; }
+  }catch(e){ document.body.classList.remove('pdfmode'); if(pm){ pm.textContent='Download diretto non riuscito ('+e.message+'): apro la stampa, scegli "Salva come PDF".'; pm.className='note ko'; } setTimeout(function(){ window.print(); },400); } }
 function msg(t,ko){ var m=document.getElementById('msg'); if(m){ m.textContent=t; m.className='note '+(ko?'ko':'ok'); } }
 async function azione(a,id){
   try{
@@ -611,6 +637,7 @@ async function azione(a,id){
     else if(a==='login'){ var rr=await call('apiLogin',val('l_u'),val('l_p')); TOKEN=rr.token; try{sessionStorage.setItem('bsrl_t',TOKEN);}catch(e){} await avvia(); }
     else if(a==='logout'){ try{await call('apiLogout');}catch(e){} esci(); }
     else if(a==='salvasim'){ S.config=await call('apiSalvaConfig',{sim:JSON.stringify(simS())}); msg('Simulazione salvata'); }
+    else if(a==='pdf'){ await salvaPdf(); }
     else if(a==='importa'){ document.getElementById('imp').click(); }
   }catch(e){ msg(e.message,1); }
 }
