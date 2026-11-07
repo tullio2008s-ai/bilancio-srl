@@ -491,8 +491,9 @@ table.fit{min-width:0;font-size:9.4px}td.mod input{border:0;background:none;padd
     var snaps = snapshot(voci, cats), items = {};
     snaps.forEach(function (s) { Object.keys(s.items).forEach(function (k) { if (cats[k].riporta) items[k] = s.items[k]; }); });
     var T = res.totali, capitale = items.sp_capitale || 0, legale = items.sp_riserva_legale || 0;
-    var tettoLegale = Math.max(0, capitale * 0.2 - legale), accLegale = Math.min(Math.max(T.utileNetto, 0) * 0.05, tettoLegale);
-    var riserve = S.usaRiserve ? (items.sp_altre_riserve || 0) + (items.sp_utile_prec || 0) : 0;
+    var up = items.sp_utile_prec || 0, acc25 = Math.min(Math.max(up, 0) * 0.05, Math.max(0, capitale * 0.2 - legale));   // utile 2025 non ancora destinato: prima il 5% a riserva legale (art. 32 statuto)
+    var tettoLegale = Math.max(0, capitale * 0.2 - legale - acc25), accLegale = Math.min(Math.max(T.utileNetto, 0) * 0.05, tettoLegale);
+    var riserve = S.usaRiserve ? (items.sp_altre_riserve || 0) + up - acc25 : 0;
     var distribuibile = Math.max(0, Math.max(T.utileNetto, 0) - accLegale) + riserve;
     var rit = num(S.ritenuta), sd = 0, sc = 0;
     var soci = S.soci.map(function (x) { sd += num(x.div); sc += num(x.cap); return { nome: x.nome, cap: num(x.cap), div: num(x.div), lordo: 0, ritenuta: 0, netto: 0 }; });
@@ -840,7 +841,7 @@ function utiliRes(o){ var u=o.utili, t=o.res.totali, P=u.piano;
   var piano=[ rw('Utile del mese (ante imposte)',function(x){return x.utile;},{c:1,zero:1,tot:r2x(P,'utile')}),
     rw('Utile cumulato dopo imposte (stima)',function(x){return x.utileNettoCum;},{c:1,zero:1,s:1}),
     rw('Distribuibile dai SOLI utili 2026 (dopo imposte − 5% riserva legale, senza riserve libere)',function(x){return x.soloUtili;},{zero:1,s:1}),
-    rw('+ Riserve libere già in bilancio (utile 2025 e altre riserve, non utili 2026)',function(){return u.riserveLibere;},{zero:1,s:1}),
+    rw('+ Riserve libere già in bilancio (riserva straordinaria + utile 2025 al netto del 5% a riserva legale)',function(){return u.riserveLibere;},{zero:1,s:1}),
     rw('= Massimo distribuibile (utile 2026 − 5% riserva legale + riserve libere)',function(x){return x.distribuibile;},{zero:1,s:1}),
     rw('PRELIEVO LORDO',function(x){return x.lordo;},{t:1,hi:1,tot:u.dividendo}),
     rw('Ritenuta '+IT.format(u.ritenutaPerc)+'% maturata',function(x){return x.ritenuta;},{tot:u.totRitenuta}),
@@ -863,7 +864,7 @@ function utiliRes(o){ var u=o.utili, t=o.res.totali, P=u.piano;
    +'<tr class="t"><td style="text-align:left">Totale</td><td></td><td></td><td>'+eur(u.dividendo)+'</td><td>'+eur(u.totRitenuta)+'</td><td>'+eur(u.totNetto)+'</td></tr></table></div>'
    +'<div class="card tw"><table><tr><td style="text-align:left">Utile dopo imposte a fine anno (simulato)</td><td>'+eur(u.utileNetto)+'</td></tr>'
    +'<tr><td style="text-align:left">− a riserva legale (5%, fino al 20% del capitale; oggi '+eur(u.riservaLegale)+' su '+eur(u.capitale)+')</td><td>'+eur(u.accantonamentoLegale)+'</td></tr>'
-   +'<tr><td style="text-align:left">+ riserve disponibili (altre riserve + utile 2025)</td><td>'+eur(u.riserveLibere)+'</td></tr>'
+   +'<tr><td style="text-align:left">+ riserve disponibili (riserva straordinaria + utile 2025 al netto del 5% a riserva legale)</td><td>'+eur(u.riserveLibere)+'</td></tr>'
    +'<tr class="t"><td style="text-align:left">Massimo distribuibile a fine anno</td><td>'+eur(u.distribuibile)+'</td></tr>'
    +'<tr><td style="text-align:left">Cassa a fine periodo dopo dividendi netti e ritenute pagate nel periodo</td><td class="'+cls(u.cassaFinePeriodo)+'">'+eur(u.cassaFinePeriodo)+'</td></tr>'
    +'<tr><td style="text-align:left">Cassa dopo anche le ritenute da versare dopo il periodo (F24 16/01)</td><td class="'+cls(u.cassaDopoRitenuta)+'">'+eur(u.cassaDopoRitenuta)+'</td></tr></table></div>'
