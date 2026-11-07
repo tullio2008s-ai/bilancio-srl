@@ -839,7 +839,8 @@ function utiliRes(o){ var u=o.utili, t=o.res.totali, P=u.piano;
     return '<tr class="'+(opt.t?'t':'')+(opt.s?' s':'')+'"><td style="text-align:left">'+l+'</td>'+P.map(function(x){ var v=fn(x); return '<td class="'+(opt.c?cls(v):'')+(opt.hi&&v?' mod':'')+'">'+(v||opt.zero?eur(v):'–')+'</td>'; }).join('')+'<td class="'+(opt.c&&tot!==''?cls(tot):'')+'">'+(tot===''?'':eur(tot))+'</td></tr>'; };
   var piano=[ rw('Utile del mese (ante imposte)',function(x){return x.utile;},{c:1,zero:1,tot:r2x(P,'utile')}),
     rw('Utile cumulato dopo imposte (stima)',function(x){return x.utileNettoCum;},{c:1,zero:1,s:1}),
-    rw('Massimo distribuibile (utile − 5% riserva legale + riserve libere)',function(x){return x.distribuibile;},{zero:1,s:1}),
+    rw('+ Riserve libere già in bilancio (utile 2025 e altre riserve, non utili 2026)',function(){return u.riserveLibere;},{zero:1,s:1}),
+    rw('= Massimo distribuibile (utile 2026 − 5% riserva legale + riserve libere)',function(x){return x.distribuibile;},{zero:1,s:1}),
     rw('PRELIEVO LORDO',function(x){return x.lordo;},{t:1,hi:1,tot:u.dividendo}),
     rw('Ritenuta '+IT.format(u.ritenutaPerc)+'% maturata',function(x){return x.ritenuta;},{tot:u.totRitenuta}),
     rw('Netto ai soci',function(x){return x.netto;},{tot:u.totNetto}),
