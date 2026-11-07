@@ -223,6 +223,7 @@ table.fit{min-width:0;font-size:9.4px}table.fit th,table.fit td{padding:2.5px 3p
       cum.ricavi += r.ricavi; cum.costi += r.costi; cum.utile += r.utile; cum.inded += r.irapInded; cum.interessi = (cum.interessi || 0) + r.interessi;
       r.ricaviCum = cum.ricavi; r.costiCum = cum.costi; r.utileCum = cum.utile;
       r.ivaSaldo = r.ivaDeb - r.ivaCred; cum.ivaSaldo += r.ivaSaldo; r.ivaCum = cum.ivaSaldo;
+      r.ivaVersata = (r.f24.f24_saldo_iva || 0) + (r.f24.f24_acconto_iva || 0); cum.ivaVers = (cum.ivaVers || 0) + r.ivaVersata; r.ivaVersataCum = cum.ivaVers; r.ivaDaVersare = r.ivaCum - r.ivaVersataCum;
       accP += r.ivaSaldo; r.ivaVersare = 0; r.ivaCreditoRiportato = riporto < 0 ? -riporto : 0;
       var fineP = ((i + 1) % perLen === 0) || i === mesi.length - 1;
       if (fineP) {
@@ -239,7 +240,7 @@ table.fit{min-width:0;font-size:9.4px}table.fit th,table.fit td{padding:2.5px 3p
       return r;
     });
     var tot = lista.reduce(function (a, r) {
-      ['ricavi', 'costi', 'varRim', 'interessi', 'ncRicavi', 'utile', 'ivaDeb', 'ivaCred', 'ivaSaldo', 'ivaVersare', 'ires', 'irap', 'uscitaNonCosto'].forEach(function (k) { a[k] = (a[k] || 0) + r[k]; });
+      ['ricavi', 'costi', 'varRim', 'interessi', 'ncRicavi', 'ivaVersata', 'utile', 'ivaDeb', 'ivaCred', 'ivaSaldo', 'ivaVersare', 'ires', 'irap', 'uscitaNonCosto'].forEach(function (k) { a[k] = (a[k] || 0) + r[k]; });
       return a;
     }, {});
     var ult = lista[lista.length - 1] || {};
@@ -313,10 +314,12 @@ table.fit{min-width:0;font-size:9.4px}table.fit th,table.fit td{padding:2.5px 3p
     var dupAdl = Object.keys(adl).filter(function (m) { return adl[m] > 1; }).sort();
     add('Fatture ad Adler: una sola voce per mese di competenza', dupAdl.length === 0, dupAdl.length ? 'Mesi con piu voci: ' + dupAdl.map(function (m) { return m + ' (' + adl[m] + ' voci)'; }).join(', ') : '');
     var MN = ['gennaio', 'febbraio', 'marzo', 'aprile', 'maggio', 'giugno', 'luglio', 'agosto', 'settembre', 'ottobre', 'novembre', 'dicembre'], bad = [];
-    (input.voci || []).forEach(function (v) { var cc = cats[v.categoria]; if (v.eliminata || !cc || cc.tipo === 'sp' || String(v.id).indexOf('sim-') === 0) return;
+    (input.voci || []).forEach(function (v) { var cc = cats[v.categoria]; if (v.eliminata || !cc || cc.tipo === 'sp' || cc.f24 || String(v.id).indexOf('sim-') === 0) return;
       var ds = String(v.descrizione || '').toLowerCase(), hit = []; MN.forEach(function (n, i) { if (new RegExp('\\b' + n + '\\b').test(ds)) hit.push(i + 1); });
       if (hit.length === 1 && +String(v.competenza).slice(5, 7) !== hit[0]) bad.push('"' + v.descrizione + '" (competenza ' + String(v.competenza).slice(0, 7) + ')'); });
     add('Mese citato nella descrizione coerente con la competenza', bad.length === 0, bad.slice(0, 5).join('; ') + (bad.length > 5 ? ' ...' : ''));
+    var ultM = L.length ? L[L.length - 1] : null;
+    add('IVA del periodo maturata e versata (F24 saldo/acconto IVA)', !ultM || ultM.ivaDaVersare <= 500, ultM && ultM.ivaDaVersare > 500 ? 'IVA maturata e non versata (stima, da fatture): ' + r2(ultM.ivaDaVersare) + ' EUR' : '');
     add('Ricavi manuali del P&L = somma voci inserite', eq(sr, man.r));
     add('Costi manuali del P&L = somma voci inserite', eq(sc, man.c));
     statoPatrimoniale(res, input.voci, input.categorie).filter(function (s) { return s.apertura; }).forEach(function (s) {
@@ -549,7 +552,12 @@ function tabF24(r){ var cs=E.CATEGORIE.filter(function(c){return c.f24;}), gen=s
   if(gen) rows.push(rowM('F24 non classificati',r,function(m){return (m.f24||{}).f24_ritenute||0;},{tot:gen}));
   var tt=function(m){ return Object.keys(m.f24||{}).reduce(function(a,k){return a+m.f24[k];},0); };
   rows.push(rowM('TOTALE F24 PAGATI',r,tt,{t:1,tot:sum(r,tt)}));
-  return '<div class="card pbk"><b>Pagamenti F24 per tipo (cassa, per mese di versamento)</b><div class="note">Non sono costi: sono i versamenti di debiti verso Erario e INPS. I costi veri (quota INPS società, sanzioni, INAIL) sono già nelle righe dei costi. Il mese corrente e i successivi contengono gli F24 ancora da pagare (scadenza il 16). IRPEF compensi = codice 1001 (compensi amministratori e redditi assimilati); IRPEF stipendi = TFR, conguagli, addizionali e crediti. Il codice 1001 non distingue stipendi da compensi: per spostare un importo cambia la categoria della voce.</div></div>'+tab(h,rows,'€ · VERSAMENTI F24'); }
+  var oggi=new Date().toISOString().slice(0,10), fut=(S.voci||[]).filter(function(v){ var c=E.CATEGORIE.filter(function(x){return x.id===v.categoria;})[0]; return !v.eliminata&&c&&c.f24&&String(v.data).slice(0,10)>=oggi; })
+    .sort(function(a,b){return String(a.data).localeCompare(String(b.data));}), ft=fut.reduce(function(t,v){return t+(+v.imponibile||0);},0);
+  var daPagare=fut.length?'<div class="card tw"><b>F24 ancora da pagare</b><table><tr><th style="text-align:left">Scadenza</th><th style="text-align:left">Tipo</th><th style="text-align:left">Descrizione</th><th>Importo €</th></tr>'
+    +fut.map(function(v){ return '<tr><td style="text-align:left">'+esc(String(v.data).slice(0,10))+'</td><td style="text-align:left">'+esc(etich[v.categoria]||v.categoria)+'</td><td style="text-align:left;white-space:normal">'+esc(v.descrizione||'')+'</td><td>'+eur(+v.imponibile||0)+'</td></tr>'; }).join('')
+    +'<tr class="t"><td colspan="3" style="text-align:left">Totale da pagare</td><td>'+eur(ft)+'</td></tr></table></div>':'';
+  return '<div class="card pbk"><b>Pagamenti F24 per tipo (cassa, per mese di versamento)</b><div class="note">Non sono costi: sono i versamenti di debiti verso Erario e INPS. I costi veri (quota INPS società, sanzioni, INAIL) sono già nelle righe dei costi. Il mese corrente e i successivi contengono gli F24 ancora da pagare (scadenza il 16). IRPEF compensi = codice 1001 (compensi amministratori e redditi assimilati); IRPEF stipendi = TFR, conguagli, addizionali e crediti. Il codice 1001 non distingue stipendi da compensi: per spostare un importo cambia la categoria della voce.</div></div>'+tab(h,rows,'€ · VERSAMENTI F24')+daPagare; }
 function sum(r,f){ return r.mesi.reduce(function(s,m){return s+f(m);},0); }
 function vPL(r){ var h=r.mesi.map(function(m){return etm(m.m);}).concat(['Totale']);
   var ricRows=E.CATEGORIE.filter(function(c){return c.tipo==='ricavo'&&!c.finanziario;}).map(function(c){
@@ -572,6 +580,8 @@ function vIva(r){ var h=r.mesi.map(function(m){return etm(m.m);}).concat(['Total
    rowM('IVA a credito (acquisti detraibili)',r,function(m){return m.ivaCred;},{tot:r.totali.ivaCred}),
    rowM('Saldo del mese (+debito / -credito)',r,function(m){return m.ivaSaldo;},{t:1,tot:r.totali.ivaSaldo}),
    rowM('Saldo cumulato',r,function(m){return m.ivaCum;},{tot:r.totali.ivaSaldo}),
+   rowM('IVA versata con F24 (saldo + acconto IVA)',r,function(m){return m.ivaVersata;},{tot:r.totali.ivaVersata}),
+   rowM('IVA maturata e ANCORA DA VERSARE (cumulata)',r,function(m){return m.ivaDaVersare;},{t:1,c:1,tot:r.mesi.length?r.mesi[r.mesi.length-1].ivaDaVersare:0}),
    rowM('IVA da versare ('+r.params.ivaPeriodo+')',r,function(m){return m.ivaVersare;},{t:1,tot:r.totali.ivaVersare}),
    rowM('Credito riportato a fine periodo',r,function(m){return m.ivaCreditoRiportato;},{tot:r.totali.ivaCreditoFinale})],'€ · SOLO IVA (imposta)')+'<div class="note">Calcolo per competenza. Non considera acconto di dicembre, interessi trimestrali (1%) né versamenti effettivi.</div>'; }
 function vImposte(r){ var h=r.mesi.map(function(m){return etm(m.m);}).concat(['Totale']);
