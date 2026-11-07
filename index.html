@@ -371,7 +371,7 @@ table.fit{min-width:0;font-size:9.4px}td.mod input{border:0;background:none;padd
     soci: [{ nome: 'Tullio Serci', cap: 60, div: 10 }, { nome: 'Rosanna Garaguso', cap: 30, div: 50 },
            { nome: 'Matteo Serci', cap: 5, div: 20 }, { nome: 'Francesca Maria Serci', cap: 5, div: 20 }]
   };
-  var SCENARIO = JSON.parse(JSON.stringify(SIM_DEFAULT));
+  var SCENARIO = JSON.parse(JSON.stringify(SIM_DEFAULT)); SCENARIO.altreRettifiche = 5000;   // TFM amministratori 2026 (accantonamento non monetario, IRAP indeducibile)
   Object.keys(SIM_DEFAULT.righe).forEach(function (k) { SIM_DEFAULT.righe[k] = [0, 0]; }); SIM_DEFAULT.prelievi = [];
   function simNorm(s) {
     var o = JSON.parse(JSON.stringify(SIM_DEFAULT)); s = s || {};
@@ -405,7 +405,7 @@ table.fit{min-width:0;font-size:9.4px}td.mod input{border:0;background:none;padd
         } else cassa.pagamenti += imp + iva;
       });
     });
-    if (num(S.altreRettifiche)) voci.push({ id: 'sim-rett', categoria: 'ammortamenti', data: S.mesi[S.mesi.length - 1] + '-28', competenza: S.mesi[S.mesi.length - 1], descrizione: 'SIMULAZIONE ammortamenti/accantonamenti (non monetari)', imponibile: num(S.altreRettifiche), iva: 0, detraibile: false, simulata: true });
+    if (num(S.altreRettifiche)) voci.push({ id: 'sim-rett', categoria: 'accantonamenti', data: S.mesi[S.mesi.length - 1] + '-28', competenza: S.mesi[S.mesi.length - 1], descrizione: 'SIMULAZIONE ammortamenti/accantonamenti (non monetari)', imponibile: num(S.altreRettifiche), iva: 0, detraibile: false, simulata: true });
     S.mesi.forEach(function (m, i) {
       var haRim = voci.some(function (v) { return v.categoria === 'sp_rimanenze' && !v.eliminata && String(v.competenza).slice(0, 7) === m; });
       if (String(S.rimanenze[i]) !== '' && S.rimanenze[i] !== null && !haRim) voci.push({ id: 'sim-rim-' + m, categoria: 'sp_rimanenze', data: m + '-31', competenza: m, descrizione: 'SIMULAZIONE rimanenza a fine mese', imponibile: num(S.rimanenze[i]), iva: 0, simulata: true });
@@ -451,7 +451,7 @@ table.fit{min-width:0;font-size:9.4px}td.mod input{border:0;background:none;padd
       if (c.tipo === 'ricavo') x.incassi += imp + iva;
       else if (c.tipo === 'costo') {
         if (c.f24 || c.nonCosto) x.f24 += imp;
-        else if (v.categoria === 'contributi' || v.categoria === 'ammortamenti') return;
+        else if (v.categoria === 'contributi' || v.categoria === 'ammortamenti' || v.categoria === 'accantonamenti') return;
         else if (v.categoria === 'compensi_amm') x.compensi += imp * num(S.nettoPerc) / 100;
         else if (v.categoria === 'stipendi') x.compensi += imp + iva;
         else x.fornitori += imp + iva;
@@ -759,7 +759,7 @@ function vSimulazione(){ var s=simS(), mesi=s.mesi.map(etm);
    +'<div class="tw"><table><tr><th style="text-align:left">Voce · importi IVA ESCLUSA</th>'+thm+'<th>IVA %</th></tr>'+rows+'</table></div>'
    +'<div class="g" style="margin-top:8px"><div><label>Contributi su compensi calcolati in automatico % (metti 0 se li inserisci a mano nella riga Contributi)</label>'+numIn('contribPerc',s.contribPerc,'0.1')+'</div>'
    +'<div><label>Quota netta dei compensi pagata in banca %</label>'+numIn('nettoPerc',s.nettoPerc,'0.1')+'</div>'
-   +'<div><label>Ammortamenti / accantonamenti TFM 2026 €</label>'+numIn('altreRettifiche',s.altreRettifiche)+'</div>'
+   +'<div><label>Accantonamento TFM amministratori 2026 € (non monetario, a dicembre)</label>'+numIn('altreRettifiche',s.altreRettifiche)+'</div>'
    +'<div><label>Saldo di cassa iniziale € (banche + cassa a fine ottobre; vuoto = ultimo saldo inserito)</label>'+numIn('cassaIniziale',s.cassaIniziale)+'</div></div>'
    +'<div style="margin-top:10px"><b>Rimanenza di magazzino a fine mese</b><div class="note">Valore del magazzino (€) alla fine del mese. Al 31/10/2026 è 0 (stock ceduto alla SRLS e saldato con FE-00130, dato confermato); da novembre riparte da zero. Lascia vuoto per "invariata rispetto al mese prima". La variazione entra nel P&amp;L.</div>'
    +'<div class="g">'+s.mesi.map(function(m,i){ return '<div><label>Rimanenza al '+(m.slice(5)==='11'?'30/11':'31/12')+' €</label>'+numIn('rimanenze.'+i,s.rimanenze[i])+'</div>'; }).join('')+'</div></div>'
