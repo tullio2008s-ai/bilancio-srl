@@ -48,7 +48,7 @@ body.pdfmode main{max-width:none;width:1500px;margin:0;padding:10px}body.pdfmode
 body.pdfmode table.fit{min-width:0;font-size:12px}body.pdfmode td.mod input{border:0;background:none;padding:0}body.pdfmode table.fit th,body.pdfmode table.fit td{padding:3px 5px}body.pdfmode table.fit th:first-child,body.pdfmode table.fit td:first-child{width:20%}body.pdfmode .card{break-inside:avoid}body.pdfmode .pbk{break-before:page;page-break-before:always}
 /* html2canvas non legge color-mix(): in modalita' PDF colori fissi */
 body.pdfmode table.fit th:last-child,body.pdfmode table.fit td:last-child{background:#f1f4fa}body.pdfmode table.fit tr.t td{background:#e8edf7}body.pdfmode table.fit tbody tr:hover td{background:#fff}body.pdfmode td.mod input{background:#f1f4fa}
-body.pdfmode .rsec{width:1440px;box-sizing:border-box}body.pdfmode .rsec .rg{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+body.pdfmode .rsec{width:1500px;padding:14px 22px;box-sizing:border-box;background:#fff}body.pdfmode .rsec .rg{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
 body.pdfmode .pdfhead{display:block;margin-bottom:8px}body.pdfmode .pdfhead b{font-size:18px}
 @media print{header,nav,.bar,.demo{display:none!important}main{max-width:none;padding:0}.tw,.card.tw{overflow:visible}.pdfhead{display:block;margin-bottom:6px}@page{size:A4 landscape;margin:8mm}
 html,body{background:#fff!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}.card{border:0;border-radius:0;padding:0 0 6px;margin-bottom:6px;break-inside:avoid;page-break-inside:avoid}
@@ -947,16 +947,16 @@ function vReport(){
    +sez('Prelievo utili, ritenute e cash flow',utiliRes(o))
    +sez('Ipotesi della previsione',ipo)
    +sez('Controlli incrociati',vControlli(rOct)); }
-async function pdfCommercialista(){ var pm=document.getElementById('pdfmsg2'), nome='Bilancio_SRL_per_commercialista_'+new Date().toISOString().slice(0,10)+'.pdf';
+async function pdfCommercialista(){ var sc0=[0,0], pm=document.getElementById('pdfmsg2'), nome='Bilancio_SRL_per_commercialista_'+new Date().toISOString().slice(0,10)+'.pdf';
   try{
     if(pm){ pm.textContent='Preparo il PDF…'; pm.className='note'; }
-    await caricaLib(); document.body.classList.add('pdfmode'); await new Promise(function(r){setTimeout(r,200);});
-    var secs=[].slice.call(document.querySelectorAll('#main .rsec')), opt={margin:[8,8,8,8],filename:nome,image:{type:'jpeg',quality:.95},html2canvas:{scale:1.6,backgroundColor:'#ffffff',windowWidth:1520},jsPDF:{unit:'px',format:[1500,1061],orientation:'landscape',hotfixes:['px_scaling']},pagebreak:{mode:['css','legacy'],avoid:['tr','.card']}};
+    await caricaLib(); sc0=[window.scrollX,window.scrollY]; window.scrollTo(0,0); document.body.classList.add('pdfmode'); await new Promise(function(r){setTimeout(r,250);});
+    var secs=[].slice.call(document.querySelectorAll('#main .rsec')), opt={margin:[0,0,0,0],filename:nome,image:{type:'jpeg',quality:.95},html2canvas:{scale:1.6,backgroundColor:'#ffffff',windowWidth:1520,scrollX:0,scrollY:0,x:0,y:0},jsPDF:{unit:'px',format:[1500,1061],orientation:'landscape',hotfixes:['px_scaling']},pagebreak:{mode:['css','legacy'],avoid:['tr','.card']}};
     var w=html2pdf().set(opt).from(secs[0]).toPdf();
     for(var i=1;i<secs.length;i++){ (function(el){ w=w.get('pdf').then(function(pdf){ pdf.addPage(); }).from(el,'element').toContainer().toCanvas().toPdf(); })(secs[i]); }
     await w.save();
-    document.body.classList.remove('pdfmode'); if(pm){ pm.textContent='PDF scaricato: '+nome; pm.className='note ok'; }
-  }catch(e){ document.body.classList.remove('pdfmode'); if(pm){ pm.textContent='Download diretto non riuscito ('+e.message+'): apro la stampa, scegli "Salva come PDF".'; pm.className='note ko'; } setTimeout(function(){ window.print(); },400); } }
+    window.scrollTo(sc0[0],sc0[1]); document.body.classList.remove('pdfmode'); if(pm){ pm.textContent='PDF scaricato: '+nome; pm.className='note ok'; }
+  }catch(e){ window.scrollTo(sc0[0],sc0[1]); document.body.classList.remove('pdfmode'); if(pm){ pm.textContent='Download diretto non riuscito ('+e.message+'): apro la stampa, scegli "Salva come PDF".'; pm.className='note ko'; } setTimeout(function(){ window.print(); },400); } }
 document.addEventListener('change',function(e){ if(e.target&&e.target.id==='repmese'){ S.repMese=e.target.value; render(); } });
 function vDash(r){ var d=S.dash||{}, ch=Object.keys(d.chiusure||{}).sort();
   return '<div class="card"><b>Dati letti dalla Dashboard V6 (sola lettura)</b><div class="note">Letti il '+esc(d.letto_il||'—')+'. Mese con chiusura = valori della chiusura (immutabili); mesi senza chiusura = fatture intercompany approvate.</div></div>'
@@ -980,9 +980,9 @@ async function salvaPdf(){ var pm=document.getElementById('pdfmsg'), nome='Bilan
   try{
     if((S.tab==='simulazione'||S.tab==='utili')&&!DEMO){ S.config=await call('apiSalvaConfig',{sim:JSON.stringify(simS())}); }
     if(pm){ pm.textContent='Preparo il PDF…'; pm.className='note'; }
-    await caricaLib(); document.body.classList.add('pdfmode');
+    await caricaLib(); window.scrollTo(0,0); document.body.classList.add('pdfmode');
     var el=document.getElementById('main'); await new Promise(function(r){setTimeout(r,150);});
-    await html2pdf().set({margin:[8,8,8,8],filename:nome,image:{type:'jpeg',quality:.95},html2canvas:{scale:1.6,backgroundColor:'#ffffff',windowWidth:1520},jsPDF:{unit:'px',format:[1500,1061],orientation:'landscape',hotfixes:['px_scaling']},pagebreak:{mode:['css','legacy'],avoid:['tr','.card']}}).from(el).save();
+    await html2pdf().set({margin:[0,0,0,0],filename:nome,image:{type:'jpeg',quality:.95},html2canvas:{scale:1.6,backgroundColor:'#ffffff',windowWidth:1520,scrollX:0,scrollY:0,x:0,y:0},jsPDF:{unit:'px',format:[1500,1061],orientation:'landscape',hotfixes:['px_scaling']},pagebreak:{mode:['css','legacy'],avoid:['tr','.card']}}).from(el).save();
     document.body.classList.remove('pdfmode'); if(pm){ pm.textContent=(S.tab==='simulazione'||S.tab==='utili'?'Simulazione salvata · ':'')+'PDF scaricato: '+nome; pm.className='note ok'; }
   }catch(e){ document.body.classList.remove('pdfmode'); if(pm){ pm.textContent='Download diretto non riuscito ('+e.message+'): apro la stampa, scegli "Salva come PDF".'; pm.className='note ko'; } setTimeout(function(){ window.print(); },400); } }
 function msg(t,ko){ var m=document.getElementById('msg'); if(m){ m.textContent=t; m.className='note '+(ko?'ko':'ok'); } }
