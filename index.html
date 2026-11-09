@@ -18,7 +18,7 @@ main{padding:12px 16px;max-width:1760px;margin:auto}
 .tw{overflow:auto}table{border-collapse:collapse;width:100%;font-size:13px}
 th,td{padding:6px 8px;border-bottom:1px solid var(--ln);text-align:right;white-space:nowrap}
 th:first-child,td:first-child{text-align:left;position:sticky;left:0;background:var(--card)}
-tr.t td{font-weight:700}tr.s td{color:var(--mu);font-size:12px}
+tr.t td{font-weight:700}tr.s td{color:var(--mu);font-size:12px}tr.sotto td{background:#fdecea}
 .neg{color:var(--ko)}.pos{color:var(--ok)}
 label{display:block;font-size:12px;color:var(--mu);margin:8px 0 2px}
 input,select,textarea{width:100%;padding:8px;border:1px solid var(--ln);border-radius:8px;background:var(--bg);color:var(--tx);font:inherit}
@@ -350,6 +350,7 @@ table.fit{min-width:0;font-size:9.4px}td.mod input{border:0;background:none;padd
     { id: 'royalties', gruppo: 'COSTI', nome: 'Royalties (a Tullio Serci)', cat: 'royalties', noIva: true },
     { id: 'paysCosto', gruppo: 'COSTI', nome: 'Fatture da Paysolution', cat: 'intercompany_costo' },
     { id: 'acqServizi', gruppo: 'COSTI', nome: 'Commercialista, consulenti e servizi', cat: 'servizi_prof' },
+    { id: 'collab', gruppo: 'COSTI', nome: 'Collaboratori a fattura (es. Matteo), senza IVA', cat: 'servizi_prof', noIva: true },
     { id: 'acqMateriali', gruppo: 'COSTI', nome: 'Acquisti materiali e merci', cat: 'acquisti_materiali' },
     { id: 'pubblicita', gruppo: 'COSTI', nome: 'Pubblicita', cat: 'pubblicita' },
     { id: 'trasferte', gruppo: 'COSTI', nome: 'Trasferte, welfare e rappresentanza', cat: 'trasferte_welfare' },
@@ -500,16 +501,109 @@ table.fit{min-width:0;font-size:9.4px}td.mod input{border:0;background:none;padd
        nov: Rosanna 6.000 netti + Tullio 200 netti = 6.200 netti; dic: Rosanna 500 netti + Tullio 200 netti = 700 netti.
        Pubblicita' 1.600; Marini 375; Paysolution 1.800; altre voci (sicurezza e varie) 1.800 al mese. Dividendi lordi 5.000 (nov) + 15.000 (dic). */
     righe: { serviziFatt: [0, 0], paysRicavo: [0, 0], venditeGett: [0, 0], amazon: [0, 0], corrisp: [0, 0], interessi: [0, 0],
-      compensi: [10163.93, 1147.54], contributi: [0, 0], stipendi: [0, 0], royalties: [0, 0], paysCosto: [1800, 1800], acqServizi: [375, 375], acqMateriali: [0, 0], pubblicita: [1600, 1600],
+      compensi: [10163.93, 1147.54], contributi: [0, 0], stipendi: [0, 0], royalties: [0, 0], paysCosto: [1800, 1800], acqServizi: [375, 375], collab: [0, 0], acqMateriali: [0, 0], pubblicita: [1600, 1600],
       trasferte: [0, 0], abbonamenti: [0, 0], trasporti: [0, 0], oneri: [0, 0], oneriFin: [0, 0], altri: [1800, 1800], f24: [0, 0] },
     iva: { serviziFatt: 0, paysRicavo: 22, venditeGett: 22, amazon: 22, corrisp: 22, paysCosto: 22, acqServizi: 22, acqMateriali: 22, pubblicita: 22, trasferte: 0, abbonamenti: 22, trasporti: 22, altri: 22 },
     contribPerc: 17, nettoPerc: 61, rimanenze: ['', ''], altreRettifiche: 0,
     laser: { attiva: false, costo: 4642.22, ricarico: 8, iva: 22, mese: '2026-12' },
-    prelievi: [{ data: '2026-11-20', lordo: 5000 }, { data: '2026-12-18', lordo: 15000 }], cassaIniziale: '', ritenuta: 26, usaRiserve: true, budget: null,
+    prelievi: [{ data: '2026-11-20', lordo: 5000 }, { data: '2026-12-18', lordo: 15000 }], cassaIniziale: '', ritenuta: 26, usaRiserve: true, budget: null, cassa: null,
     soci: [{ nome: 'Tullio Serci', cap: 60, div: 10 }, { nome: 'Rosanna Garaguso', cap: 30, div: 50 },
            { nome: 'Matteo Serci', cap: 5, div: 20 }, { nome: 'Francesca Maria Serci', cap: 5, div: 20 }]
   };
-  var SCENARIO = JSON.parse(JSON.stringify(SIM_DEFAULT)); SCENARIO.altreRettifiche = 5000;   // TFM amministratori 2026 (accantonamento non monetario, IRAP indeducibile)
+
+  /* ── Piano di cassa giorno per giorno (pagina Cassa) ──
+     Saldo di banche e cassa a una data + movimenti futuri: voci registrate (con regole di data di incasso/pagamento), previsione nov-dic,
+     prelievi di utili (dividendi netti + F24 ritenuta) e movimenti manuali. I movimenti con data <= data del saldo sono GIA' nel saldo e non si contano. */
+  function cassaDefault() {
+    return { data: '2026-11-09', saldo: 28008.25, soglia: 5000, fine: '2027-02-28',
+      regole: [{ match: 'ADLER', comp: '2026-10', giorni: '', data: '2026-12-10', importo: '' }, { match: 'ADLER', comp: '2026-11', giorni: '', data: '2027-01-10', importo: '' },
+               { match: 'ADLER', comp: '2026-12', giorni: '', data: '2027-02-10', importo: '' }, { match: 'ADLER', comp: '', giorni: 40, data: '', importo: '' },
+               { match: 'altre voci, sicurezza e varie novembre', comp: '', giorni: '', data: '2026-11-27', importo: 1800 }],
+      esclusi: ['2026-22/EXT', '2026-23/EXT'],
+      manuali: [{ data: '2026-11-30', desc: 'Compenso netto Tullio (novembre)', importo: -200, nota: 'Rosanna: 6.000 netti già incassati prima del 09/11 (nel saldo)' },
+                { data: '2026-12-20', desc: 'Compenso netto Rosanna (dicembre)', importo: -200, nota: '' },
+                { data: '2026-12-20', desc: 'Compenso netto Tullio (dicembre)', importo: -2000, nota: '' },
+                { data: '2026-12-15', desc: 'Compensazione Paysolution (da saldare reciproco): netto da regolare', importo: 0, nota: 'Riconciliato con la prima nota Sibill del 09/11: i saldi mensili si regolano per differenza. Aperti: TS deve a PS 22.077,29 (fatture 119, 405, 504, 606, 689/2026); PS deve a TS 22.721,25 (FE-00127, 129, 130 al netto della NC): netto circa +644 a favore di TS. Inserire un importo solo se viene regolato in banca.' }] };
+  }
+  function cassaNorm(c) {
+    var d = cassaDefault(); if (!c || typeof c !== 'object') return d;
+    var o = Object.assign({}, d, c);
+    ['regole', 'esclusi', 'manuali'].forEach(function (k) { if (!Array.isArray(o[k])) o[k] = d[k]; });
+    return o;
+  }
+  /* Scenario concordato il 09/11/2026 (applicato una sola volta, quando la previsione salvata non ha ancora la sezione cassa) */
+  function scenario0911(o) {
+    o.righe.compensi = [10333.33, 3666.67];      // lordi: netti 6.200 (Rosanna 6.000 + Tullio 200) e 2.200 (Rosanna 200 + Tullio 2.000) al 60%
+    o.righe.contributi = [0, 0]; o.nettoPerc = 60; o.contribPerc = 17;
+    o.righe.collab = [1000, 1000];               // Matteo, fattura senza IVA
+    o.prelievi = [{ data: '2026-11-20', lordo: 7786, ritenuta: 0, base: 'div' }, { data: '2026-12-18', lordo: 12000, ritenuta: '', base: 'div' }];   // 7.786 = altre riserve da utili SAS (già tassati per trasparenza: ritenuta 0 da confermare col commercialista), ripartiti con il diritto particolare sugli utili (art. 9 statuto: riserve da utili 10/50/20/20)
+    o.cassaIniziale = 28008.25;
+    return o;
+  }
+  function addDays(d, n) { var t = new Date(d + 'T12:00:00Z'); t.setUTCDate(t.getUTCDate() + n); return t.toISOString().slice(0, 10); }
+  function cassaPiano(input, o) {
+    var S = o.sim, C = cassaNorm(S.cassa), cats = {}, righe = [], d0 = C.data, fine = C.fine, avv = [];
+    (input.categorie || CATEGORIE).forEach(function (c) { cats[c.id] = c; });
+    var saldo0 = String(C.saldo) !== '' ? num(C.saldo) : num(S.cassaIniziale);
+    if (!d0) avv.push('Manca la data del saldo di cassa.');
+    function regola(v) {
+      var t = (String(v.descrizione || '') + ' ' + String(v.riferimento || '')).toUpperCase(), comp = String(v.competenza || '').slice(0, 7);
+      for (var i = 0; i < C.regole.length; i++) {
+        var r = C.regole[i], mt = String(r.match || '').toUpperCase(); if (!mt || t.indexOf(mt) < 0) continue;
+        if (r.comp && r.comp !== comp) continue;
+        if (r.data) return { data: r.data, importo: r.importo };
+        if (num(r.giorni)) return { data: addDays(String(v.data).slice(0, 10), num(r.giorni)), importo: r.importo };
+        if (String(r.importo) !== '') return { data: String(v.data).slice(0, 10), importo: r.importo };
+      }
+      return { data: String(v.data).slice(0, 10), importo: '' };
+    }
+    function ev(v, tot) { var g = regola(v); return { data: g.data, tot: String(g.importo) !== '' && num(g.importo) ? (tot < 0 ? -Math.abs(num(g.importo)) : Math.abs(num(g.importo))) : tot }; }
+    function push(data, desc, imp, fonte, nota) { data = String(data || '').slice(0, 10); if (!data || !imp || data <= d0 || data > fine) return; righe.push({ data: data, desc: desc, importo: r2(imp), fonte: fonte, nota: nota || '' }); }
+    var nonCash = { contributi: 1, ammortamenti: 1, accantonamenti: 1, compensi_amm: 1 };
+    (input.voci || []).forEach(function (v) {
+      if (v.eliminata) return; var c = cats[v.categoria]; if (!c || (c.tipo !== 'ricavo' && c.tipo !== 'costo')) return;
+      if (nonCash[v.categoria]) return;
+      var ref = String(v.riferimento || '') + ' ' + String(v.descrizione || '');
+      if (C.esclusi.some(function (x) { return x && ref.indexOf(x) >= 0; })) return;
+      var imp = num(v.imponibile), iva = num(v.iva), tot = c.tipo === 'ricavo' ? imp + iva : -((c.f24 || c.nonCosto) ? imp : imp + iva);
+      var e = ev(v, tot); push(e.data, String(v.descrizione || '').slice(0, 90), e.tot, /^PREVISIONE/i.test(String(v.descrizione || '')) ? 'Previsione (voce)' : 'Registrata', '');
+    });
+    SIM_RIGHE.forEach(function (rg) {
+      if (rg.id === 'compensi' || rg.id === 'contributi') return;
+      S.mesi.forEach(function (m, i) {
+        var imp = num(S.righe[rg.id] && S.righe[rg.id][i]); if (!imp) return;
+        if (rg.soloCassa) { push(m + '-28', 'F24 inserito nella previsione', -imp, 'Previsione', ''); return; }
+        var iva = rg.noIva ? 0 : r2(imp * num(S.iva[rg.id]) / 100), v = { descrizione: 'PREVISIONE ' + rg.nome, riferimento: '', competenza: m, data: m + '-28' };
+        var e = ev(v, rg.ricavo ? imp + iva : -(imp + iva)); push(e.data, 'Previsione: ' + rg.nome + ' (' + etmC(m) + ')', e.tot, 'Previsione', '');
+      });
+    });
+    S.mesi.forEach(function (m, i) {      // F24 su compensi: ritenute e INPS del lordo + contributi ditta, versati il 16 del mese dopo
+      var lordo = num(S.righe.compensi[i]); if (!lordo) return;
+      var f = lordo * (100 - num(S.nettoPerc)) / 100 + lordo * num(S.contribPerc) / 100 + num(S.righe.contributi[i]);
+      push(mesePiu(m) + '-16', 'F24 su compensi ' + etmC(m) + ' (ritenute + INPS, stimato)', -f, 'Previsione', 'Stima: lordo − quota netta + contributi ditta');
+    });
+    if (o.laser) push(o.laser.mese + '-28', 'Incasso cessione macchina laser a SRLS (IVA inclusa)', o.laser.prezzo + o.laser.iva, 'Previsione', '');
+    ((o.utili && o.utili.prelievi) || []).forEach(function (p) {
+      push(p.data, 'Dividendi netti ai soci (lordo ' + r2(p.lordo) + ')', -p.netto, 'Prelievo utili', '');
+      push(p.f24Data, 'F24 ritenuta 26% sui dividendi', -p.ritenuta, 'Prelievo utili', '');
+    });
+    C.manuali.forEach(function (x) { if (!num(x.importo)) return; push(x.data, x.desc || 'Movimento manuale', num(x.importo), 'Manuale', x.nota); });
+    var ord = { 'Manuale': 0, 'Registrata': 1, 'Previsione (voce)': 2, 'Previsione': 3, 'Prelievo utili': 4 };
+    righe.sort(function (a, b) { return a.data < b.data ? -1 : a.data > b.data ? 1 : ((ord[a.fonte] || 0) - (ord[b.fonte] || 0)); });
+    var bal = saldo0, minimo = { saldo: saldo0, data: d0 }, mesi = {}, ordine = [];
+    righe.forEach(function (x) {
+      bal = r2(bal + x.importo); x.saldo = bal; if (bal < minimo.saldo) minimo = { saldo: bal, data: x.data };
+      var m = x.data.slice(0, 7); if (!mesi[m]) { mesi[m] = { m: m, entrate: 0, uscite: 0, chiusura: bal }; ordine.push(m); }
+      if (x.importo > 0) mesi[m].entrate = r2(mesi[m].entrate + x.importo); else mesi[m].uscite = r2(mesi[m].uscite - x.importo); mesi[m].chiusura = bal;
+    });
+    var soglia = num(C.soglia), sotto = righe.filter(function (x) { return x.saldo < soglia; });
+    if (minimo.saldo < 0) avv.push('Cassa negativa: il minimo è ' + minimo.saldo + ' € il ' + minimo.data + '.');
+    else if (soglia && minimo.saldo < soglia) avv.push('La cassa scende sotto la soglia di ' + soglia + ' €: minimo ' + minimo.saldo + ' € il ' + minimo.data + '.');
+    var fin26 = saldo0; righe.forEach(function (x) { if (x.data <= '2026-12-31') fin26 = x.saldo; });
+    return { cfg: C, saldo0: r2(saldo0), righe: righe, mesi: ordine.map(function (m) { return mesi[m]; }), minimo: minimo, finale: r2(bal), fine2026: r2(fin26), sotto: sotto.length, avvisi: avv };
+  }
+  function etmC(m) { var n = ['gen', 'feb', 'mar', 'apr', 'mag', 'giu', 'lug', 'ago', 'set', 'ott', 'nov', 'dic']; return n[+m.slice(5, 7) - 1] + ' ' + m.slice(0, 4); }
+  var SCENARIO = JSON.parse(JSON.stringify(SIM_DEFAULT)); SCENARIO.cassa = cassaDefault(); SCENARIO.altreRettifiche = 5000;   // TFM amministratori 2026 (accantonamento non monetario, IRAP indeducibile)
   Object.keys(SIM_DEFAULT.righe).forEach(function (k) { SIM_DEFAULT.righe[k] = [0, 0]; }); SIM_DEFAULT.prelievi = [];
   function simNorm(s) {
     var o = JSON.parse(JSON.stringify(SIM_DEFAULT)); s = s || {};
@@ -521,8 +615,10 @@ table.fit{min-width:0;font-size:9.4px}td.mod input{border:0;background:none;padd
     if (s.rimanenzeFinali !== undefined && String(s.rimanenzeFinali) !== '' && !(s.rimanenze && s.rimanenze.some(function (x) { return String(x) !== ''; }))) o.rimanenze[o.rimanenze.length - 1] = s.rimanenzeFinali;
     o.laser = Object.assign({}, SIM_DEFAULT.laser, s.laser || {});
     delete o.dividendo; o.budget = budgetNorm(o.budget);
+    if (s.cassa === undefined || s.cassa === null) { scenario0911(o); o.cassaMigrata = true; }
+    o.cassa = cassaNorm(o.cassa);
     if (!Array.isArray(s.prelievi) && num(s.dividendo) > 0) o.prelievi = [{ data: o.mesi[o.mesi.length - 1] + '-18', lordo: num(s.dividendo) }];   // vecchia previsione con un solo dividendo
-    o.prelievi = (o.prelievi || []).map(function (p) { return { data: String((p && p.data) || ''), lordo: p && p.lordo !== undefined ? p.lordo : 0 }; });
+    o.prelievi = (o.prelievi || []).map(function (p) { return { data: String((p && p.data) || ''), lordo: p && p.lordo !== undefined ? p.lordo : 0, ritenuta: p && p.ritenuta !== undefined ? p.ritenuta : '', base: p && (p.base === 'cap' || p.base === 'sas') ? p.base : 'div' }; });
     return o;
   }
   function num(x) { var n = parseFloat(x); return isFinite(n) ? n : 0; }
@@ -634,12 +730,13 @@ table.fit{min-width:0;font-size:9.4px}td.mod input{border:0;background:none;padd
     var riserve = S.usaRiserve ? (items.sp_altre_riserve || 0) + up - acc25 : 0;
     var distribuibile = Math.max(0, Math.max(T.utileNetto, 0) - accLegale) + riserve;
     var rit = num(S.ritenuta), sd = 0, sc = 0;
-    var soci = S.soci.map(function (x) { sd += num(x.div); sc += num(x.cap); return { nome: x.nome, cap: num(x.cap), div: num(x.div), lordo: 0, ritenuta: 0, netto: 0 }; });
+    var soci = S.soci.map(function (x) { sd += num(x.div); sc += num(x.cap); var sas = x.sas !== undefined && x.sas !== '' ? num(x.sas) : (/tullio/i.test(x.nome) ? 70 : /rosanna/i.test(x.nome) ? 30 : 0); return { nome: x.nome, cap: num(x.cap), div: num(x.div), sas: sas, lordo: 0, ritenuta: 0, netto: 0 }; });
     var prelievi = (S.prelievi || []).filter(function (p) { return num(p.lordo) > 0 && /^\d{4}-\d{2}-\d{2}$/.test(p.data); })
       .sort(function (a, b) { return a.data < b.data ? -1 : a.data > b.data ? 1 : 0; }).map(function (p) {
-        var ss = soci.map(function (x) { var l = r2(num(p.lordo) * x.div / 100), r = r2(l * rit / 100); x.lordo = r2(x.lordo + l); x.ritenuta = r2(x.ritenuta + r); x.netto = r2(x.netto + l - r); return { nome: x.nome, lordo: l, ritenuta: r, netto: r2(l - r) }; });
+        var rp = (p.ritenuta === undefined || p.ritenuta === '' || p.ritenuta === null) ? rit : num(p.ritenuta);
+        var ss = soci.map(function (x) { var l = r2(num(p.lordo) * (p.base === 'cap' ? x.cap : p.base === 'sas' ? x.sas : x.div) / 100), r = r2(l * rp / 100); x.lordo = r2(x.lordo + l); x.ritenuta = r2(x.ritenuta + r); x.netto = r2(x.netto + l - r); return { nome: x.nome, lordo: l, ritenuta: r, netto: r2(l - r) }; });
         var sm = function (k) { return r2(ss.reduce(function (a, y) { return a + y[k]; }, 0)); };
-        return { data: p.data, mese: p.data.slice(0, 7), f24Mese: mesePiu(p.data.slice(0, 7)), f24Data: mesePiu(p.data.slice(0, 7)) + '-16', lordoInserito: num(p.lordo), lordo: sm('lordo'), ritenuta: sm('ritenuta'), netto: sm('netto'), soci: ss };
+        return { data: p.data, ritPerc: rp, base: p.base === 'cap' || p.base === 'sas' ? p.base : 'div', mese: p.data.slice(0, 7), f24Mese: mesePiu(p.data.slice(0, 7)), f24Data: mesePiu(p.data.slice(0, 7)) + '-16', lordoInserito: num(p.lordo), lordo: sm('lordo'), ritenuta: sm('ritenuta'), netto: sm('netto'), soci: ss };
       });
     var D = r2(prelievi.reduce(function (a, p) { return a + p.lordo; }, 0));
     var totRit = r2(prelievi.reduce(function (a, p) { return a + p.ritenuta; }, 0)), totNetto = r2(prelievi.reduce(function (a, p) { return a + p.netto; }, 0));
@@ -662,7 +759,7 @@ table.fit{min-width:0;font-size:9.4px}td.mod input{border:0;background:none;padd
       acc25: r2(acc25), impostePatrimoniali: r2(T.imposte), caricoFiscale: r2(T.imposte + totRit), avvisi: avv };
   }
 
-  var api = { budgetCalc: budgetCalc, budgetSim: budgetSim, budgetNorm: budgetNorm, BUD_RIC: BUD_RIC, BUD_COS: BUD_COS, SCENARIO: SCENARIO, CATEGORIE: CATEGORIE, PARAMS_DEFAULT: PARAMS_DEFAULT, calcola: calcola, simula: simula, dividendi: dividendi, SIM_RIGHE: SIM_RIGHE, SIM_DEFAULT: SIM_DEFAULT, simNorm: simNorm, statoPatrimoniale: statoPatrimoniale, daDashboard: daDashboard, elencoMesi: elencoMesi, r2: r2 };
+  var api = { budgetCalc: budgetCalc, budgetSim: budgetSim, budgetNorm: budgetNorm, BUD_RIC: BUD_RIC, BUD_COS: BUD_COS, SCENARIO: SCENARIO, CATEGORIE: CATEGORIE, PARAMS_DEFAULT: PARAMS_DEFAULT, calcola: calcola, simula: simula, dividendi: dividendi, SIM_RIGHE: SIM_RIGHE, SIM_DEFAULT: SIM_DEFAULT, simNorm: simNorm, cassaPiano: cassaPiano, cassaDefault: cassaDefault, statoPatrimoniale: statoPatrimoniale, daDashboard: daDashboard, elencoMesi: elencoMesi, r2: r2 };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.Engine = api;
 })(typeof window !== 'undefined' ? window : this);
 
@@ -728,9 +825,9 @@ function calc(){ return E.calcola({voci:S.voci,dash:S.dash||{},params:params()})
 function cls(x){ return x<-0.004?'neg':(x>0.004?'pos':''); }
 
 /* ── Viste ── */
-var TABS=[['riepilogo','Riepilogo'],['pl','P&L mensile'],['iva','IVA'],['imposte','Imposte (stima)'],['patrimonio','Stato patrimoniale'],['simulazione','Previsione nov-dic'],['utili','Prelievo utili'],['budget','Budget'],['commercialista','Per il commercialista'],['voci','Voci manuali'],['dashboard','Da Dashboard V6'],['param','Parametri'],['controlli','Controlli'],['storico','Storico']];
+var TABS=[['riepilogo','Riepilogo'],['pl','P&L mensile'],['cassa','Cassa'],['iva','IVA'],['imposte','Imposte (stima)'],['patrimonio','Stato patrimoniale'],['simulazione','Previsione nov-dic'],['utili','Prelievo utili'],['budget','Budget'],['commercialista','Per il commercialista'],['voci','Voci manuali'],['dashboard','Da Dashboard V6'],['param','Parametri'],['controlli','Controlli'],['storico','Storico']];
 function nav(){ document.getElementById('nav').innerHTML=TABS.map(function(t){return '<button class="'+(S.tab===t[0]?'on':'')+'" data-t="'+t[0]+'">'+t[1]+'</button>';}).join(''); }
-function render(){ nav(); var reg=calc(); S.__reg=reg; var r=reg, SIMO=null; if(S.tab==='pl'&&S.plPrev!==false){ try{ SIMO=simRun(); r=SIMO.res; }catch(e){ r=reg; SIMO=null; } } var f={riepilogo:vRiepilogo,pl:vPL,iva:vIva,imposte:vImposte,patrimonio:vPatrimonio,simulazione:vSimulazione,utili:vUtili,commercialista:vReport,budget:vBudget,voci:vVoci,dashboard:vDash,param:vParam,controlli:vControlli,storico:vStorico}[S.tab]; document.getElementById('main').innerHTML='<div class="bar"><span id="pdfmsg" class="note"></span><button class="p" data-a="pdf" style="margin:0">⬇ Salva PDF</button></div><div class="pdfhead"'+(S.tab==='commercialista'?' style="display:none!important"':'')+'><b>Bilancio SRL — '+esc(TABS.filter(function(t){return t[0]===S.tab;})[0][1])+'</b><div class="note">Tullio Serci S.r.l. · generato il '+new Date().toLocaleDateString('it-IT')+' · importi in euro, IVA esclusa salvo dove indicato</div></div>'+f(r)+(SIMO?cashFlowHtml(SIMO):'');
+function render(){ nav(); var reg=calc(); S.__reg=reg; var r=reg, SIMO=null; if(S.tab==='pl'&&S.plPrev!==false){ try{ SIMO=simRun(); r=SIMO.res; }catch(e){ r=reg; SIMO=null; } } var f={riepilogo:vRiepilogo,pl:vPL,iva:vIva,imposte:vImposte,patrimonio:vPatrimonio,simulazione:vSimulazione,cassa:vCassa,utili:vUtili,commercialista:vReport,budget:vBudget,voci:vVoci,dashboard:vDash,param:vParam,controlli:vControlli,storico:vStorico}[S.tab]; document.getElementById('main').innerHTML='<div class="bar"><span id="pdfmsg" class="note"></span><button class="p" data-a="pdf" style="margin:0">⬇ Salva PDF</button></div><div class="pdfhead"'+(S.tab==='commercialista'?' style="display:none!important"':'')+'><b>Bilancio SRL — '+esc(TABS.filter(function(t){return t[0]===S.tab;})[0][1])+'</b><div class="note">Tullio Serci S.r.l. · generato il '+new Date().toLocaleDateString('it-IT')+' · importi in euro, IVA esclusa salvo dove indicato</div></div>'+f(r)+(SIMO?cashFlowHtml(SIMO):'');
   if(S.tab==='riepilogo') grafico(r); if(S.tab==='voci') bulkInfo(); }
 function kpi(l,v,c){ return '<div class="kpi card"><span>'+l+'</span><b class="'+(c||'')+'">'+v+' €</b></div>'; }
 function vRiepilogo(r){ var t=r.totali, ok=r.controlli.every(function(c){return c.ok;});
@@ -995,6 +1092,7 @@ function vSimulazione(){ var s=simS(), mesi=s.mesi.map(etm);
    +'<div><label>Mese della vendita</label><select data-sim="laser.mese">'+s.mesi.map(function(m){return '<option value="'+m+'"'+(s.laser.mese===m?' selected':'')+'>'+etm(m)+'</option>';}).join('')+'</select></div></div></div>'+simSalva()+'</div><div id="simres">'+simRes('simulazione')+'</div>'; }
 function simRes(tab){ var o=simRun(), r=S.__base||calc(), b=r.totali, t=o.res.totali, c=o.cassa;
   if(tab==='utili') return utiliRes(o);
+  if(tab==='cassa') return cassaRes(o);
   var riga=function(l,x,y,cl){ return '<tr><td style="text-align:left">'+l+'</td><td>'+eur(x)+'</td><td>'+eur(y)+'</td><td class="'+(cl?cls(y-x):'')+'">'+eur(y-x)+'</td></tr>'; };
   return '<div class="card tw"><table><tr><th style="text-align:left;font-size:11px;color:var(--mu)">€ · IVA ESCLUSA</th><th>Reale a oggi</th><th>Simulato a fine anno</th><th>Differenza</th></tr>'
    +riga('Ricavi',b.ricavi,t.ricavi)+riga('Costi',b.costi,t.costi)+riga('Variazione rimanenze',b.varRim,t.varRim)
@@ -1004,6 +1102,31 @@ function simRes(tab){ var o=simRun(), r=S.__base||calc(), b=r.totali, t=o.res.to
    +(o.laser?'<div class="card"><b>Cessione macchina laser alla SRLS</b><div class="note">Prezzo '+eur(o.laser.prezzo)+' € + IVA '+eur(o.laser.iva)+' € · plusvalenza (utile) '+eur(o.laser.plusvalenza)+' € · mese: '+etm(o.laser.mese)+'</div></div>':'')
    +'<div class="card"><b>P&amp;L mensile simulato</b></div>'+vPL(o.res,true)+cashFlowHtml(o); }
 function dmy(d){ return String(d).slice(8,10)+'/'+String(d).slice(5,7)+'/'+String(d).slice(0,4); }
+
+/* ── Pagina Cassa: saldo di banche + movimenti futuri giorno per giorno, legata a P&L previsionale, voci registrate e prelievo utili ── */
+function cIn(path,val,type,w){ return '<input type="'+(type||'text')+'" '+(type==='number'?'step="0.01" ':'')+'data-sim="'+path+'" value="'+esc(val)+'"'+(w?' style="min-width:'+w+'px"':'')+'>'; }
+function cassaRes(o){ var P=E.cassaPiano({voci:S.voci,dash:S.dash||{},params:params()},o), C=P.cfg;
+  var kp=function(l,v,c){ return '<div class="kpi card"><span>'+l+'</span><b class="'+(c||'')+'">'+eur(v)+' €</b></div>'; };
+  var mesiH=P.mesi.map(function(x){ return '<tr><td style="text-align:left">'+etm(x.m)+'</td><td>'+eur(x.entrate)+'</td><td>−'+eur(x.uscite)+'</td><td class="'+cls(x.chiusura-C.soglia)+'">'+eur(x.chiusura)+'</td></tr>'; }).join('');
+  var righe=P.righe.map(function(x){ var rs=x.saldo<C.soglia;
+    return '<tr class="'+(rs?'sotto':'')+'"><td style="text-align:left;white-space:nowrap">'+dmy(x.data)+'</td><td style="text-align:left;white-space:normal">'+esc(x.desc)+(x.nota?'<div class="note">'+esc(x.nota)+'</div>':'')+'</td><td class="note">'+esc(x.fonte)+'</td><td class="'+(x.importo>0?'pos':'')+'">'+(x.importo>0?eur(x.importo):'')+'</td><td class="'+(x.importo<0?'neg':'')+'">'+(x.importo<0?'−'+eur(-x.importo):'')+'</td><td class="'+(rs?'neg':'')+'"><b>'+eur(x.saldo)+'</b></td></tr>'; }).join('');
+  return '<div class="kpis">'+kp('Saldo di partenza al '+dmy(C.data),P.saldo0)+kp('Saldo minimo previsto ('+dmy(P.minimo.data)+')',P.minimo.saldo,cls(P.minimo.saldo-C.soglia))+kp('Cassa al 31/12/2026',P.fine2026,cls(P.fine2026))+kp('Cassa al '+dmy(C.fine),P.finale,cls(P.finale))+'</div>'
+   +(P.avvisi.length?'<div class="card wa note">'+P.avvisi.map(esc).join('<br>')+'</div>':'')
+   +'<div class="card tw"><b>Riepilogo mensile (IVA inclusa)</b><table><tr><th style="text-align:left">Mese</th><th>Entrate</th><th>Uscite</th><th>Cassa a fine mese</th></tr>'+mesiH+'</table></div>'
+   +'<div class="card tw"><b>Movimenti giorno per giorno</b><div class="note">Righe sotto la soglia di allerta ('+eur(C.soglia)+' €) evidenziate. Fonte: <i>Registrata</i> = voce nel Foglio; <i>Previsione</i> = pagina Previsione nov-dic; <i>Prelievo utili</i> = pagina Prelievo utili; <i>Manuale</i> = righe che inserisci qui sopra.</div><table><tr><th style="text-align:left">Data</th><th style="text-align:left">Movimento</th><th>Fonte</th><th>Entrata €</th><th>Uscita €</th><th>Saldo €</th></tr>'+(righe||'<tr><td colspan="6" class="note">Nessun movimento dopo la data del saldo.</td></tr>')+'</table></div>'
+   +'<div class="note">Non incluso: fatture già emesse o ricevute <b>prima</b> della data del saldo e non ancora incassate/pagate (crediti e debiti già maturati) — vanno inseriti come movimenti manuali con la data prevista. IRES/IRAP e IVA di dicembre se non registrate come voci F24. L\'IVA delle vendite e dei costi è inclusa negli incassi e nei pagamenti.</div>'; }
+function vCassa(){ var s=simS(), C=s.cassa, o=simRun();
+  var rg=C.regole.map(function(r,i){ return '<tr><td style="text-align:left">'+cIn('cassa.regole.'+i+'.match',r.match,'text',200)+'</td><td>'+cIn('cassa.regole.'+i+'.comp',r.comp,'text',80)+'</td><td>'+cIn('cassa.regole.'+i+'.giorni',r.giorni,'number')+'</td><td>'+cIn('cassa.regole.'+i+'.data',r.data,'date')+'</td><td>'+cIn('cassa.regole.'+i+'.importo',r.importo===undefined?'':r.importo,'number')+'</td><td><button class="l" data-a="delcassa" data-id="regole:'+i+'">Elimina</button></td></tr>'; }).join('');
+  var mn=C.manuali.map(function(r,i){ return '<tr><td>'+cIn('cassa.manuali.'+i+'.data',r.data,'date')+'</td><td style="text-align:left">'+cIn('cassa.manuali.'+i+'.desc',r.desc,'text',280)+'</td><td>'+cIn('cassa.manuali.'+i+'.importo',r.importo,'number')+'</td><td style="text-align:left">'+cIn('cassa.manuali.'+i+'.nota',r.nota,'text',200)+'</td><td><button class="l" data-a="delcassa" data-id="manuali:'+i+'">Elimina</button></td></tr>'; }).join('');
+  return '<div class="card"><b>Cassa — saldo di banche e piano degli incassi/pagamenti</b>'
+   +(s.cassaMigrata?'<div class="wa note" style="margin:6px 0">Scenario del 09/11 caricato (compensi, Matteo, prelievo utili di dicembre, saldo 28.008,25 €): premi <b>Salva previsione</b> per conservarlo.</div>':'')
+   +'<div class="note">Parti dal saldo reale dei conti (Sibill + Sella + Intesa) a una data; da quella data in poi si contano solo i movimenti futuri. Le voci (fatture, F24), la previsione di nov-dic e i prelievi di utili alimentano la cassa; compensi netti, Matteo e altri movimenti si aggiungono come righe manuali.</div>'
+   +'<div class="g"><div><label>Data del saldo</label>'+cIn('cassa.data',C.data,'date')+'</div><div><label>Saldo di banche e cassa a quella data €</label>'+cIn('cassa.saldo',C.saldo,'number')+'</div><div><label>Soglia di allerta €</label>'+cIn('cassa.soglia',C.soglia,'number')+'</div><div><label>Fino al</label>'+cIn('cassa.fine',C.fine,'date')+'</div></div>'
+   +'<div style="margin-top:10px"><b>Regole di data e importo per incassi/pagamenti</b><div class="note">Cercano il testo nella descrizione o nel riferimento della voce (anche nelle righe di previsione, es. "Paysolution"). Se indichi una data, la voce si incassa/paga in quel giorno; con i giorni, si somma alla data fattura; l\'importo (facoltativo) sostituisce il totale con IVA (es. Amex 1.800 €). Vince la prima regola che corrisponde: metti prima le più specifiche. Mese di competenza facoltativo (aaaa-mm).</div>'
+   +'<div class="tw"><table><tr><th style="text-align:left">Testo da cercare</th><th>Competenza</th><th>Giorni</th><th>Data fissa</th><th>Importo €</th><th></th></tr>'+rg+'</table></div><button class="l" data-a="addcassa" data-id="regole" style="margin:6px 0">+ Aggiungi regola</button></div>'
+   +'<div style="margin-top:6px"><b>Escludi dalla cassa (già incassate/pagate)</b><div class="note">Numeri o testi di fatture da non contare, separati da virgola (es. fatture Adler già incassate).</div><input type="text" data-sim="cassa.esclusi" value="'+esc(C.esclusi.join(', '))+'" style="width:100%"></div>'
+   +'<div style="margin-top:10px"><b>Movimenti manuali</b><div class="note">Importo con segno: negativo = uscita, positivo = entrata. Importo 0 = riga ignorata (promemoria).</div><div class="tw"><table><tr><th>Data</th><th style="text-align:left">Descrizione</th><th>Importo €</th><th style="text-align:left">Nota</th><th></th></tr>'+mn+'</table></div><button class="l" data-a="addcassa" data-id="manuali" style="margin:6px 0">+ Aggiungi movimento</button></div>'
+   +'<div style="margin-top:8px"><button class="p" data-a="salvasim">Salva previsione</button> <span id="msg" class="note"></span></div></div><div id="simres">'+simRes('cassa')+'</div>'; }
 function cashFlowHtml(o){ var f=o.flusso; if(!f||!f.righe.length) return '';
   var h=f.righe.map(function(x){return etm(x.m);}).concat(['Dopo il 31/12']);
   var row=function(l,fn,opt){ opt=opt||{}; var oltre=opt.oltre===undefined?'':opt.oltre;
@@ -1019,7 +1142,7 @@ function cashFlowHtml(o){ var f=o.flusso; if(!f||!f.righe.length) return '';
     row('= SALDO DI CASSA A FINE MESE',function(x){return x.chiusura;},{t:1,c:1,oltre:f.finaleDopoOltre}) ];
   return '<div class="card pbk"><b>Cash flow (cassa) — armonizzato con il P&amp;L previsionale e con i prelievi di utili</b>'
    +(f.avvisi.length?'<div class="wa note" style="margin-top:6px">'+f.avvisi.map(esc).join('<br>')+'</div>':'')
-   +'<div class="note">Saldo iniziale: '+(f.manuale?'inserito a mano':(f.aperturaData?'saldo banche e cassa del '+esc(f.aperturaData):'nessun saldo disponibile'))+' ('+eur(f.apertura)+' €). I movimenti sono per DATA della fattura/pagamento (non per competenza), IVA inclusa. Il saldo iniziale si inserisce in "Previsione nov-dic" o in "Prelievo utili".</div></div>'
+   +'<div class="note">Saldo iniziale: '+(f.manuale?'inserito a mano':(f.aperturaData?'saldo banche e cassa del '+esc(f.aperturaData):'nessun saldo disponibile'))+' ('+eur(f.apertura)+' €). I movimenti sono per DATA della fattura/pagamento (non per competenza), IVA inclusa. Il saldo iniziale si inserisce in "Previsione nov-dic" o in "Prelievo utili". <b>Per la cassa giorno per giorno, con date di incasso e movimenti manuali, usa la pagina Cassa.</b></div></div>'
    +'<div class="card tw"><table class="fit"><thead><tr><th style="text-align:left">€ · CASSA (IVA inclusa)</th>'+h.map(function(x){return '<th>'+x+'</th>';}).join('')+'</tr></thead><tbody>'+rows.join('')+'</tbody></table></div>'
    +'<div class="note">Non incluso: fatture e debiti già maturati ma non ancora pagati (es. Paysolution, fornitori), acconti IRES/IRAP e IVA di dicembre se non registrati come F24, stipendi al lordo (non il netto). Contributi e ritenute dei compensi escono con gli F24, non qui. L\'ultima colonna mostra le ritenute sui dividendi di dicembre, che si versano a gennaio.</div>'; }
 function graficoUtili(u){ var P=u.piano, W=720, H=270, pl=46, pb=26, pt=14, n=P.length, bw=(W-pl)/n;
@@ -1049,9 +1172,9 @@ function suddivisione(u){ if(!u.dividendo) return '<div class="note">Nessun prel
    +'<div class="note">'+seg.map(function(x){ return '<span style="display:inline-block;width:11px;height:11px;background:'+x.c+';border-radius:2px;margin:0 4px -1px 8px"></span>'+x.t+' <b>'+eur(x.v)+' €</b> ('+IT.format(Math.round(x.v/tot*1000)/10)+'%)'; }).join(' ')+'</div>'; }
 function vUtili(){ var s=simS();
   var soci=s.soci.map(function(x,i){ return '<tr><td style="text-align:left"><input data-sim="soci.'+i+'.nome" value="'+esc(x.nome)+'" type="text"></td><td>'+numIn('soci.'+i+'.cap',x.cap,'0.01')+'</td><td>'+numIn('soci.'+i+'.div',x.div,'0.01')+'</td></tr>'; }).join('');
-  var pre=s.prelievi.map(function(p,i){ return '<tr><td><input type="date" data-sim="prelievi.'+i+'.data" value="'+esc(p.data)+'"></td><td>'+numIn('prelievi.'+i+'.lordo',p.lordo)+'</td><td><button class="l" data-a="delprel" data-id="'+i+'">Elimina</button></td></tr>'; }).join('');
+  var pre=s.prelievi.map(function(p,i){ return '<tr><td><input type="date" data-sim="prelievi.'+i+'.data" value="'+esc(p.data)+'"></td><td>'+numIn('prelievi.'+i+'.lordo',p.lordo)+'</td><td>'+numIn('prelievi.'+i+'.ritenuta',p.ritenuta===undefined?'':p.ritenuta,'0.1')+'</td><td><select data-sim="prelievi.'+i+'.base"><option value="div"'+(p.base!=='cap'?' selected':'')+'>Quote utili</option><option value="cap"'+(p.base==='cap'?' selected':'')+'>Quote capitale attuali (60/30/5/5)</option><option value="sas"'+(p.base==='sas'?' selected':'')+'>Quote ex SAS (70/30)</option></select></td><td><button class="l" data-a="delprel" data-id="'+i+'">Elimina</button></td></tr>'; }).join('');
   return '<div class="card"><b>Prelievo utili (dividendi ai soci) — piano mese per mese</b><div class="note">Scegli data e importo LORDO di ogni prelievo (anche più di uno). Per ogni prelievo vedi la suddivisione tra i soci, la ritenuta e la data dell\'F24 (16 del mese dopo). Sotto, mese per mese, quanto utile è distribuibile e come cambia la cassa. Le quote seguono la tabella dei soci (diverse dal capitale: serve che lo statuto lo preveda).</div>'
-   +'<div class="tw"><table><tr><th style="text-align:left">Data del prelievo</th><th>Importo lordo €</th><th></th></tr>'+(pre||'<tr><td colspan="3" class="note">Nessun prelievo: aggiungine uno.</td></tr>')+'</table></div>'
+   +'<div class="tw"><table><tr><th style="text-align:left">Data del prelievo</th><th>Importo lordo €</th><th>Ritenuta % (vuoto = '+'predefinita)</th><th>Ripartizione tra i soci</th><th></th></tr>'+(pre||'<tr><td colspan="5" class="note">Nessun prelievo: aggiungine uno.</td></tr>')+'</table></div>'
    +'<button class="l" data-a="addprel" style="margin:6px 0 10px">+ Aggiungi prelievo</button>'
    +'<div class="g"><div><label>Ritenuta sui dividendi % (persone fisiche)</label>'+numIn('ritenuta',s.ritenuta,'0.1')+'</div>'
    +'<div><label>Includere le riserve disponibili (altre riserve + utile 2025)</label><select data-sim="usaRiserve"><option value="1"'+(s.usaRiserve?' selected':'')+'>Sì</option><option value="0"'+(!s.usaRiserve?' selected':'')+'>No, solo utile 2026</option></select></div>'
@@ -1198,12 +1321,12 @@ function val(id){ return document.getElementById(id).value; }
 function caricaLib(){ return new Promise(function(ok,ko){ if(window.html2pdf) return ok(); var sc=document.createElement('script'); sc.src='https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js'; sc.onload=ok; sc.onerror=function(){ko(new Error('libreria PDF non raggiungibile'));}; document.head.appendChild(sc); }); }
 async function salvaPdf(){ var pm=document.getElementById('pdfmsg'), nome='Bilancio_SRL_'+S.tab+'_'+new Date().toISOString().slice(0,10)+'.pdf';
   try{
-    if((S.tab==='simulazione'||S.tab==='utili')&&!DEMO){ S.config=await call('apiSalvaConfig',{sim:JSON.stringify(simS())}); }
+    if((S.tab==='simulazione'||S.tab==='utili'||S.tab==='cassa')&&!DEMO){ S.config=await call('apiSalvaConfig',{sim:JSON.stringify(simS())}); }
     if(pm){ pm.textContent='Preparo il PDF…'; pm.className='note'; }
     await caricaLib(); window.scrollTo(0,0); document.body.classList.add('pdfmode');
     var el=document.getElementById('main'); await new Promise(function(r){setTimeout(r,150);});
     await html2pdf().set({margin:[0,0,0,0],filename:nome,image:{type:'jpeg',quality:.95},html2canvas:{scale:1.6,backgroundColor:'#ffffff',windowWidth:1520,scrollX:0,scrollY:0,x:0,y:0},jsPDF:{unit:'px',format:[1500,1061],orientation:'landscape',hotfixes:['px_scaling']},pagebreak:{mode:['css','legacy'],avoid:['tr','.card']}}).from(el).save();
-    document.body.classList.remove('pdfmode'); if(pm){ pm.textContent=(S.tab==='simulazione'||S.tab==='utili'?'Simulazione salvata · ':'')+'PDF scaricato: '+nome; pm.className='note ok'; }
+    document.body.classList.remove('pdfmode'); if(pm){ pm.textContent=(S.tab==='simulazione'||S.tab==='utili'||S.tab==='cassa'?'Simulazione salvata · ':'')+'PDF scaricato: '+nome; pm.className='note ok'; }
   }catch(e){ document.body.classList.remove('pdfmode'); if(pm){ pm.textContent='Download diretto non riuscito ('+e.message+'): apro la stampa, scegli "Salva come PDF".'; pm.className='note ko'; } setTimeout(function(){ window.print(); },400); } }
 function msg(t,ko){ var m=document.getElementById('msg'); if(m){ m.textContent=t; m.className='note '+(ko?'ko':'ok'); } }
 async function azione(a,id){
@@ -1229,6 +1352,8 @@ async function azione(a,id){
     else if(a==='budzero'){ if(confirm('Azzerare tutto il budget?')){ simS().budget=E.budgetNorm({}); budSalva(); render(); } }
     else if(a==='addprel'){ var sp=simS(); sp.prelievi.push({data:sp.mesi[sp.mesi.length-1]+'-18',lordo:0}); render(); }
     else if(a==='delprel'){ simS().prelievi.splice(+id,1); render(); }
+    else if(a==='addcassa'){ var cc=simS().cassa; if(id==='regole') cc.regole.push({match:'',comp:'',giorni:'',data:'',importo:''}); else cc.manuali.push({data:cc.data,desc:'',importo:0,nota:''}); render(); }
+    else if(a==='delcassa'){ var q=String(id).split(':'); simS().cassa[q[0]].splice(+q[1],1); render(); }
     else if(a==='simreset'){ S.sim=E.simNorm(E.SCENARIO); render(); msg('Scenario ripristinato: premi "Salva previsione" per conservarlo'); }
     else if(a==='salvasim'){ S.config=await call('apiSalvaConfig',{sim:JSON.stringify(simS())}); msg('Previsione salvata'); }
     else if(a==='pdf'){ await salvaPdf(); }
@@ -1239,7 +1364,7 @@ async function azione(a,id){
 async function ricarica(){ var st=await call('apiStato'); S.voci=(st.voci||[]).map(voceDaServer); S.config=st.config||{}; document.getElementById('utente').textContent=st.utente||''; if(S.tab==='storico') S.storico=await call('apiStorico'); render(); }
 document.addEventListener('click',function(e){ var t=e.target.closest('[data-t]'); if(t){ S.tab=t.dataset.t; if(S.tab==='storico') call('apiStorico').then(function(x){S.storico=x;render();}); else render(); return; }
   var a=e.target.closest('[data-a]'); if(a) azione(a.dataset.a,a.dataset.id); });
-function simAgg(e){ var p=e.target.dataset&&e.target.dataset.sim; if(!p) return; var v=e.target.value; if(p==='usaRiserve'||p==='laser.attiva') v=(v==='1'); else if(!/\.nome$/.test(p)) v=v===''?'':v; simPath(p,v); var d=document.getElementById('simres'); if(d) d.innerHTML=simRes(S.tab); var k=document.getElementById('simkpi'); if(k) k.innerHTML=simKpi(); }
+function simAgg(e){ var p=e.target.dataset&&e.target.dataset.sim; if(!p) return; var v=e.target.value; if(p==='usaRiserve'||p==='laser.attiva') v=(v==='1'); else if(p==='cassa.esclusi') v=String(v).split(',').map(function(x){return x.trim();}).filter(Boolean); else if(!/\.nome$/.test(p)) v=v===''?'':v; simPath(p,v); var d=document.getElementById('simres'); if(d) d.innerHTML=simRes(S.tab); var k=document.getElementById('simkpi'); if(k) k.innerHTML=simKpi(); }
 document.addEventListener('input',simAgg); document.addEventListener('change',simAgg);
 document.addEventListener('change',function(e){ var k=e.target.dataset&&e.target.dataset.pl; if(!k) return; var q=k.split('|'); plSet(q[0],q[1],e.target.value); plSalva(); clearTimeout(plRT); plRT=setTimeout(plRender,350); });
 document.addEventListener('change',function(e){ var k=e.target.dataset&&e.target.dataset.bud; if(!k) return; budSet(k,e.target.value); budSalva(); setTimeout(function(){ var a=document.activeElement, kk=a&&a.dataset&&a.dataset.bud; render(); if(kk){ var el=document.querySelector('[data-bud="'+kk+'"]'); if(el){ el.focus(); if(el.select) el.select(); } } },0); });
