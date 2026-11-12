@@ -935,7 +935,7 @@ function formVoce(sp){ var oggi=new Date().toISOString(), e=S.edit||(sp?{categor
       :'<div><label>IVA € (0 se esente / escluso)</label><input type="number" step="0.01" id="f_iva" value="'+esc(e.iva)+'"></div><div><label>IVA detraibile (costi)</label><select id="f_detraibile"><option value="1"'+(e.detraibile!==false?' selected':'')+'>Sì</option><option value="0"'+(e.detraibile===false?' selected':'')+'>No (va a costo)</option></select></div>')+'</div>'
    +'<label>Descrizione</label><input id="f_descrizione" value="'+esc(e.descrizione)+'"><div class="g"><div><label>Riferimento / allegato</label><input id="f_riferimento" value="'+esc(e.riferimento)+'"></div><div><label>Note</label><input id="f_note" value="'+esc(e.note)+'"></div></div>'
    +'<button class="p" data-a="salva">Salva</button>'+(e.id?'<button class="l" data-a="annulla">Annulla modifica</button>':'')
-   +'<button class="l" data-a="importa">Importa da file JSON</button><input type="file" id="imp" accept=".json" class="hid"><div id="msg" class="note"></div></div>'; }
+   +'<button class="l" data-a="esporta">Esporta dati (file per riconciliazione)</button> '+'<button class="l" data-a="importa">Importa da file JSON</button><input type="file" id="imp" accept=".json" class="hid"><div id="msg" class="note"></div></div>'; }
 function elencoVoci(sp){ var rows=S.voci.filter(function(v){ var c=E.CATEGORIE.filter(function(x){return x.id===v.categoria;})[0]; return ((c&&c.tipo)==='sp')===!!sp; }).sort(function(a,b){return (b.competenza+b.data).localeCompare(a.competenza+a.data);}).map(function(v){
    return '<tr style="'+(v.eliminata?'opacity:.45;text-decoration:line-through':'')+'"><td>'+esc(v.competenza)+'</td><td style="text-align:left">'+esc(catNome(v.categoria))+'</td><td style="text-align:left">'+esc(v.descrizione)+'</td><td>'+eur(v.imponibile)+'</td>'+(sp?'':'<td>'+eur(v.iva)+'</td><td>'+eur(+v.imponibile+(+v.iva||0))+'</td>')+'<td>'
    +(v.eliminata?'<button class="l" data-a="rip" data-id="'+v.id+'">Ripristina</button>':'<button class="l" data-a="mod" data-id="'+v.id+'">Modifica</button> <button class="l" data-a="del" data-id="'+v.id+'">Elimina</button>')+'</td></tr>'; }).join('');
@@ -1358,7 +1358,8 @@ async function azione(a,id){
     else if(a==='salvasim'){ S.config=await call('apiSalvaConfig',{sim:JSON.stringify(simS())}); msg('Previsione salvata'); }
     else if(a==='pdf'){ await salvaPdf(); }
     else if(a==='pdfcomm'){ await pdfCommercialista(); }
-    else if(a==='importa'){ document.getElementById('imp').click(); }
+    else if(a==='esporta'){ var out={esportato:new Date().toISOString(),voci:S.voci||[],config:S.config||{},dash:S.dash||{}}; try{ out.calcolo=calc(); }catch(err){ out.calcolo_errore=String(err&&err.message||err); } var blob=new Blob([JSON.stringify(out,null,1)],{type:'application/json'}), u=URL.createObjectURL(blob), lk=document.createElement('a'); lk.href=u; lk.download='consolle_export_'+new Date().toISOString().slice(0,10)+'.json'; document.body.appendChild(lk); lk.click(); setTimeout(function(){ URL.revokeObjectURL(u); lk.remove(); },1000); }
+else if(a==='importa'){ document.getElementById('imp').click(); }
   }catch(e){ msg(e.message,1); }
 }
 async function ricarica(){ var st=await call('apiStato'); S.voci=(st.voci||[]).map(voceDaServer); S.config=st.config||{}; document.getElementById('utente').textContent=st.utente||''; if(S.tab==='storico') S.storico=await call('apiStorico'); render(); }
