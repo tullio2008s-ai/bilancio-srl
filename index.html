@@ -316,7 +316,7 @@ table.fit{min-width:0;font-size:9.4px}td.mod input{border:0;background:none;padd
     add('Nessun doppio conteggio Paysolution (Dashboard V6 + voci manuali)', dup.length === 0, dup.length ? 'Mesi con le due fonti insieme: ' + dup.join(', ') : (esclusi.length ? 'Dashboard esclusa automaticamente nei mesi: ' + esclusi.join(', ') : ''));
     var sumCat = L.reduce(function (t, r) { return t + Object.keys(r.cat).reduce(function (a, k) { return a + (cats[k] && cats[k].tipo === 'ricavo' ? r.cat[k] : 0); }, 0); }, 0);
     add('Righe ricavi (Adler + Paysolution + gettoniere + Amazon + corrispettivi) = totale fatturato manuale', eq(sumCat, sr), 'Somma righe ' + r2(sumCat) + ' - totale ' + r2(sr));
-    var adl = {}; (input.voci || []).forEach(function (v) { if (v.eliminata || v.categoria !== 'servizi' || String(v.id).indexOf('sim-') === 0) return; var m = String(v.competenza).slice(0, 7); adl[m] = (adl[m] || 0) + 1; });
+    var adl = {}; (input.voci || []).forEach(function (v) { if (v.eliminata || v.categoria !== 'servizi' || String(v.id).indexOf('sim-') === 0 || /PROVVISORI/i.test(String(v.descrizione || ''))) return; var m = String(v.competenza).slice(0, 7); adl[m] = (adl[m] || 0) + 1; });
     var dupAdl = Object.keys(adl).filter(function (m) { return adl[m] > 1; }).sort();
     add('Fatture ad Adler: una sola voce per mese di competenza', dupAdl.length === 0, dupAdl.length ? 'Mesi con piu voci: ' + dupAdl.map(function (m) { return m + ' (' + adl[m] + ' voci)'; }).join(', ') : '');
     var MN = ['gennaio', 'febbraio', 'marzo', 'aprile', 'maggio', 'giugno', 'luglio', 'agosto', 'settembre', 'ottobre', 'novembre', 'dicembre'], bad = [];
