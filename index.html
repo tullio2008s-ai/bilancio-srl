@@ -515,7 +515,7 @@ table.fit{min-width:0;font-size:9.4px}td.mod input{border:0;background:none;padd
      Saldo di banche e cassa a una data + movimenti futuri: voci registrate (con regole di data di incasso/pagamento), previsione nov-dic,
      prelievi di utili (dividendi netti + F24 ritenuta) e movimenti manuali. I movimenti con data <= data del saldo sono GIA' nel saldo e non si contano. */
   function cassaDefault() {
-    return { data: '2026-11-09', saldo: 28008.25, soglia: 5000, fine: '2027-02-28',
+    return { data: '2026-11-12', saldo: 13720.82, soglia: 5000, fido: 10000, fine: '2027-02-28',
       regole: [{ match: 'ADLER', comp: '2026-10', giorni: '', data: '2026-12-10', importo: '' }, { match: 'ADLER', comp: '2026-11', giorni: '', data: '2027-01-10', importo: '' },
                { match: 'ADLER', comp: '2026-12', giorni: '', data: '2027-02-10', importo: '' }, { match: 'ADLER', comp: '', giorni: 40, data: '', importo: '' },
                { match: 'altre voci, sicurezza e varie novembre', comp: '', giorni: '', data: '2026-11-27', importo: 1800 }],
@@ -597,10 +597,12 @@ table.fit{min-width:0;font-size:9.4px}td.mod input{border:0;background:none;padd
       if (x.importo > 0) mesi[m].entrate = r2(mesi[m].entrate + x.importo); else mesi[m].uscite = r2(mesi[m].uscite - x.importo); mesi[m].chiusura = bal;
     });
     var soglia = num(C.soglia), sotto = righe.filter(function (x) { return x.saldo < soglia; });
-    if (minimo.saldo < 0) avv.push('Cassa negativa: il minimo è ' + minimo.saldo + ' € il ' + minimo.data + '.');
+    var fido = num(C.fido);
+    if (minimo.saldo < -fido) avv.push('Fido superato: il minimo è ' + minimo.saldo + ' € il ' + minimo.data + (fido ? ' (fido ' + fido + ' €).' : '.'));
+    else if (minimo.saldo < 0) avv.push('Cassa negativa, coperta dal fido: il minimo è ' + minimo.saldo + ' € il ' + minimo.data + '; fido ancora disponibile ' + r2(fido + minimo.saldo) + ' €.');
     else if (soglia && minimo.saldo < soglia) avv.push('La cassa scende sotto la soglia di ' + soglia + ' €: minimo ' + minimo.saldo + ' € il ' + minimo.data + '.');
     var fin26 = saldo0; righe.forEach(function (x) { if (x.data <= '2026-12-31') fin26 = x.saldo; });
-    return { cfg: C, saldo0: r2(saldo0), righe: righe, mesi: ordine.map(function (m) { return mesi[m]; }), minimo: minimo, finale: r2(bal), fine2026: r2(fin26), sotto: sotto.length, avvisi: avv };
+    return { cfg: C, fido: num(C.fido), saldo0: r2(saldo0), righe: righe, mesi: ordine.map(function (m) { return mesi[m]; }), minimo: minimo, finale: r2(bal), fine2026: r2(fin26), sotto: sotto.length, avvisi: avv };
   }
   function etmC(m) { var n = ['gen', 'feb', 'mar', 'apr', 'mag', 'giu', 'lug', 'ago', 'set', 'ott', 'nov', 'dic']; return n[+m.slice(5, 7) - 1] + ' ' + m.slice(0, 4); }
   var SCENARIO = JSON.parse(JSON.stringify(SIM_DEFAULT)); SCENARIO.cassa = cassaDefault(); SCENARIO.altreRettifiche = 5000;   // TFM amministratori 2026 (accantonamento non monetario, IRAP indeducibile)
@@ -1110,7 +1112,7 @@ function cassaRes(o){ var P=E.cassaPiano({voci:S.voci,dash:S.dash||{},params:par
   var mesiH=P.mesi.map(function(x){ return '<tr><td style="text-align:left">'+etm(x.m)+'</td><td>'+eur(x.entrate)+'</td><td>−'+eur(x.uscite)+'</td><td class="'+cls(x.chiusura-C.soglia)+'">'+eur(x.chiusura)+'</td></tr>'; }).join('');
   var righe=P.righe.map(function(x){ var rs=x.saldo<C.soglia;
     return '<tr class="'+(rs?'sotto':'')+'"><td style="text-align:left;white-space:nowrap">'+dmy(x.data)+'</td><td style="text-align:left;white-space:normal">'+esc(x.desc)+(x.nota?'<div class="note">'+esc(x.nota)+'</div>':'')+'</td><td class="note">'+esc(x.fonte)+'</td><td class="'+(x.importo>0?'pos':'')+'">'+(x.importo>0?eur(x.importo):'')+'</td><td class="'+(x.importo<0?'neg':'')+'">'+(x.importo<0?'−'+eur(-x.importo):'')+'</td><td class="'+(rs?'neg':'')+'"><b>'+eur(x.saldo)+'</b></td></tr>'; }).join('');
-  return '<div class="kpis">'+kp('Saldo di partenza al '+dmy(C.data),P.saldo0)+kp('Saldo minimo previsto ('+dmy(P.minimo.data)+')',P.minimo.saldo,cls(P.minimo.saldo-C.soglia))+kp('Cassa al 31/12/2026',P.fine2026,cls(P.fine2026))+kp('Cassa al '+dmy(C.fine),P.finale,cls(P.finale))+'</div>'
+  return '<div class="kpis">'+kp('Saldo di partenza al '+dmy(C.data),P.saldo0)+kp('Saldo minimo previsto ('+dmy(P.minimo.data)+')',P.minimo.saldo,cls(P.minimo.saldo-C.soglia))+kp('Minimo disponibile con il fido ('+eur(P.fido)+' €)',P.minimo.saldo+P.fido,cls(P.minimo.saldo+P.fido))+kp('Cassa al 31/12/2026',P.fine2026,cls(P.fine2026))+kp('Cassa al '+dmy(C.fine),P.finale,cls(P.finale))+'</div>'
    +(P.avvisi.length?'<div class="card wa note">'+P.avvisi.map(esc).join('<br>')+'</div>':'')
    +'<div class="card tw"><b>Riepilogo mensile (IVA inclusa)</b><table><tr><th style="text-align:left">Mese</th><th>Entrate</th><th>Uscite</th><th>Cassa a fine mese</th></tr>'+mesiH+'</table></div>'
    +'<div class="card tw"><b>Movimenti giorno per giorno</b><div class="note">Righe sotto la soglia di allerta ('+eur(C.soglia)+' €) evidenziate. Fonte: <i>Registrata</i> = voce nel Foglio; <i>Previsione</i> = pagina Previsione nov-dic; <i>Prelievo utili</i> = pagina Prelievo utili; <i>Manuale</i> = righe che inserisci qui sopra.</div><table><tr><th style="text-align:left">Data</th><th style="text-align:left">Movimento</th><th>Fonte</th><th>Entrata €</th><th>Uscita €</th><th>Saldo €</th></tr>'+(righe||'<tr><td colspan="6" class="note">Nessun movimento dopo la data del saldo.</td></tr>')+'</table></div>'
@@ -1121,7 +1123,7 @@ function vCassa(){ var s=simS(), C=s.cassa, o=simRun();
   return '<div class="card"><b>Cassa — saldo di banche e piano degli incassi/pagamenti</b>'
    +(s.cassaMigrata?'<div class="wa note" style="margin:6px 0">Scenario del 09/11 caricato (compensi, Matteo, prelievo utili di dicembre, saldo 28.008,25 €): premi <b>Salva previsione</b> per conservarlo.</div>':'')
    +'<div class="note">Parti dal saldo reale dei conti (Sibill + Sella + Intesa) a una data; da quella data in poi si contano solo i movimenti futuri. Le voci (fatture, F24), la previsione di nov-dic e i prelievi di utili alimentano la cassa; compensi netti, Matteo e altri movimenti si aggiungono come righe manuali.</div>'
-   +'<div class="g"><div><label>Data del saldo</label>'+cIn('cassa.data',C.data,'date')+'</div><div><label>Saldo di banche e cassa a quella data €</label>'+cIn('cassa.saldo',C.saldo,'number')+'</div><div><label>Soglia di allerta €</label>'+cIn('cassa.soglia',C.soglia,'number')+'</div><div><label>Fino al</label>'+cIn('cassa.fine',C.fine,'date')+'</div></div>'
+   +'<div class="g"><div><label>Data del saldo</label>'+cIn('cassa.data',C.data,'date')+'</div><div><label>Saldo di banche e cassa a quella data €</label>'+cIn('cassa.saldo',C.saldo,'number')+'</div><div><label>Soglia di allerta €</label>'+cIn('cassa.soglia',C.soglia,'number')+'</div><div><label>Fido bancario (Sella) €</label>'+cIn('cassa.fido',C.fido,'number')+'</div><div><label>Fino al</label>'+cIn('cassa.fine',C.fine,'date')+'</div></div>'
    +'<div style="margin-top:10px"><b>Regole di data e importo per incassi/pagamenti</b><div class="note">Cercano il testo nella descrizione o nel riferimento della voce (anche nelle righe di previsione, es. "Paysolution"). Se indichi una data, la voce si incassa/paga in quel giorno; con i giorni, si somma alla data fattura; l\'importo (facoltativo) sostituisce il totale con IVA (es. Amex 1.800 €). Vince la prima regola che corrisponde: metti prima le più specifiche. Mese di competenza facoltativo (aaaa-mm).</div>'
    +'<div class="tw"><table><tr><th style="text-align:left">Testo da cercare</th><th>Competenza</th><th>Giorni</th><th>Data fissa</th><th>Importo €</th><th></th></tr>'+rg+'</table></div><button class="l" data-a="addcassa" data-id="regole" style="margin:6px 0">+ Aggiungi regola</button></div>'
    +'<div style="margin-top:6px"><b>Escludi dalla cassa (già incassate/pagate)</b><div class="note">Numeri o testi di fatture da non contare, separati da virgola (es. fatture Adler già incassate).</div><input type="text" data-sim="cassa.esclusi" value="'+esc(C.esclusi.join(', '))+'" style="width:100%"></div>'
