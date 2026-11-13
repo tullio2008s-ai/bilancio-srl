@@ -320,7 +320,7 @@ table.fit{min-width:0;font-size:9.4px}td.mod input{border:0;background:none;padd
     var dupAdl = Object.keys(adl).filter(function (m) { return adl[m] > 1; }).sort();
     add('Fatture ad Adler: una sola voce per mese di competenza', dupAdl.length === 0, dupAdl.length ? 'Mesi con piu voci: ' + dupAdl.map(function (m) { return m + ' (' + adl[m] + ' voci)'; }).join(', ') : '');
     var MN = ['gennaio', 'febbraio', 'marzo', 'aprile', 'maggio', 'giugno', 'luglio', 'agosto', 'settembre', 'ottobre', 'novembre', 'dicembre'], bad = [];
-    (input.voci || []).forEach(function (v) { var cc = cats[v.categoria]; if (v.eliminata || !cc || cc.tipo === 'sp' || cc.f24 || String(v.id).indexOf('sim-') === 0) return;
+    (input.voci || []).forEach(function (v) { var cc = cats[v.categoria]; if (v.eliminata || !cc || cc.tipo === 'sp' || cc.f24 || String(v.id).indexOf('sim-') === 0 || /PROVVISORI/i.test(String(v.descrizione || ''))) return;
       var ds = String(v.descrizione || '').toLowerCase(), hit = []; MN.forEach(function (n, i) { if (new RegExp('\\b' + n + '\\b').test(ds)) hit.push(i + 1); });
       if (hit.length === 1 && +String(v.competenza).slice(5, 7) !== hit[0]) bad.push('"' + v.descrizione + '" (competenza ' + String(v.competenza).slice(0, 7) + ')'); });
     add('Mese citato nella descrizione coerente con la competenza', bad.length === 0, bad.slice(0, 5).join('; ') + (bad.length > 5 ? ' ...' : ''));
