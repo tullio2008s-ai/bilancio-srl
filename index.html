@@ -827,9 +827,9 @@ function calc(){ return E.calcola({voci:S.voci,dash:S.dash||{},params:params()})
 function cls(x){ return x<-0.004?'neg':(x>0.004?'pos':''); }
 
 /* ── Viste ── */
-var TABS=[['riepilogo','Riepilogo'],['pl','P&L mensile'],['cassa','Cassa'],['iva','IVA'],['imposte','Imposte (stima)'],['patrimonio','Stato patrimoniale'],['simulazione','Previsione nov-dic'],['utili','Prelievo utili'],['budget','Budget'],['commercialista','Per il commercialista'],['voci','Voci manuali'],['dashboard','Da Dashboard V6'],['param','Parametri'],['controlli','Controlli'],['storico','Storico']];
+var TABS=[['riepilogo','Riepilogo'],['pl','P&L mensile'],['cassa','Cassa'],['iva','IVA'],['imposte','Imposte (stima)'],['patrimonio','Stato patrimoniale'],['simulazione','Previsione nov-dic'],['utili','Prelievo utili'],['budget','Budget'],['commercialista','Per il commercialista'],['marini','Marini'],['voci','Voci manuali'],['dashboard','Da Dashboard V6'],['param','Parametri'],['controlli','Controlli'],['storico','Storico']];
 function nav(){ document.getElementById('nav').innerHTML=TABS.map(function(t){return '<button class="'+(S.tab===t[0]?'on':'')+'" data-t="'+t[0]+'">'+t[1]+'</button>';}).join(''); }
-function render(){ nav(); var reg=calc(); S.__reg=reg; var r=reg, SIMO=null; if(S.tab==='pl'&&S.plPrev!==false){ try{ SIMO=simRun(); r=SIMO.res; }catch(e){ r=reg; SIMO=null; } } var f={riepilogo:vRiepilogo,pl:vPL,iva:vIva,imposte:vImposte,patrimonio:vPatrimonio,simulazione:vSimulazione,cassa:vCassa,utili:vUtili,commercialista:vReport,budget:vBudget,voci:vVoci,dashboard:vDash,param:vParam,controlli:vControlli,storico:vStorico}[S.tab]; document.getElementById('main').innerHTML='<div class="bar"><span id="pdfmsg" class="note"></span><button class="p" data-a="pdf" style="margin:0">⬇ Salva PDF</button></div><div class="pdfhead"'+(S.tab==='commercialista'?' style="display:none!important"':'')+'><b>Bilancio SRL — '+esc(TABS.filter(function(t){return t[0]===S.tab;})[0][1])+'</b><div class="note">Tullio Serci S.r.l. · generato il '+new Date().toLocaleDateString('it-IT')+' · importi in euro, IVA esclusa salvo dove indicato</div></div>'+f(r)+(SIMO?cashFlowHtml(SIMO):'');
+function render(){ nav(); var reg=calc(); S.__reg=reg; var r=reg, SIMO=null; if(S.tab==='pl'&&S.plPrev!==false){ try{ SIMO=simRun(); r=SIMO.res; }catch(e){ r=reg; SIMO=null; } } var f={riepilogo:vRiepilogo,pl:vPL,iva:vIva,imposte:vImposte,patrimonio:vPatrimonio,simulazione:vSimulazione,cassa:vCassa,utili:vUtili,commercialista:vReport,marini:vMarini,budget:vBudget,voci:vVoci,dashboard:vDash,param:vParam,controlli:vControlli,storico:vStorico}[S.tab]; document.getElementById('main').innerHTML='<div class="bar"><span id="pdfmsg" class="note"></span><button class="p" data-a="pdf" style="margin:0">⬇ Salva PDF</button></div><div class="pdfhead"'+(S.tab==='commercialista'?' style="display:none!important"':'')+'><b>Bilancio SRL — '+esc(TABS.filter(function(t){return t[0]===S.tab;})[0][1])+'</b><div class="note">Tullio Serci S.r.l. · generato il '+new Date().toLocaleDateString('it-IT')+' · importi in euro, IVA esclusa salvo dove indicato</div></div>'+f(r)+(SIMO?cashFlowHtml(SIMO):'');
   if(S.tab==='riepilogo') grafico(r); if(S.tab==='voci') bulkInfo(); }
 function kpi(l,v,c){ return '<div class="kpi card"><span>'+l+'</span><b class="'+(c||'')+'">'+v+' €</b></div>'; }
 function vRiepilogo(r){ var t=r.totali, ok=r.controlli.every(function(c){return c.ok;});
@@ -1229,6 +1229,97 @@ function repMesi(){ var p=params(), all=[], y=+p.inizio.slice(0,4), k=+p.inizio.
   var m=S.repMese&&all.indexOf(S.repMese)>=0?S.repMese:(all.indexOf(pm)>=0?pm:all[Math.max(0,all.length-3)]);
   return {all:all,m:m,n:all.indexOf(m)+1}; }
 function fineMese(m){ var y=+m.slice(0,4), k=+m.slice(5,7); var g=new Date(y,k,0).getDate(); return m+'-'+(g<10?'0':'')+g; }
+
+/* ===== Pagina MARINI: conto economico con il piano dei conti del bilancino dello studio, dal 01/01 alla data scelta (fine mese) ===== */
+var MC={
+ '401':'COSTI PER MAT. PRIME, SUSS., CONSUMO','401.01004':'MERCI C/ACQUISTI','401.01006':'MATERIALI DI CONSUMO C/ACQUISTI','401.02016':'MERCI C/ACQUISTI EXTRA UE',
+ '402':'COSTI PER SERVIZI','402.01016':'INSERZIONI PUBBLICITARIE','402.01025':'SERVIZI DI TRASPORTO','402.02009':'VIAGGI E SOGGIORNI','402.02010':'SPESE DI RISTORAZIONE E RAPPRESENTANZA','402.02013':'SERVIZI VARI COMMERCIALI','402.02014':'LOCAZIONI E NOLEGGI',
+ '402.03002':'TELEFONICHE','402.03007':'ASSICURAZIONI DIVERSE','402.03008':'ELABORAZIONE DATI E SOFTWARE','402.03010':'CONSULENZE FISCALI E AMMINISTRATIVE','402.03019':'SERVIZI DI PULIZIA','402.03020':'SERVIZI DI SMALTIMENTO RIFIUTI','402.03029':'PRESTAZIONI DI SERVIZI (PAYSOLUTION)','402.03041':'ACQUISTO BUONI PASTO E WELFARE','402.03060':'ONERI SOCIALI AMMINISTRATORI','402.03065':'COMPENSO AMMINISTRATORI','402.03070':'COMMISSIONI PASSIVE VENDITE ONLINE','402.09900':'SPESE SENZA FATTURA DA RICLASSIFICARE',
+ '403':'COSTI PER GODIMENTO BENI DI TERZI','403.01001':'AFFITTI PASSIVI','403.01022':'COMPENSI PER ROYALTIES SU MARCHIO',
+ '404':'COSTI PER IL PERSONALE','404.01002':'SALARI E STIPENDI','404.02001':'ONERI SOCIALI SU RETRIBUZIONI','404.03001':'TRATTAMENTO DI FINE RAPPORTO',
+ '405':'AMMORTAMENTI E ACCANTONAMENTI','405.00001':'AMMORTAMENTI','405.00002':'ACCANTONAMENTI',
+ '408':'RIMANENZE INIZIALI DI MAGAZZINO','408.00001':'RIMANENZE INIZIALI',
+ '410':'ONERI DIVERSI DI GESTIONE','410.02023':'IMPOSTE, BOLLI E DIRITTI','410.09999':'ALTRI ONERI DI GESTIONE',
+ '411':'ONERI FINANZIARI','411.02002':'COMMISSIONI E SPESE BANCARIE','411.02012':'INTERESSI E ONERI FINANZIARI',
+ '501':'RICAVI DELLE VENDITE E DELLE PRESTAZIONI','501.01002':'CORRISPETTIVI NETTI','501.02001':'RICAVI (VENDITE GETTONIERE E AMAZON)','501.02003':'RICAVI DELLE PRESTAZIONI (PAYSOLUTION)','501.02005':'CESSIONI DI MATERIALI A PAYSOLUTION','501.05044':'RICAVI PER PRESTAZIONI DI CONSULENZA',
+ '506':'PROVENTI FINANZIARI','506.00001':'INTERESSI ATTIVI SU FINANZIAMENTO SOCI',
+ '508':'RIMANENZE FINALI DI MAGAZZINO','508.00001':'RIMANENZE FINALI'};
+function mcConto(v){ var d=String(v.descrizione||'').toUpperCase(), c=v.categoria, tg=d.match(/\[CONTO (\d{3}\.\d{5})\]/);
+  if(tg&&MC[tg[1]]) return tg[1];
+  if(/SPESE ANNOTATE SENZA E-FATTURA|RETTIFICA RICONCILIAZIONE|ALLINEAMENTO SPESE SENZA FATTURA|STORNO AGGREGATO SPESE SENZA FATTURA/.test(d)) return '402.09900';
+  E.CATEGORIE.forEach(function(k){ d=d.split(String(k.nome).toUpperCase()).join(' '); }); d=d.replace(/\([a-z_]+\)/gi,' ');
+  var t=function(re){ return re.test(d); };
+  switch(c){
+   case 'servizi': return '501.05044';
+   case 'intercompany_ricavo': return t(/MAGAZZINO|MATERIALI/)?'501.02005':'501.02003';
+   case 'vendite': case 'vendite_amazon': return '501.02001';
+   case 'corrispettivi': return '501.01002';
+   case 'interessi_attivi': return '506.00001';
+   case 'acquisti_materiali': return t(/IMPORTAZIONE|EXTRA UE|GUANGZHOU|HONG ?KONG|LIAOCHENG|INDEPSALE|CLENPORTE|EASY FUN/)?'401.02016':(t(/MATERIALI INDIRETTI|CONSUMO|BRICOMAN|METRO/)?'401.01006':'401.01004');
+   case 'trasporti': return '402.01025';
+   case 'pubblicita': return t(/AMAZON EU|COMMISSION/)?'402.03070':'402.01016';
+   case 'trasferte_welfare': return t(/DAY S\.?P|WELFARE|BUONI PASTO/)?'402.03041':(t(/RAPPRESENTANZA|RISTOR/)?'402.02010':'402.02009');
+   case 'abbonamenti_utenze': return t(/FASTWEB|VODAFONE|TELECOM|TELEFON|HOLAFLY|\bTIM\b/)?'402.03002':(t(/GENERALI|ASSICUR|POLIZZA/)?'402.03007':(t(/VERISURE|SICUREZZA/)?'402.02013':'402.03008'));
+   case 'servizi_prof': return t(/ELETTROMECCANIC|AFFITT/)?'403.01001':(t(/COMMERCIALIST|FISCAL|PARCELLA/)?'402.03010':(t(/PULIZI/)?'402.03019':(t(/RIFIUT|PILE|BATTERIE/)?'402.03020':'402.02013')));
+   case 'intercompany_costo': return '402.03029';
+   case 'compensi_amm': return '402.03065';
+   case 'contributi': return t(/AMMINISTRATOR|GESTIONE SEPARATA/)?'402.03060':'404.02001';
+   case 'stipendi': return t(/\bTFR\b/)?'404.03001':'404.01002';
+   case 'royalties': return '403.01022';
+   case 'altri': return t(/ANTHROPIC|OPENAI|SOFTWARE|LICENZA|ABBONAMENT/)?'402.03008':t(/BONUS|WELFARE/)?'402.03041':t(/HOTEL|STARHOTEL/)?'402.02009':t(/CAPEX|ATTREZZATUR/)?'401.01006':t(/ELETTROMECCANIC|AFFITT/)?'403.01001':(t(/NOLEGG|LOCAZ|LEASING/)?'402.02014':(t(/RIFIUT|PILE|BATTERIE/)?'402.03020':(t(/PULIZI/)?'402.03019':(t(/BOLLO|IMPOSTA|INFOCAMERE|DIRITT|TASSA/)?'410.02023':(t(/COMMISSION/)?'402.03070':'410.09999')))));
+   case 'oneri_bancari': return '411.02002';
+   case 'oneri_finanziari': return '411.02012';
+   case 'ammortamenti': return '405.00001';
+   case 'accantonamenti': return '405.00002';
+  }
+  return null; }
+function mcFineMese(m){ var y=+m.slice(0,4), k=+m.slice(5,7); return m+'-'+String(new Date(Date.UTC(y,k,0)).getUTCDate()).padStart(2,'0'); }
+function mcCalcola(r){ var P=params(), m0=P.inizio||'2026-01', mesi=r.mesi.map(function(x){return x.m;}), ultimo=mesi[mesi.length-1];
+  var oggi=new Date().toISOString().slice(0,7), def=mesi.filter(function(m){return m<oggi;}).pop()||ultimo;
+  var mSel=String(S.mariniData||mcFineMese(def)).slice(0,7); if(mSel<m0) mSel=m0; if(mSel>ultimo) mSel=ultimo;
+  var cats={}; E.CATEGORIE.forEach(function(c){cats[c.id]=c;});
+  var conti={}, voci={}, nonMap=[];
+  (S.voci||[]).forEach(function(v){ if(v.eliminata) return; var c=cats[v.categoria]; if(!c||c.tipo==='sp'||c.nonCosto) return;
+    var m=String(v.competenza).slice(0,7); if(m<m0||m>mSel) return;
+    var imp=+v.imponibile||0, iva=+v.iva||0, val=(c.tipo==='ricavo'||c.finanziario)?imp:imp+(v.detraibile!==false?0:iva);
+    var k=mcConto(v); if(!k){ k=c.tipo==='ricavo'?'501.02001':'410.09999'; nonMap.push(v.descrizione); }
+    conti[k]=(conti[k]||0)+val; (voci[k]=voci[k]||[]).push({d:v.data,c:v.competenza,desc:v.descrizione,imp:val}); });
+  var rim=r.rimanenze||[], ini=rim.length?rim[0].saldo:0, fin=ini; rim.forEach(function(x){ if(x.m<=mSel) fin=x.saldo; });
+  if(ini) conti['408.00001']=ini; if(fin) conti['508.00001']=fin;
+  var tc=0,tr=0; Object.keys(conti).forEach(function(k){ if(k<'500') tc+=conti[k]; else tr+=conti[k]; });
+  var q={ricavi:0,costi:0,varRim:0,interessi:0,utile:0}; r.mesi.forEach(function(x){ if(x.m>=m0&&x.m<=mSel){ q.ricavi+=x.ricavi; q.costi+=x.costi; q.varRim+=x.varRim; q.interessi+=x.interessi; q.utile+=x.utile; } });
+  var ric=0; Object.keys(conti).forEach(function(k){ if(k.slice(0,3)==='501') ric+=conti[k]; });
+  var mine={ricavi:ric, costi:tc-(conti['408.00001']||0), varRim:(conti['508.00001']||0)-(conti['408.00001']||0), interessi:conti['506.00001']||0, utile:tr-tc};
+  return {mSel:mSel, data:mcFineMese(mSel), conti:conti, voci:voci, tc:tc, tr:tr, utile:tr-tc, q:q, mine:mine, nonMap:nonMap, mesi:mesi}; }
+function vMarini(r){ var X=mcCalcola(r), C=X.conti, eu=function(x){ return x?eur(x):''; };
+  var lato=function(lo,hi){ var gr=Object.keys(MC).filter(function(k){ return k.length===3&&k>=lo&&k<hi; }), h='';
+    gr.forEach(function(g){ var sub=Object.keys(C).filter(function(k){ return k.slice(0,3)===g&&Math.abs(C[k])>0.004; }).sort(); if(!sub.length) return;
+      var tot=sub.reduce(function(a,k){return a+C[k];},0);
+      h+='<tr class="mg"><td>'+g+'</td><td><b>'+esc(MC[g])+'</b></td><td><b>'+eur(tot)+'</b></td></tr>';
+      sub.forEach(function(k){ h+='<tr><td class="note">'+k+'</td><td>'+esc(MC[k]||k)+'</td><td>'+eu(C[k])+'</td></tr>'; }); });
+    return '<table class="mct"><thead><tr><th>Conto</th><th>Descrizione</th><th>Importo</th></tr></thead><tbody>'+h+'</tbody></table>'; };
+  var ok=function(a,b){ return Math.abs(a-b)<0.005; }, Q=X.q, M=X.mine, tutto=ok(Q.ricavi,M.ricavi)&&ok(Q.costi,M.costi)&&ok(Q.varRim,M.varRim)&&ok(Q.interessi,M.interessi)&&ok(Q.utile,M.utile);
+  var qr=function(l,a,b){ return '<tr><td style="text-align:left">'+l+'</td><td>'+eur(b)+'</td><td>'+eur(a)+'</td><td class="'+(ok(a,b)?'pos':'neg')+'">'+(ok(a,b)?'✓':eur(b-a))+'</td></tr>'; };
+  var opts=X.mesi.map(function(m){ var d=mcFineMese(m); return '<option value="'+d+'"'+(m===X.mSel?' selected':'')+'>'+dmy(d)+'</option>'; }).join('');
+  var dett='';
+  if(S.mariniDett){ dett='<div class="card pbk"><b>Dettaglio delle voci per conto</b>'+Object.keys(X.voci).sort().map(function(k){ var L=X.voci[k].slice().sort(function(a,b){return a.d<b.d?-1:1;});
+      return '<div style="margin-top:8px"><b>'+k+' '+esc(MC[k]||'')+'</b> — '+eur(C[k])+' €<table class="mct"><tbody>'+L.map(function(x){ return '<tr><td class="note" style="white-space:nowrap">'+dmy(x.d)+'</td><td>'+esc(x.desc)+'</td><td>'+eur(x.imp)+'</td></tr>'; }).join('')+'</tbody></table></div>'; }).join('')+'</div>'; }
+  return '<style>.mct{width:100%;border-collapse:collapse}.mct td,.mct th{padding:3px 6px;border-bottom:1px solid #e5e7eb;text-align:left}.mct td:last-child,.mct th:last-child{text-align:right;white-space:nowrap}.mct tr.mg td{background:#f3f4f6;padding-top:7px}.mcg{display:grid;grid-template-columns:1fr 1fr;gap:14px}</style>'
+   +'<div class="card"><b>Bilancio Marini — conto economico con il piano dei conti dello studio</b>'
+   +'<div class="note">Stessi conti del bilancino di Marini, alimentati dalle voci della consolle (fatture emesse e ricevute, corrispettivi, spese senza fattura allineate alle banche Sibill, paghe, royalty). Periodo dal 01/01 alla fine del mese scelto, per competenza. A differenza del bilancino, qui ci sono anche le rimanenze finali e le consulenze Adler per mese di competenza.</div>'
+   +'<div class="g" style="margin-top:8px"><div><label>Conto economico al</label><select id="marinidata">'+opts+'</select></div><div><label><input type="checkbox" id="marinidett"'+(S.mariniDett?' checked':'')+'> mostra il dettaglio delle voci (anche nel PDF)</label></div></div></div>'
+   +'<div class="card"><div style="text-align:center"><b>TULLIO SERCI S.R.L.</b><br><b>CONTO ECONOMICO dal 01/01/'+X.mSel.slice(2,4)+' al '+dmy(X.data).slice(0,6)+X.mSel.slice(2,4)+'</b></div>'
+   +'<div class="mcg" style="margin-top:10px"><div><b>COSTI</b>'+lato('400','500')+'</div><div><b>RICAVI</b>'+lato('500','600')+'</div></div>'
+   +'<table class="mct" style="margin-top:12px"><tbody><tr><td><b>TOTALE COSTI</b></td><td><b>'+eur(X.tc)+'</b></td><td><b>TOTALE RICAVI</b></td><td><b>'+eur(X.tr)+'</b></td></tr>'
+   +'<tr><td></td><td></td><td><b>'+(X.utile>=0?'UTILE D\'ESERCIZIO':'PERDITA D\'ESERCIZIO')+'</b></td><td class="'+cls(X.utile)+'"><b>'+eur(Math.abs(X.utile))+'</b></td></tr>'
+   +'<tr><td><b>TOTALE A PAREGGIO</b></td><td><b>'+eur(Math.max(X.tc,X.tr))+'</b></td><td></td><td></td></tr></tbody></table>'
+   +'<div class="note" style="margin-top:6px">Utile prima delle imposte (IRES e IRAP non incluse). Importi in euro, IVA esclusa; IVA indetraibile compresa nel costo.</div></div>'
+   +'<div class="card"><b>Quadratura con la consolle</b> '+(tutto?'<span class="pos">✓ tutto torna</span>':'<span class="neg">✗ differenze</span>')
+   +'<table class="mct"><thead><tr><th>Dal 01/01 al '+dmy(X.data)+'</th><th>Bilancio Marini</th><th>P&amp;L consolle</th><th>Esito</th></tr></thead><tbody>'
+   +qr('Ricavi delle vendite e prestazioni',Q.ricavi,M.ricavi)+qr('Costi (escluse rimanenze)',Q.costi,M.costi)+qr('Variazione rimanenze (finali − iniziali)',Q.varRim,M.varRim)+qr('Interessi attivi',Q.interessi,M.interessi)+qr('Utile prima delle imposte',Q.utile,M.utile)+'</tbody></table>'
+   +(X.nonMap.length?'<div class="note neg">Voci senza conto specifico (messe in conti generici): '+X.nonMap.length+'</div>':'')
+   +'<div class="note">Non incluse: F24 (sono pagamenti, non costi), imposte sul reddito, previsioni della pagina Previsione nov-dic.</div></div>'+dett; }
+
 function vReport(){
   var R=repMesi(), p=params(), s=simS(), rOct=E.calcola({voci:S.voci,dash:S.dash||{},params:Object.assign({},p,{mesi:R.n})}),
       o=simRun(), rf=o.res, u=o.utili, fl=o.flusso, a=rOct.totali, t=rf.totali, fine=fineMese(R.m), anno=R.all[R.all.length-1].slice(0,4), ultimo=rOct.mesi[rOct.mesi.length-1]||{};
@@ -1302,7 +1393,7 @@ async function pdfCommercialista(){ var sc0=[0,0], pm=document.getElementById('p
     await w.save();
     window.scrollTo(sc0[0],sc0[1]); document.body.classList.remove('pdfmode'); if(pm){ pm.textContent='PDF scaricato: '+nome; pm.className='note ok'; }
   }catch(e){ window.scrollTo(sc0[0],sc0[1]); document.body.classList.remove('pdfmode'); if(pm){ pm.textContent='Download diretto non riuscito ('+e.message+'): apro la stampa, scegli "Salva come PDF".'; pm.className='note ko'; } setTimeout(function(){ window.print(); },400); } }
-document.addEventListener('change',function(e){ if(e.target&&e.target.id==='repmese'){ S.repMese=e.target.value; render(); } });
+document.addEventListener('change',function(e){ if(e.target&&e.target.id==='repmese'){ S.repMese=e.target.value; render(); } if(e.target&&e.target.id==='marinidata'){ S.mariniData=e.target.value; render(); } if(e.target&&e.target.id==='marinidett'){ S.mariniDett=e.target.checked; render(); } });
 function vDash(r){ var d=S.dash||{}, ch=Object.keys(d.chiusure||{}).sort();
   return '<div class="card"><b>Dati letti dalla Dashboard V6 (sola lettura)</b><div class="note">Letti il '+esc(d.letto_il||'—')+'. Mese con chiusura = valori della chiusura (immutabili); mesi senza chiusura = fatture intercompany approvate.</div></div>'
   +'<div class="card tw"><table><tr><th>Mese</th><th>Ricavi TS→PS (imponibile)</th><th>IVA debito</th><th>Costi PS→TS (imponibile)</th><th>IVA credito</th><th>Fonte</th></tr>'
