@@ -504,7 +504,7 @@ table.fit{min-width:0;font-size:9.4px}td.mod input{border:0;background:none;padd
       compensi: [10163.93, 1147.54], contributi: [0, 0], stipendi: [0, 0], royalties: [0, 0], paysCosto: [1800, 1800], acqServizi: [375, 375], collab: [0, 0], acqMateriali: [0, 0], pubblicita: [1600, 1600],
       trasferte: [0, 0], abbonamenti: [0, 0], trasporti: [0, 0], oneri: [0, 0], oneriFin: [0, 0], altri: [1800, 1800], f24: [0, 0] },
     iva: { serviziFatt: 0, paysRicavo: 22, venditeGett: 22, amazon: 22, corrisp: 22, paysCosto: 22, acqServizi: 22, acqMateriali: 22, pubblicita: 22, trasferte: 0, abbonamenti: 22, trasporti: 22, altri: 22 },
-    contribPerc: 17, nettoPerc: 61, rimanenze: ['', ''], altreRettifiche: 0, mariniNote: '',
+    contribPerc: 17, nettoPerc: 61, rimanenze: ['', ''], altreRettifiche: 0, mariniNote: '', cf: null,
     laser: { attiva: false, costo: 4642.22, ricarico: 8, iva: 22, mese: '2026-12' },
     prelievi: [{ data: '2026-11-20', lordo: 5000 }, { data: '2026-12-18', lordo: 15000 }], cassaIniziale: '', ritenuta: 26, usaRiserve: true, budget: null, cassa: null,
     soci: [{ nome: 'Tullio Serci', cap: 60, div: 10 }, { nome: 'Rosanna Garaguso', cap: 30, div: 50 },
@@ -607,6 +607,34 @@ table.fit{min-width:0;font-size:9.4px}td.mod input{border:0;background:none;padd
   function etmC(m) { var n = ['gen', 'feb', 'mar', 'apr', 'mag', 'giu', 'lug', 'ago', 'set', 'ott', 'nov', 'dic']; return n[+m.slice(5, 7) - 1] + ' ' + m.slice(0, 4); }
   var SCENARIO = JSON.parse(JSON.stringify(SIM_DEFAULT)); SCENARIO.cassa = cassaDefault(); SCENARIO.altreRettifiche = 5000;   // TFM amministratori 2026 (accantonamento non monetario, IRAP indeducibile)
   Object.keys(SIM_DEFAULT.righe).forEach(function (k) { SIM_DEFAULT.righe[k] = [0, 0]; }); SIM_DEFAULT.prelievi = [];
+  /* ── Cash flow mensile a mano (pagina Cash flow) ──
+     Entrate e uscite digitate mese per mese (IVA inclusa, come escono in banca). Saldo di partenza a una data:
+     nel primo mese vanno messi solo i movimenti successivi a quella data. Cassa a fine mese = saldo + entrate - uscite cumulate. */
+  function cfDefault(cassa) {
+    var d = cassa && /^\d{4}-\d{2}-\d{2}$/.test(String(cassa.data)) ? String(cassa.data) : '';
+    return { inizio: d ? d.slice(0, 7) : new Date().toISOString().slice(0, 7), mesi: 14, saldo: cassa && cassa.saldo !== undefined && cassa.saldo !== '' ? num(cassa.saldo) : '', dataSaldo: d,
+      entrate: ['Clienti: fatture di servizi', 'Clienti: vendite e corrispettivi', 'Altre entrate'].map(function (n) { return { nome: n, v: {} }; }),
+      uscite: ['F24 (ritenute, contributi, imposte)', 'IVA (versamenti e ravvedimento)', 'Compensi netti e stipendi', 'Carte di credito', 'Fornitori e altre uscite'].map(function (n) { return { nome: n, v: {} }; }) };
+  }
+  function cfNorm(c) {
+    if (!c || typeof c !== 'object') return cfDefault(null);
+    var riga = function (x) { var v = {}; if (x && x.v && typeof x.v === 'object') Object.keys(x.v).forEach(function (m) { if (/^\d{4}-\d{2}$/.test(m) && num(x.v[m])) v[m] = num(x.v[m]); }); return { nome: String((x && x.nome) || ''), v: v }; };
+    var n = parseInt(c.mesi, 10);
+    return { inizio: /^\d{4}-\d{2}$/.test(String(c.inizio)) ? String(c.inizio) : '2026-11', mesi: isFinite(n) ? Math.min(36, Math.max(1, n)) : 14,
+      saldo: c.saldo === '' || c.saldo === undefined || c.saldo === null ? '' : num(c.saldo), dataSaldo: String(c.dataSaldo || ''),
+      entrate: Array.isArray(c.entrate) ? c.entrate.map(riga) : [], uscite: Array.isArray(c.uscite) ? c.uscite.map(riga) : [] };
+  }
+  function cfCalc(cIn, fido) {
+    var c = cfNorm(cIn), mesi = elencoMesi(c.inizio, c.mesi), F = num(fido);
+    var somma = function (rows) { return mesi.map(function (m) { return r2(rows.reduce(function (a, x) { return a + num(x.v[m]); }, 0)); }); };
+    var tot = function (x) { return r2(mesi.reduce(function (a, m) { return a + num(x.v[m]); }, 0)); };
+    var E1 = somma(c.entrate), U1 = somma(c.uscite), ap = [], ne = [], ch = [], bal = num(c.saldo), min = null, mMin = '', sotto = 0, oltreFido = 0;
+    mesi.forEach(function (m, i) { ap.push(r2(bal)); ne.push(r2(E1[i] - U1[i])); bal = r2(bal + E1[i] - U1[i]); ch.push(bal);
+      if (min === null || bal < min) { min = bal; mMin = m; } if (bal < -0.004) sotto++; if (bal < -F - 0.004) oltreFido++; });
+    return { cfg: c, mesi: mesi, fido: F, saldo: num(c.saldo), entrate: E1, uscite: U1, apertura: ap, netto: ne, chiusura: ch,
+      totEntrate: r2(E1.reduce(function (a, x) { return a + x; }, 0)), totUscite: r2(U1.reduce(function (a, x) { return a + x; }, 0)),
+      totRigheE: c.entrate.map(tot), totRigheU: c.uscite.map(tot), finale: r2(bal), minimo: min === null ? r2(bal) : min, meseMinimo: mMin, mesiSotto: sotto, mesiOltreFido: oltreFido };
+  }
   function simNorm(s) {
     var o = JSON.parse(JSON.stringify(SIM_DEFAULT)); s = s || {};
     Object.keys(o).forEach(function (k) {
@@ -619,6 +647,7 @@ table.fit{min-width:0;font-size:9.4px}td.mod input{border:0;background:none;padd
     delete o.dividendo; o.budget = budgetNorm(o.budget);
     if (s.cassa === undefined || s.cassa === null) { scenario0911(o); o.cassaMigrata = true; }
     o.cassa = cassaNorm(o.cassa);
+    o.cf = o.cf ? cfNorm(o.cf) : cfDefault(o.cassa);
     if (!Array.isArray(s.prelievi) && num(s.dividendo) > 0) o.prelievi = [{ data: o.mesi[o.mesi.length - 1] + '-18', lordo: num(s.dividendo) }];   // vecchia previsione con un solo dividendo
     o.prelievi = (o.prelievi || []).map(function (p) { return { data: String((p && p.data) || ''), lordo: p && p.lordo !== undefined ? p.lordo : 0, ritenuta: p && p.ritenuta !== undefined ? p.ritenuta : '', base: p && (p.base === 'cap' || p.base === 'sas') ? p.base : 'div' }; });
     return o;
@@ -761,7 +790,7 @@ table.fit{min-width:0;font-size:9.4px}td.mod input{border:0;background:none;padd
       acc25: r2(acc25), impostePatrimoniali: r2(T.imposte), caricoFiscale: r2(T.imposte + totRit), avvisi: avv };
   }
 
-  var api = { budgetCalc: budgetCalc, budgetSim: budgetSim, budgetNorm: budgetNorm, BUD_RIC: BUD_RIC, BUD_COS: BUD_COS, SCENARIO: SCENARIO, CATEGORIE: CATEGORIE, PARAMS_DEFAULT: PARAMS_DEFAULT, calcola: calcola, simula: simula, dividendi: dividendi, SIM_RIGHE: SIM_RIGHE, SIM_DEFAULT: SIM_DEFAULT, simNorm: simNorm, cassaPiano: cassaPiano, cassaDefault: cassaDefault, statoPatrimoniale: statoPatrimoniale, daDashboard: daDashboard, elencoMesi: elencoMesi, r2: r2 };
+  var api = { budgetCalc: budgetCalc, budgetSim: budgetSim, budgetNorm: budgetNorm, BUD_RIC: BUD_RIC, BUD_COS: BUD_COS, SCENARIO: SCENARIO, CATEGORIE: CATEGORIE, PARAMS_DEFAULT: PARAMS_DEFAULT, calcola: calcola, simula: simula, dividendi: dividendi, SIM_RIGHE: SIM_RIGHE, SIM_DEFAULT: SIM_DEFAULT, simNorm: simNorm, cassaPiano: cassaPiano, cassaDefault: cassaDefault, cfCalc: cfCalc, cfDefault: cfDefault, cfNorm: cfNorm, statoPatrimoniale: statoPatrimoniale, daDashboard: daDashboard, elencoMesi: elencoMesi, r2: r2 };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.Engine = api;
 })(typeof window !== 'undefined' ? window : this);
 
@@ -827,9 +856,9 @@ function calc(){ return E.calcola({voci:S.voci,dash:S.dash||{},params:params()})
 function cls(x){ return x<-0.004?'neg':(x>0.004?'pos':''); }
 
 /* ── Viste ── */
-var TABS=[['riepilogo','Riepilogo'],['pl','P&L mensile'],['cassa','Cassa'],['iva','IVA'],['imposte','Imposte (stima)'],['patrimonio','Stato patrimoniale'],['simulazione','Previsione nov-dic'],['utili','Prelievo utili'],['budget','Budget'],['commercialista','Per il commercialista'],['marini','Marini'],['voci','Voci manuali'],['dashboard','Da Dashboard V6'],['param','Parametri'],['controlli','Controlli'],['storico','Storico']];
+var TABS=[['riepilogo','Riepilogo'],['pl','P&L mensile'],['cassa','Cassa'],['flussi','Cash flow'],['iva','IVA'],['imposte','Imposte (stima)'],['patrimonio','Stato patrimoniale'],['simulazione','Previsione nov-dic'],['utili','Prelievo utili'],['budget','Budget'],['commercialista','Per il commercialista'],['marini','Marini'],['voci','Voci manuali'],['dashboard','Da Dashboard V6'],['param','Parametri'],['controlli','Controlli'],['storico','Storico']];
 function nav(){ document.getElementById('nav').innerHTML=TABS.map(function(t){return '<button class="'+(S.tab===t[0]?'on':'')+'" data-t="'+t[0]+'">'+t[1]+'</button>';}).join(''); }
-function render(){ nav(); var reg=calc(); S.__reg=reg; var r=reg, SIMO=null; if(S.tab==='pl'&&S.plPrev!==false){ try{ SIMO=simRun(); r=SIMO.res; }catch(e){ r=reg; SIMO=null; } } var f={riepilogo:vRiepilogo,pl:vPL,iva:vIva,imposte:vImposte,patrimonio:vPatrimonio,simulazione:vSimulazione,cassa:vCassa,utili:vUtili,commercialista:vReport,marini:vMarini,budget:vBudget,voci:vVoci,dashboard:vDash,param:vParam,controlli:vControlli,storico:vStorico}[S.tab]; document.getElementById('main').innerHTML='<div class="bar"><span id="pdfmsg" class="note"></span><button class="p" data-a="pdf" style="margin:0">⬇ Salva PDF</button></div><div class="pdfhead"'+(S.tab==='commercialista'?' style="display:none!important"':'')+'><b>Bilancio SRL — '+esc(TABS.filter(function(t){return t[0]===S.tab;})[0][1])+'</b><div class="note">Tullio Serci S.r.l. · generato il '+new Date().toLocaleDateString('it-IT')+' · importi in euro, IVA esclusa salvo dove indicato</div></div>'+f(r)+(SIMO?cashFlowHtml(SIMO):'');
+function render(){ nav(); var reg=calc(); S.__reg=reg; var r=reg, SIMO=null; if(S.tab==='pl'&&S.plPrev!==false){ try{ SIMO=simRun(); r=SIMO.res; }catch(e){ r=reg; SIMO=null; } } var f={riepilogo:vRiepilogo,pl:vPL,iva:vIva,imposte:vImposte,patrimonio:vPatrimonio,simulazione:vSimulazione,cassa:vCassa,flussi:vFlussi,utili:vUtili,commercialista:vReport,marini:vMarini,budget:vBudget,voci:vVoci,dashboard:vDash,param:vParam,controlli:vControlli,storico:vStorico}[S.tab]; document.getElementById('main').innerHTML='<div class="bar"><span id="pdfmsg" class="note"></span><button class="p" data-a="pdf" style="margin:0">⬇ Salva PDF</button></div><div class="pdfhead"'+(S.tab==='commercialista'?' style="display:none!important"':'')+'><b>Bilancio SRL — '+esc(TABS.filter(function(t){return t[0]===S.tab;})[0][1])+'</b><div class="note">Tullio Serci S.r.l. · generato il '+new Date().toLocaleDateString('it-IT')+' · importi in euro, IVA esclusa salvo dove indicato</div></div>'+f(r)+(SIMO?cashFlowHtml(SIMO):'');
   if(S.tab==='riepilogo') grafico(r); if(S.tab==='voci') bulkInfo(); }
 function kpi(l,v,c){ return '<div class="kpi card"><span>'+l+'</span><b class="'+(c||'')+'">'+v+' €</b></div>'; }
 function vRiepilogo(r){ var t=r.totali, ok=r.controlli.every(function(c){return c.ok;});
@@ -1450,11 +1479,12 @@ async function azione(a,id){
     else if(a==='delprel'){ simS().prelievi.splice(+id,1); render(); }
     else if(a==='addcassa'){ var cc=simS().cassa; if(id==='regole') cc.regole.push({match:'',comp:'',giorni:'',data:'',importo:''}); else cc.manuali.push({data:cc.data,desc:'',importo:0,nota:''}); render(); }
     else if(a==='delcassa'){ var q=String(id).split(':'); simS().cassa[q[0]].splice(+q[1],1); render(); }
-    else if(a==='simreset'){ S.sim=E.simNorm(E.SCENARIO); render(); msg('Scenario ripristinato: premi "Salva previsione" per conservarlo'); }
+    else if(a==='simreset'){ var kcf=simS().cf, knt=simS().mariniNote; S.sim=E.simNorm(E.SCENARIO); S.sim.cf=kcf; S.sim.mariniNote=knt; render(); msg('Scenario ripristinato: premi "Salva previsione" per conservarlo'); }
     else if(a==='salvasim'){ S.config=await call('apiSalvaConfig',{sim:JSON.stringify(simS())}); msg('Previsione salvata'); }
     else if(a==='pdf'){ await salvaPdf(); }
     else if(a==='pdfcomm'){ await pdfCommercialista(); }
     else if(a==='esporta'){ var out={esportato:new Date().toISOString(),voci:S.voci||[],config:S.config||{},dash:S.dash||{}}; try{ out.calcolo=calc(); }catch(err){ out.calcolo_errore=String(err&&err.message||err); } var blob=new Blob([JSON.stringify(out,null,1)],{type:'application/json'}), u=URL.createObjectURL(blob), lk=document.createElement('a'); lk.href=u; lk.download='consolle_export_'+new Date().toISOString().slice(0,10)+'.json'; document.body.appendChild(lk); lk.click(); setTimeout(function(){ URL.revokeObjectURL(u); lk.remove(); },1000); }
+else if(a==='cfadd'||a==='cfdel'||a==='cfreset'){ cfAzione(a,id); }
 else if(a==='importa'){ document.getElementById('imp').click(); }
   }catch(e){ msg(e.message,1); }
 }
@@ -1462,6 +1492,86 @@ async function ricarica(){ var st=await call('apiStato'); S.voci=(st.voci||[]).m
 document.addEventListener('click',function(e){ var t=e.target.closest('[data-t]'); if(t){ S.tab=t.dataset.t; if(S.tab==='storico') call('apiStorico').then(function(x){S.storico=x;render();}); else render(); return; }
   var a=e.target.closest('[data-a]'); if(a) azione(a.dataset.a,a.dataset.id); });
 function simAgg(e){ var p=e.target.dataset&&e.target.dataset.sim; if(!p) return; var v=e.target.value; if(p==='usaRiserve'||p==='laser.attiva') v=(v==='1'); else if(p==='cassa.esclusi') v=String(v).split(',').map(function(x){return x.trim();}).filter(Boolean); else if(!/\.nome$/.test(p)) v=v===''?'':v; simPath(p,v); var d=document.getElementById('simres'); if(d) d.innerHTML=simRes(S.tab); var k=document.getElementById('simkpi'); if(k) k.innerHTML=simKpi(); }
+/* ── Pagina Cash flow: entrate e uscite digitate mese per mese, cassa a fine mese e grafico ── */
+function cfS(){ var s=simS(); if(!s.cf) s.cf=E.cfDefault(s.cassa); return s.cf; }
+function cfRes(){ return E.cfCalc(cfS(), simS().cassa&&simS().cassa.fido); }
+function cfIn(v){ return v?eurIn(v):''; }
+function cfRiga(t,x,i,mesi,tot){ return '<tr><td class="mod" style="text-align:left"><div style="display:flex;gap:3px"><input type="text" data-cf="n|'+t+'|'+i+'" value="'+esc(x.nome)+'" placeholder="Descrizione" style="text-align:left"><button class="l norep" data-a="cfdel" data-id="'+t+'|'+i+'" title="Elimina la riga" style="padding:1px 6px">×</button></div></td>'
+  +mesi.map(function(m){ return '<td class="mod"><input type="text" inputmode="decimal" data-cf="v|'+t+'|'+i+'|'+m+'" value="'+cfIn(x.v[m])+'"></td>'; }).join('')+'<td id="cf-rt-'+t+'-'+i+'">'+eur(tot)+'</td></tr>'; }
+function cfCalcRow(l,id,arr,o){ o=o||{}; return '<tr class="'+(o.t?'t':'')+(o.s?' s':'')+'"><td style="text-align:left">'+l+'</td>'+arr.map(function(v,j){ return '<td id="cf-'+id+'-'+j+'" class="'+(o.c?cls(v):'')+'">'+(o.neg&&v?'−'+eur(v):eur(v))+'</td>'; }).join('')+'<td id="cf-'+id+'-t" class="'+(o.c&&o.tot!==undefined?cls(o.tot):'')+'">'+(o.tot===undefined?'':(o.neg&&o.tot?'−'+eur(o.tot):eur(o.tot)))+'</td></tr>'; }
+function cfKpi(R){ var md=R.meseMinimo?etm(R.meseMinimo):'';
+  return kpi('Cassa a fine periodo ('+etm(R.mesi[R.mesi.length-1])+')',eur(R.finale),cls(R.finale))+kpi('Cassa minima di fine mese'+(md?' ('+md+')':''),eur(R.minimo),cls(R.minimo))
+   +kpi('Minimo disponibile con il fido',eur(R.minimo+R.fido),cls(R.minimo+R.fido))+kpi('Totale entrate',eur(R.totEntrate))+kpi('Totale uscite',eur(R.totUscite))
+   +'<div class="kpi card"><span>Mesi che chiudono sotto zero</span><b class="'+(R.mesiSotto?'neg':'pos')+'">'+R.mesiSotto+(R.mesiOltreFido?' · '+R.mesiOltreFido+' oltre il fido':'')+'</b></div>'; }
+function cfGrafico(R){ var W=1200,H=330,pl=56,pb=28,pt=22,n=R.mesi.length,bw=(W-pl)/n, F=R.fido;
+  var vals=[0,R.saldo]; R.mesi.forEach(function(m,i){ vals.push(R.entrate[i],-R.uscite[i],R.chiusura[i]); }); if(F) vals.push(-F);
+  var mx=Math.max.apply(null,vals), mn=Math.min.apply(null,vals); if(mx<=mn) mx=mn+1; var pad=(mx-mn)*0.06; mx+=pad; mn-=pad;
+  var Y=function(v){ return pt+(mx-v)/(mx-mn)*(H-pt-pb); }, k=function(v){ return (Math.round(v/100)/10).toLocaleString('it-IT')+'k'; }, h='<rect x="0" y="0" width="'+W+'" height="'+H+'" fill="#fff"/>';
+  var rg=mx-mn, st=Math.pow(10,Math.floor(Math.log10(rg/5))); [1,2,2.5,5,10].some(function(f){ if(rg/(st*f)<=6){ st=st*f; return true; } return false; });
+  for(var tv=Math.ceil(mn/st)*st; tv<=mx; tv+=st) h+='<line x1="'+pl+'" x2="'+W+'" y1="'+Y(tv)+'" y2="'+Y(tv)+'" stroke="#e3e6ea" stroke-width=".7"/><text x="'+(pl-6)+'" y="'+(Y(tv)+4)+'" font-size="11" text-anchor="end" fill="#667">'+k(tv)+'</text>';
+  var y0=Y(0), pts=[];
+  R.mesi.forEach(function(m,i){ var x0=pl+i*bw, c=x0+bw/2, e=R.entrate[i], u=R.uscite[i];
+    if(e) h+='<rect x="'+(x0+bw*.18)+'" y="'+Y(e)+'" width="'+(bw*.3)+'" height="'+Math.max(y0-Y(e),1)+'" fill="#1a7f4b" opacity=".75"><title>'+etm(m)+': entrate '+eur(e)+' €</title></rect>';
+    if(u) h+='<rect x="'+(x0+bw*.52)+'" y="'+y0+'" width="'+(bw*.3)+'" height="'+Math.max(Y(-u)-y0,1)+'" fill="#b3261e" opacity=".75"><title>'+etm(m)+': uscite '+eur(u)+' €</title></rect>';
+    pts.push(c+','+Y(R.chiusura[i]));
+    h+='<text x="'+c+'" y="'+(H-9)+'" font-size="12" text-anchor="middle" fill="#334">'+etm(m)+'</text>'; });
+  h+='<line x1="'+pl+'" x2="'+W+'" y1="'+y0+'" y2="'+y0+'" stroke="#888" stroke-width=".8"/>';
+  if(F) h+='<line x1="'+pl+'" x2="'+W+'" y1="'+Y(-F)+'" y2="'+Y(-F)+'" stroke="#d9822b" stroke-width="1.2" stroke-dasharray="5 4"/><text x="'+(W-4)+'" y="'+(Y(-F)-4)+'" font-size="11" text-anchor="end" fill="#a85f12">limite fido −'+k(F)+'</text>';
+  h+='<polyline points="'+pts.join(' ')+'" fill="none" stroke="#2f6fb3" stroke-width="2.2"/>';
+  R.mesi.forEach(function(m,i){ var c=pl+i*bw+bw/2, v=R.chiusura[i], col=v< -F-0.004?'#b3261e':(v<-0.004?'#d9822b':'#2f6fb3');
+    h+='<circle cx="'+c+'" cy="'+Y(v)+'" r="4" fill="'+col+'"><title>'+etm(m)+': cassa a fine mese '+eur(v)+' €</title></circle><text x="'+c+'" y="'+(Y(v)-9)+'" font-size="12" font-weight="700" text-anchor="middle" fill="'+col+'" stroke="#fff" stroke-width="3" paint-order="stroke">'+k(v)+'</text>'; });
+  var leg=function(c,t){ return '<span style="display:inline-block;width:11px;height:11px;background:'+c+';border-radius:2px;margin:0 4px -1px 10px"></span>'+t; };
+  return '<svg viewBox="0 0 '+W+' '+H+'" width="100%" role="img" aria-label="Entrate, uscite e cassa a fine mese">'+h+'</svg>'
+   +'<div class="note">'+leg('#1a7f4b','Entrate del mese')+leg('#b3261e','Uscite del mese')+leg('#2f6fb3','Cassa a fine mese (linea)')+(F?leg('#d9822b','Limite del fido (tratteggio)'):'')+'</div>'; }
+function vFlussi(){ var C=cfS(), R=cfRes(), M=R.mesi, opt='';
+  for(var q=3;q<=24;q++) opt+='<option value="'+q+'"'+(q===C.mesi?' selected':'')+'>'+q+'</option>';
+  var head='<tr><th style="text-align:left">€ · IVA inclusa, come in banca</th>'+M.map(function(m){return '<th>'+etm(m)+'</th>';}).join('')+'<th>Totale</th></tr>';
+  var sez=function(l){ return '<tr class="s"><td colspan="'+(M.length+2)+'" style="text-align:left;font-weight:700;color:var(--ac);padding-top:8px">'+l+'</td></tr>'; };
+  var add=function(t,l){ return '<tr class="norep"><td colspan="'+(M.length+2)+'" style="text-align:left"><button class="l" data-a="cfadd" data-id="'+t+'">+ '+l+'</button></td></tr>'; };
+  var body=sez('ENTRATE')+C.entrate.map(function(x,i){ return cfRiga('E',x,i,M,R.totRigheE[i]); }).join('')+add('E','Aggiungi entrata')+cfCalcRow('Totale entrate','te',R.entrate,{t:1,tot:R.totEntrate})
+    +sez('USCITE')+C.uscite.map(function(x,i){ return cfRiga('U',x,i,M,R.totRigheU[i]); }).join('')+add('U','Aggiungi uscita')+cfCalcRow('Totale uscite','tu',R.uscite,{t:1,neg:1,tot:R.totUscite});
+  var sint=sez('CASSA')+cfCalcRow('Cassa a inizio mese','ap',R.apertura,{s:1})+cfCalcRow('+ Entrate','e2',R.entrate,{tot:R.totEntrate})+cfCalcRow('− Uscite','u2',R.uscite,{neg:1,tot:R.totUscite})
+    +cfCalcRow('= Flusso netto del mese','ne',R.netto,{t:1,c:1,tot:r2b(R.totEntrate-R.totUscite)})+cfCalcRow('= CASSA A FINE MESE','ch',R.chiusura,{t:1,c:1,tot:R.finale})
+    +cfCalcRow('Disponibile con il fido ('+eur(R.fido)+')','fi',R.chiusura.map(function(v){return r2b(v+R.fido);}),{s:1,c:1});
+  return '<div class="card"><b>Cash flow mensile</b><div class="note">Digita entrate e uscite di ogni mese (importi positivi, IVA inclusa, nel mese in cui passano in banca). La cassa a fine mese si calcola sotto. Salvataggio automatico.</div>'
+   +'<div style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;margin-top:8px">'
+   +'<div><label>Primo mese</label><input type="month" data-cf="inizio" value="'+esc(C.inizio)+'"></div>'
+   +'<div><label>Numero di mesi</label><select data-cf="mesi">'+opt+'</select></div>'
+   +'<div><label>Saldo di partenza (banche + cassa) €</label><input type="text" inputmode="decimal" data-cf="saldo" value="'+(C.saldo===''?'':eurIn(C.saldo))+'"></div>'
+   +'<div><label>alla data</label><input type="date" data-cf="dataSaldo" value="'+esc(C.dataSaldo)+'"></div>'
+   +'<div><label>Fido €</label><input type="text" inputmode="decimal" data-cf="fido" value="'+eurIn(R.fido)+'"></div>'
+   +'<div class="norep"><button class="l" data-a="cfreset">Svuota il piano</button></div><span id="cfmsg" class="note norep"></span></div>'
+   +(C.dataSaldo&&C.dataSaldo.slice(0,7)===C.inizio?'<div class="note" style="margin-top:6px">Il saldo è al '+esc(C.dataSaldo.split('-').reverse().join('/'))+': nel mese di '+etm(C.inizio)+' inserisci solo i movimenti successivi a quella data.</div>':'')+'</div>'
+   +'<div class="kpis" id="cfkpi">'+cfKpi(R)+'</div>'
+   +'<div class="card tw"><table class="fit"><thead>'+head+'</thead><tbody>'+body+'</tbody><tbody>'+sint+'</tbody></table></div>'
+   +'<div class="card pbk"><b>Cassa a fine mese</b><div id="cfgr">'+cfGrafico(R)+'</div></div>'
+   +'<div class="note">La cassa è quella di fine mese: dentro il mese può scendere di più (per esempio se un incasso arriva l\'ultimo giorno). Per il saldo giorno per giorno usa la pagina Cassa. Il fido è lo stesso della pagina Cassa (modificandolo qui cambia anche là). Questa pagina è un piano a mano: non legge le voci registrate.</div>'; }
+function cfAggiorna(){ var R=cfRes(), set=function(id,v,o){ var el=document.getElementById(id); if(!el) return; o=o||{}; el.textContent=(o.neg&&v?'−'+eur(v):eur(v)); el.className=o.c?cls(v):''; };
+  R.totRigheE.forEach(function(v,i){ set('cf-rt-E-'+i,v); }); R.totRigheU.forEach(function(v,i){ set('cf-rt-U-'+i,v); });
+  R.mesi.forEach(function(m,j){ set('cf-te-'+j,R.entrate[j]); set('cf-tu-'+j,R.uscite[j],{neg:1}); set('cf-ap-'+j,R.apertura[j]); set('cf-e2-'+j,R.entrate[j]); set('cf-u2-'+j,R.uscite[j],{neg:1});
+    set('cf-ne-'+j,R.netto[j],{c:1}); set('cf-ch-'+j,R.chiusura[j],{c:1}); set('cf-fi-'+j,r2b(R.chiusura[j]+R.fido),{c:1}); });
+  set('cf-te-t',R.totEntrate); set('cf-e2-t',R.totEntrate); set('cf-tu-t',R.totUscite,{neg:1}); set('cf-u2-t',R.totUscite,{neg:1}); set('cf-ne-t',r2b(R.totEntrate-R.totUscite),{c:1}); set('cf-ch-t',R.finale,{c:1});
+  var k=document.getElementById('cfkpi'); if(k) k.innerHTML=cfKpi(R); var g=document.getElementById('cfgr'); if(g) g.innerHTML=cfGrafico(R); }
+var cfTimer;
+function cfSalva(){ clearTimeout(cfTimer); cfTimer=setTimeout(async function(){ var m=document.getElementById('cfmsg'); if(m){ m.textContent='Salvataggio…'; m.className='note norep'; } try{ S.config=await call('apiSalvaConfig',{sim:JSON.stringify(simS())}); m=document.getElementById('cfmsg'); if(m){ m.textContent='Cash flow salvato'; m.className='note ok norep'; } }catch(e){ m=document.getElementById('cfmsg'); if(m){ m.textContent='Salvataggio non riuscito: '+e.message; m.className='note ko norep'; } } },600); }
+function cfSet(k,txt){ var C=cfS(), q=k.split('|');
+  if(q[0]==='v'){ var n=plParse(txt); if(n===null) return false; var r=(q[1]==='E'?C.entrate:C.uscite)[+q[2]]; if(!r) return false; if(n) r.v[q[3]]=n; else delete r.v[q[3]]; return true; }
+  if(q[0]==='n'){ var r2_=(q[1]==='E'?C.entrate:C.uscite)[+q[2]]; if(r2_) r2_.nome=String(txt); return true; }
+  if(k==='saldo'){ if(String(txt).trim()===''){ C.saldo=''; return true; } var s_=plParse(txt); if(s_===null) return false; C.saldo=s_; return true; }
+  if(k==='fido'){ var f_=plParse(txt); if(f_===null) return false; simS().cassa.fido=f_; return true; }
+  if(k==='dataSaldo'){ C.dataSaldo=String(txt); return true; }
+  if(k==='inizio'){ if(!/^\d{4}-\d{2}$/.test(String(txt))) return false; C.inizio=String(txt); return true; }
+  if(k==='mesi'){ C.mesi=parseInt(txt,10)||C.mesi; return true; }
+  return false; }
+function cfAzione(a,id){ var C=cfS();
+  if(a==='cfadd'){ (id==='E'?C.entrate:C.uscite).push({nome:'',v:{}}); render(); cfSalva(); var t=id, i=(id==='E'?C.entrate:C.uscite).length-1, el=document.querySelector('[data-cf="n|'+t+'|'+i+'"]'); if(el) el.focus(); return; }
+  if(a==='cfdel'){ var q=String(id).split('|'), L=q[0]==='E'?C.entrate:C.uscite, x=L[+q[1]]; if(!x) return; var tot=Object.keys(x.v).reduce(function(s,m){return s+x.v[m];},0);
+    if(tot&&!confirm('Eliminare la riga "'+(x.nome||'senza nome')+'" ('+eur(tot)+' € in totale)?')) return; L.splice(+q[1],1); render(); cfSalva(); return; }
+  if(a==='cfreset'){ if(!confirm('Svuotare il cash flow? Righe e importi digitati andranno persi; saldo e data ripartono da quelli della pagina Cassa.')) return; simS().cf=E.cfDefault(simS().cassa); render(); cfSalva(); } }
+document.addEventListener('input',function(e){ var k=e.target.dataset&&e.target.dataset.cf; if(!k||k==='inizio'||k==='mesi'||k==='dataSaldo') return; if(cfSet(k,e.target.value)) cfAggiorna(); });
+document.addEventListener('change',function(e){ var k=e.target.dataset&&e.target.dataset.cf; if(!k) return; if(!cfSet(k,e.target.value)) return; cfSalva();
+  if(k==='inizio'||k==='mesi'||k==='dataSaldo') render(); else if(k.charAt(0)==='v'||k==='saldo'||k==='fido'){ var v=k==='fido'?simS().cassa.fido:(k==='saldo'?cfS().saldo:null); if(k.charAt(0)==='v'){ var q=k.split('|'), r=(q[1]==='E'?cfS().entrate:cfS().uscite)[+q[2]]; v=r?r.v[q[3]]:0; e.target.value=cfIn(v); } else e.target.value=v===''?'':eurIn(v); } });
+document.addEventListener('keydown',function(e){ if(e.key==='Enter'&&e.target.dataset&&e.target.dataset.cf&&e.target.tagName==='INPUT'){ e.target.blur(); } });
 document.addEventListener('input',simAgg); document.addEventListener('change',simAgg);
 document.addEventListener('change',function(e){ var k=e.target.dataset&&e.target.dataset.pl; if(!k) return; var q=k.split('|'); plSet(q[0],q[1],e.target.value); plSalva(); clearTimeout(plRT); plRT=setTimeout(plRender,350); });
 document.addEventListener('change',function(e){ var k=e.target.dataset&&e.target.dataset.bud; if(!k) return; budSet(k,e.target.value); budSalva(); setTimeout(function(){ var a=document.activeElement, kk=a&&a.dataset&&a.dataset.bud; render(); if(kk){ var el=document.querySelector('[data-bud="'+kk+'"]'); if(el){ el.focus(); if(el.select) el.select(); } } },0); });
