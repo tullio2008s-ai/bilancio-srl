@@ -1688,7 +1688,7 @@ async function importaPacchetto(o){
   togli.forEach(function(r){ righe.push('⚙ Prelievo utili del '+r.data+' ('+eur(nn(r.lordo))+' € lordi) eliminato'); });
   var prendi=function(path){ var x=sm; String(path).split('.').forEach(function(k){ x=x==null?x:x[k]; }); return x; };
   var ugualeV=function(a,b){ return typeof b==='number'?Math.abs(nn(a)-b)<0.005:String(a==null?'':a).toUpperCase()===String(b).toUpperCase(); };
-  var opsOk=[];
+  var opsOk=[]; if((sp.operazioni||[]).some(function(op){ return /^strategia\./.test(op.percorso||op.lista||''); })&&!sm.strategia) sm.strategia=E.strategiaNorm(null);
   (sp.operazioni||[]).forEach(function(op){ var et=op.nota||(op.op+' '+(op.lista||op.percorso));
     if(op.op==='imposta'){ var cur=prendi(op.percorso); if(JSON.stringify(cur)===JSON.stringify(op.valore)){ righe.push('✓ '+et+': già a posto'); return; } opsOk.push(op); righe.push('⚙ '+et); return; }
     var L=prendi(op.lista); if(!Array.isArray(L)){ righe.push('✗ '+et+': elenco non trovato'); return; }
@@ -1971,6 +1971,7 @@ function vIstruzioni(){ var ctx=stCtx(), c=stCfg(), R=E.strategia(ctx,c), M=R.me
     // incassi attesi
     if(r.adler[i]>0.5) add(4,'Controlla l\'incasso Adler (servizio di '+istMese(stMesePiu(m,-2))+')',r.adler[i],'entrata');
     var servPrec=stMesePiu(m,-1); if(!(c.adlerFine&&servPrec>c.adlerFine)) add(15,'Emetti la fattura Adler del servizio di '+istMese(servPrec)+' (inversione contabile, art. 7-ter)',null,'entro il 15: oltre è fuori termine');
+    if(Math.abs(r.straord[i])>0.5){ var dsc=(c.straordDesc&&c.straordDesc[m])||'Movimento straordinario (pagina Strategia)'; add(+((c.straordGiorno&&c.straordGiorno[m])||28),(r.straord[i]>0?'Controlla l\'incasso: ':'Paga: ')+esc(dsc),Math.abs(r.straord[i]),r.straord[i]>0?'entrata':''); }
     // F24 del 16
     var f=[], tot16=0, ivaM=r.ivaVers[i]-(r.accIva[i]||0);
     if(ivaM>0.5){ f.push('IVA di '+istMese(prev)+' – cod. 60'+prev.slice(5)+' anno '+prev.slice(0,4)+': '+eur(ivaM)+' €'); tot16+=ivaM; }
