@@ -50,9 +50,12 @@ body.pdfmode table.fit{min-width:0;font-size:12px}body.pdfmode td.mod input{bord
 body.pdfmode table.fit th:last-child,body.pdfmode table.fit td:last-child{background:#f1f4fa}body.pdfmode table.fit tr.t td{background:#e8edf7}body.pdfmode table.fit tbody tr:hover td{background:#fff}body.pdfmode td.mod input{background:#f1f4fa}
 body.pdfmode .rsec{width:1500px;padding:14px 22px;box-sizing:border-box;background:#fff}body.pdfmode .rsec .rg{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
 body.pdfmode .pdfhead{display:block;margin-bottom:8px}body.pdfmode .pdfhead b{font-size:18px}
+/* Tabelle larghe: in PDF e in stampa stanno nella larghezza della pagina A4 orizzontale (niente larghezza minima, carattere ridotto in base alle colonne) */
+body.pdfmode table.fit{min-width:0!important;width:100%!important}body.pdfmode table.fit.w13{font-size:10.5px}body.pdfmode table.fit.w16{font-size:9.6px}body.pdfmode table.fit.w16 th,body.pdfmode table.fit.w16 td{padding:2px 2px}body.pdfmode table.fit.w16 th:first-child,body.pdfmode table.fit.w16 td:first-child{width:15%}
+body.pdfmode .card{margin-bottom:8px}body.pdfmode svg{max-width:100%}
 @media print{header,nav,.bar,.demo{display:none!important}main{max-width:none;padding:0}.tw,.card.tw{overflow:visible}.pdfhead{display:block;margin-bottom:6px}@page{size:A4 landscape;margin:8mm}
 html,body{background:#fff!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}.card{border:0;border-radius:0;padding:0 0 6px;margin-bottom:6px;break-inside:avoid;page-break-inside:avoid}
-table.fit{min-width:0;font-size:9.4px}td.mod input{border:0;background:none;padding:0}table.fit th,table.fit td{padding:2.5px 3px}table.fit th:first-child,table.fit td:first-child{width:19%}table.fit thead{display:table-header-group}table.fit tr{break-inside:avoid;page-break-inside:avoid}
+table.fit{min-width:0!important;width:100%!important;font-size:9.4px}table.fit.w13{font-size:8.4px}table.fit.w16{font-size:7.9px}table.fit.w16 th,table.fit.w16 td{padding:2px 1px}table.fit.w16 th:first-child,table.fit.w16 td:first-child{width:14%}svg{max-width:100%;height:auto}td.mod input{border:0;background:none;padding:0}table.fit th,table.fit td{padding:2.5px 3px}table.fit th:first-child,table.fit td:first-child{width:19%}table.fit thead{display:table-header-group}table.fit tr{break-inside:avoid;page-break-inside:avoid}
 .pbk{break-before:page;page-break-before:always}}
 .note{font-size:12px;color:var(--mu)}.hid{display:none}
 </style></head><body>
@@ -1019,7 +1022,8 @@ function cls(x){ return x<-0.004?'neg':(x>0.004?'pos':''); }
 var TABS=[['riepilogo','Riepilogo'],['strategia','Strategia'],['pl','P&L mensile'],['cassa','Cassa'],['flussi','Cash flow'],['iva','IVA'],['imposte','Imposte (stima)'],['patrimonio','Stato patrimoniale'],['simulazione','Previsione nov-dic'],['utili','Prelievo utili'],['budget','Budget'],['commercialista','Per il commercialista'],['marini','Marini'],['voci','Voci manuali'],['dashboard','Da Dashboard V6'],['param','Parametri'],['controlli','Controlli'],['storico','Storico']];
 function nav(){ document.getElementById('nav').innerHTML=TABS.map(function(t){return '<button class="'+(S.tab===t[0]?'on':'')+'" data-t="'+t[0]+'">'+t[1]+'</button>';}).join(''); }
 function render(){ nav(); var reg=calc(); S.__reg=reg; var r=reg, SIMO=null; if(S.tab==='pl'&&S.plPrev!==false){ try{ SIMO=simRun(); r=SIMO.res; }catch(e){ r=reg; SIMO=null; } } var f={riepilogo:vRiepilogo,strategia:vStrategia,pl:vPL,iva:vIva,imposte:vImposte,patrimonio:vPatrimonio,simulazione:vSimulazione,cassa:vCassa,flussi:vFlussi,utili:vUtili,commercialista:vReport,marini:vMarini,budget:vBudget,voci:vVoci,dashboard:vDash,param:vParam,controlli:vControlli,storico:vStorico}[S.tab]; document.getElementById('main').innerHTML='<div class="bar">'+provvHtml()+'<span id="pdfmsg" class="note"></span><button class="p" data-a="pdf" style="margin:0">⬇ Salva PDF</button></div><div class="pdfhead"'+(S.tab==='commercialista'?' style="display:none!important"':'')+'><b>Bilancio SRL — '+esc(TABS.filter(function(t){return t[0]===S.tab;})[0][1])+'</b><div class="note">Tullio Serci S.r.l. · generato il '+new Date().toLocaleDateString('it-IT')+' · importi in euro, IVA esclusa salvo dove indicato'+esc(provvNota())+'</div></div>'+f(r)+(SIMO?cashFlowHtml(SIMO):'');
-  if(S.tab==='riepilogo') grafico(r); if(S.tab==='voci') bulkInfo(); }
+  if(S.tab==='riepilogo') grafico(r); if(S.tab==='voci') bulkInfo(); marcaTabelle(); }
+function marcaTabelle(){ [].forEach.call(document.querySelectorAll('#main table.fit'),function(t){ var n=t.rows.length&&t.rows[0].cells?[].reduce.call(t.rows[0].cells,function(a,c){ return a+(c.colSpan||1); },0):0; t.classList.toggle('w13',n>=13&&n<16); t.classList.toggle('w16',n>=16); }); }
 function kpi(l,v,c){ return '<div class="kpi card"><span>'+l+'</span><b class="'+(c||'')+'">'+v+' €</b></div>'; }
 function vRiepilogo(r){ var t=r.totali, ok=r.controlli.every(function(c){return c.ok;});
   return '<div class="note" style="margin-bottom:6px">Tutti gli importi sono in € e IVA ESCLUSA, salvo dove indicato (IVA, cassa e crediti/debiti).</div><div class="kpis">'+kpi('Ricavi (IVA esclusa)',eur(t.ricavi))+kpi('Costi (IVA esclusa)',eur(t.costi))+kpi('Utile ante imposte',eur(t.utile),cls(t.utile))+'<div class="kpi card"><span>Margine utile sul fatturato</span><b class="'+cls(t.utile)+'">'+pct(t.utile,t.ricavi)+'</b></div>'+kpi('Imposte stimate',eur(t.imposte))+kpi('Utile stimato dopo imposte',eur(t.utileNetto),cls(t.utileNetto))+kpi('IVA da versare nel periodo',eur(t.ivaVersare))+kpi('Credito IVA residuo',eur(t.ivaCreditoFinale))+'</div>'
@@ -1592,13 +1596,13 @@ function vReport(){
 async function pdfCommercialista(){ var sc0=[0,0], pm=document.getElementById('pdfmsg2'), nome='Bilancio_SRL_per_commercialista_'+new Date().toISOString().slice(0,10)+'.pdf';
   try{
     if(pm){ pm.textContent='Preparo il PDF…'; pm.className='note'; }
-    await caricaLib(); sc0=[window.scrollX,window.scrollY]; window.scrollTo(0,0); document.body.classList.add('pdfmode'); await new Promise(function(r){setTimeout(r,250);});
+    await caricaLib(); sc0=[window.scrollX,window.scrollY]; window.scrollTo(0,0); document.body.classList.add('pdfmode'); await new Promise(function(r){setTimeout(r,250);}); fissaSvg(true);
     var secs=[].slice.call(document.querySelectorAll('#main .rsec')), opt={margin:[0,0,0,0],filename:nome,image:{type:'jpeg',quality:.95},html2canvas:{scale:1.6,backgroundColor:'#ffffff',windowWidth:1520,scrollX:0,scrollY:0,x:0,y:0},jsPDF:{unit:'px',format:[1500,1061],orientation:'landscape',hotfixes:['px_scaling']},pagebreak:{mode:['css','legacy'],avoid:['tr','.card']}};
     var w=html2pdf().set(opt).from(secs[0]).toPdf();
     for(var i=1;i<secs.length;i++){ (function(el){ w=w.get('pdf').then(function(pdf){ pdf.addPage(); }).from(el,'element').toContainer().toCanvas().toPdf(); })(secs[i]); }
     await w.save();
-    window.scrollTo(sc0[0],sc0[1]); document.body.classList.remove('pdfmode'); if(pm){ pm.textContent='PDF scaricato: '+nome; pm.className='note ok'; }
-  }catch(e){ window.scrollTo(sc0[0],sc0[1]); document.body.classList.remove('pdfmode'); if(pm){ pm.textContent='Download diretto non riuscito ('+e.message+'): apro la stampa, scegli "Salva come PDF".'; pm.className='note ko'; } setTimeout(function(){ window.print(); },400); } }
+    fissaSvg(false); window.scrollTo(sc0[0],sc0[1]); document.body.classList.remove('pdfmode'); if(pm){ pm.textContent='PDF scaricato: '+nome; pm.className='note ok'; }
+  }catch(e){ fissaSvg(false); window.scrollTo(sc0[0],sc0[1]); document.body.classList.remove('pdfmode'); if(pm){ pm.textContent='Download diretto non riuscito ('+e.message+'): apro la stampa, scegli "Salva come PDF".'; pm.className='note ko'; } setTimeout(function(){ window.print(); },400); } }
 document.addEventListener('change',function(e){ if(!e.target||e.target.id!=='provv') return; simS().includiProvvisorie=e.target.checked; render(); (async function(){ var m=document.getElementById('pdfmsg'); try{ S.config=await call('apiSalvaConfig',{sim:JSON.stringify(simS())}); m=document.getElementById('pdfmsg'); if(m){ m.textContent=e.target.checked?'Voci provvisorie incluse':'Voci provvisorie escluse'; m.className='note ok'; } }catch(x){ m=document.getElementById('pdfmsg'); if(m){ m.textContent='Salvataggio non riuscito: '+x.message; m.className='note ko'; } } })(); });
 document.addEventListener('change',function(e){ if(e.target&&e.target.id==='repmese'){ S.repMese=e.target.value; render(); } if(e.target&&e.target.id==='marinidata'){ S.mariniData=e.target.value; render(); } if(e.target&&e.target.id==='marinidett'){ S.mariniDett=e.target.checked; render(); } if(e.target&&e.target.id==='marininote'){ simS().mariniNote=e.target.value; var dn=e.target.parentNode.querySelector('.onlyrep'); if(dn) dn.textContent=e.target.value; (async function(){ var m=document.getElementById('marinimsg'); try{ S.config=await call('apiSalvaConfig',{sim:JSON.stringify(simS())}); if(m){ m.textContent='Note salvate'; m.className='note ok norep'; } }catch(x){ if(m){ m.textContent='Salvataggio non riuscito: '+x.message; m.className='note neg norep'; } } })(); } });
 function vDash(r){ var d=S.dash||{}, ch=Object.keys(d.chiusure||{}).sort();
@@ -1618,16 +1622,17 @@ function vStorico(){ return '<div class="card tw"><table><tr><th>Quando</th><th>
 
 /* ── Azioni ── */
 function val(id){ return document.getElementById(id).value; }
+function fissaSvg(on){ [].forEach.call(document.querySelectorAll('#main svg[viewBox]'),function(g){ if(on){ var vb=g.viewBox.baseVal, w=g.getBoundingClientRect().width; if(vb&&vb.width&&w){ g.dataset.hOrig=g.getAttribute('height')||''; g.setAttribute('height',Math.round(w*vb.height/vb.width)); } } else if(g.dataset.hOrig!==undefined){ if(g.dataset.hOrig) g.setAttribute('height',g.dataset.hOrig); else g.removeAttribute('height'); delete g.dataset.hOrig; } }); }
 function caricaLib(){ return new Promise(function(ok,ko){ if(window.html2pdf) return ok(); var sc=document.createElement('script'); sc.src='https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js'; sc.onload=ok; sc.onerror=function(){ko(new Error('libreria PDF non raggiungibile'));}; document.head.appendChild(sc); }); }
 async function salvaPdf(){ var pm=document.getElementById('pdfmsg'), nome='Bilancio_SRL_'+S.tab+'_'+new Date().toISOString().slice(0,10)+'.pdf';
   try{
     if((S.tab==='simulazione'||S.tab==='utili'||S.tab==='cassa')&&!DEMO){ S.config=await call('apiSalvaConfig',{sim:JSON.stringify(simS())}); }
     if(pm){ pm.textContent='Preparo il PDF…'; pm.className='note'; }
     await caricaLib(); window.scrollTo(0,0); document.body.classList.add('pdfmode');
-    var el=document.getElementById('main'); await new Promise(function(r){setTimeout(r,150);});
+    var el=document.getElementById('main'); await new Promise(function(r){setTimeout(r,150);}); fissaSvg(true);
     await html2pdf().set({margin:[0,0,0,0],filename:nome,image:{type:'jpeg',quality:.95},html2canvas:{scale:1.6,backgroundColor:'#ffffff',windowWidth:1520,scrollX:0,scrollY:0,x:0,y:0},jsPDF:{unit:'px',format:[1500,1061],orientation:'landscape',hotfixes:['px_scaling']},pagebreak:{mode:['css','legacy'],avoid:['tr','.card']}}).from(el).save();
-    document.body.classList.remove('pdfmode'); if(pm){ pm.textContent=(S.tab==='simulazione'||S.tab==='utili'||S.tab==='cassa'?'Simulazione salvata · ':'')+'PDF scaricato: '+nome; pm.className='note ok'; }
-  }catch(e){ document.body.classList.remove('pdfmode'); if(pm){ pm.textContent='Download diretto non riuscito ('+e.message+'): apro la stampa, scegli "Salva come PDF".'; pm.className='note ko'; } setTimeout(function(){ window.print(); },400); } }
+    fissaSvg(false); document.body.classList.remove('pdfmode'); if(pm){ pm.textContent=(S.tab==='simulazione'||S.tab==='utili'||S.tab==='cassa'?'Simulazione salvata · ':'')+'PDF scaricato: '+nome; pm.className='note ok'; }
+  }catch(e){ fissaSvg(false); document.body.classList.remove('pdfmode'); if(pm){ pm.textContent='Download diretto non riuscito ('+e.message+'): apro la stampa, scegli "Salva come PDF".'; pm.className='note ko'; } setTimeout(function(){ window.print(); },400); } }
 function msg(t,ko){ var m=document.getElementById('msg'); if(m){ m.textContent=t; m.className='note '+(ko?'ko':'ok'); } }
 async function azione(a,id){
   try{
@@ -1901,7 +1906,7 @@ function vStrategia(){ var ctx=stCtx(), c=stCfg(), R=E.strategia(ctx,c), M=R.mes
    +'<div style="margin-top:6px"><b>Decisioni</b>'+stDecisioni(R,ctx)+'</div></div>'
    +'<div class="kpis">'+kp+'</div>'
    +'<div class="card pbk"><b>Cassa a fine mese e pagamenti fiscali</b>'+stGrafico(R,ctx)+'</div>'
-   +'<div class="card tw"><table class="fit" style="min-width:'+(M.length*96+330)+'px"><thead>'+head+'</thead><tbody>'+tab+'</tbody></table><div class="note">Le celle tratteggiate si possono cambiare mese per mese. La tabella scorre in orizzontale.</div></div>'
+   +'<div class="card tw"><table class="fit" style="min-width:'+(M.length*96+330)+'px"><thead>'+head+'</thead><tbody>'+tab+'</tbody></table><div class="note norep">Le celle tratteggiate si possono cambiare mese per mese. La tabella scorre in orizzontale.</div></div>'
    +leve
    +'<div class="card"><b>Da dove partiamo</b><table class="fit" style="min-width:600px;margin-top:6px"><tbody>'
    +'<tr><td style="text-align:left">Cassa prevista al 31/12/'+(+R.anno-1)+' (pagina Cassa)</td><td>'+eur(ctx.cassa31)+'</td></tr><tr><td style="text-align:left">− IVA di novembre (16/12)</td><td>−'+eur(ctx.ivaNov)+'</td></tr><tr><td style="text-align:left">− Acconto IVA (27/12)</td><td>−'+eur(R.acconto26)+'</td></tr><tr class="t"><td style="text-align:left">= Cassa di partenza</td><td>'+eur(R.cassa0)+'</td></tr>'
