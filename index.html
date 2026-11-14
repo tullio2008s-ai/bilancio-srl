@@ -33,6 +33,7 @@ div.wa{background:var(--kobg);border:1px solid rgba(234,120,20,.5);border-radius
 .kpi.card{border-top:0;border-left:5px solid #d81b60}.kpi.card:nth-child(3n+2){border-left-color:#8e24aa}.kpi.card:nth-child(3n){border-left-color:#1f6fd1}
 .kpi.kpos{border-left-color:#1b7a43!important}.kpi.kneg{border-left-color:#e8710a!important}
 table.fit thead th{background:linear-gradient(180deg,rgba(142,36,170,.10),rgba(194,24,91,.06));color:#6a1b9a}
+.fit.sc th:nth-child(1),.fit.sc td:nth-child(1){width:11%!important}.fit.sc th:nth-child(2),.fit.sc td:nth-child(2){width:57%!important}.fit.sc th:nth-child(3),.fit.sc td:nth-child(3){width:13%!important}.fit.sc th:nth-child(4),.fit.sc td:nth-child(4){width:19%!important}
 .pill{display:inline-block;padding:4px 10px;border-radius:8px}.pill.ppos{background:var(--okbg)}.pill.pneg{background:var(--kobg)}.pill b{font-weight:700}.pos{color:var(--ok)}
 label{display:block;font-size:12px;color:var(--mu);margin:8px 0 2px}
 input,select,textarea{width:100%;padding:8px;border:1px solid var(--ln);border-radius:8px;background:var(--bg);color:var(--tx);font:inherit}
@@ -2214,7 +2215,7 @@ function vOggi(r){ vIstruzioni(); var I=IST, R=I.R, ctx=I.ctx, oggi=new Date().t
     +(f24?'<div class="kpi card"><span>Prossimo F24 ('+fmtD(f24.d)+')</span><b>'+eur(f24.a.imp)+' €</b></div>':'')
     +kpi('Ancora da incassare in '+MESI_LUNGHI[+mOggi.slice(5)-1],eur(inMese),'pos')+kpi('Ancora da pagare in '+MESI_LUNGHI[+mOggi.slice(5)-1],eur(outMese))
     +(fineMese!==null?kpi('Cassa prevista a fine mese',eur(fineMese),fineMese<R.sogliaEff?'neg':'pos'):'');
-  var riga=function(t){ var e=entrata(t.a); return '<tr><td style="text-align:left">'+fmtD(t.d)+'</td><td style="text-align:left;white-space:normal">'+t.a.cosa+'</td><td class="'+(t.a.imp?(e?'pos':''):'')+'">'+(t.a.imp?(e?'+':'−')+eur(t.a.imp):'')+'</td><td style="text-align:left" class="note">'+(e?'incasso atteso':esc(t.a.nota||''))+'</td></tr>'; };
+  var riga=function(t){ var e=entrata(t.a); return '<tr><td style="text-align:left">'+fmtD(t.d)+'</td><td style="text-align:left;white-space:normal">'+(t===f24?'<b>Paga l\'F24</b> – righe nel riquadro "Prossimo F24" qui sopra':t.a.cosa)+'</td><td class="'+(t.a.imp?(e?'pos':''):'')+'">'+(t.a.imp?(e?'+':'−')+eur(t.a.imp):'')+'</td><td style="text-align:left" class="note">'+(e?'incasso atteso':esc(t.a.nota||''))+'</td></tr>'; };
   var tabMesi='<table class="fit cdt" style="min-width:600px"><thead><tr><th style="text-align:left">Mese</th><th>Cassa a inizio mese</th><th>Spese del mese</th><th>Cassa a fine mese</th></tr></thead><tbody>'+mesi.map(function(x){ return '<tr class="t"><td style="text-align:left;text-transform:capitalize">'+istMese(x.m)+'</td><td>'+(x.ini===null?'—':eur(x.ini))+'</td><td>'+eur(x.usc)+'</td><td class="'+(x.fin===null?'':(x.fin<R.sogliaEff?'neg':'pos'))+'">'+(x.fin===null?'—':eur(x.fin))+'</td></tr>'; }).join('')+'</tbody></table>';
   var guida='<ul style="margin:6px 0 0 18px;padding:0;line-height:1.5"><li><b>Ogni giorno</b> (2 minuti): questa pagina. Se hai incassato o pagato qualcosa di importante, aggiorna saldo e data nella pagina <b>Cassa</b>.</li>'
     +'<li><b>Ogni settimana</b>: <b>Istruzioni</b> (cosa pagare e incassare nel mese) e <b>Cassa</b> (movimenti giorno per giorno e minimo del mese).</li>'
@@ -2225,7 +2226,7 @@ function vOggi(r){ vIstruzioni(); var I=IST, R=I.R, ctx=I.ctx, oggi=new Date().t
    +'<div class="kpis">'+kp+'</div>'
    +(al.length?'<div class="card"><b>Allerte</b><div class="wa" style="margin-top:6px">'+al.map(function(x){ return '• '+x; }).join('<br>')+'</div></div>':'<div class="card"><b class="pos">Nessuna allerta</b></div>')
    +(f24?'<div class="card"><b>Prossimo F24: '+fmtD(f24.d)+' – '+eur(f24.a.imp)+' €</b><div style="margin-top:4px">'+f24.a.cosa.replace(/<b>Paga l.F24<\/b>/,'')+'</div></div>':'')
-   +'<div class="card tw"><b>Scadenze dei prossimi 30 giorni</b><table class="fit cdt" style="min-width:600px;margin-top:6px"><thead><tr><th style="text-align:left;width:10%">Data</th><th style="text-align:left">Cosa fare</th><th style="width:14%">Importo €</th><th style="text-align:left;width:16%">Note</th></tr></thead><tbody>'+(prossime.map(riga).join('')||'<tr><td colspan="4">Nessuna scadenza</td></tr>')+'</tbody></table></div>'
+   +'<div class="card tw"><b>Scadenze dei prossimi 30 giorni</b><table class="fit sc" style="min-width:600px;margin-top:6px"><thead><tr><th style="text-align:left">Data</th><th style="text-align:left">Cosa fare</th><th>Importo €</th><th style="text-align:left">Note</th></tr></thead><tbody>'+(prossime.map(riga).join('')||'<tr><td colspan="4">Nessuna scadenza</td></tr>')+'</tbody></table></div>'
    +'<div class="card tw"><b>Cassa nei prossimi mesi</b>'+tabMesi+(minM?'<div class="note" style="margin-top:4px">Minimo: '+eur(minM.fin)+' € a '+istMese(minM.m)+' (minimo consentito: '+eur(R.sogliaEff)+' €'+(R.cfg.usaFido?', cioè disponibile con il fido '+eur(+R.cfg.soglia)+' €':'')+').</div>':'')+'</div>'
    +'<div class="card"><b>Cosa guardare e quando</b>'+guida+'</div>'; }
 document.addEventListener('input',simAgg); document.addEventListener('change',simAgg);
