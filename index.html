@@ -504,7 +504,7 @@ table.fit{min-width:0;font-size:9.4px}td.mod input{border:0;background:none;padd
       compensi: [10163.93, 1147.54], contributi: [0, 0], stipendi: [0, 0], royalties: [0, 0], paysCosto: [1800, 1800], acqServizi: [375, 375], collab: [0, 0], acqMateriali: [0, 0], pubblicita: [1600, 1600],
       trasferte: [0, 0], abbonamenti: [0, 0], trasporti: [0, 0], oneri: [0, 0], oneriFin: [0, 0], altri: [1800, 1800], f24: [0, 0] },
     iva: { serviziFatt: 0, paysRicavo: 22, venditeGett: 22, amazon: 22, corrisp: 22, paysCosto: 22, acqServizi: 22, acqMateriali: 22, pubblicita: 22, trasferte: 0, abbonamenti: 22, trasporti: 22, altri: 22 },
-    contribPerc: 17, nettoPerc: 61, rimanenze: ['', ''], altreRettifiche: 0, mariniNote: '', cf: null,
+    contribPerc: 17, nettoPerc: 61, rimanenze: ['', ''], altreRettifiche: 0, mariniNote: '', cf: null, includiProvvisorie: true,
     laser: { attiva: false, costo: 4642.22, ricarico: 8, iva: 22, mese: '2026-12' },
     prelievi: [{ data: '2026-11-20', lordo: 5000 }, { data: '2026-12-18', lordo: 15000 }], cassaIniziale: '', ritenuta: 26, usaRiserve: true, budget: null, cassa: null,
     soci: [{ nome: 'Tullio Serci', cap: 60, div: 10 }, { nome: 'Rosanna Garaguso', cap: 30, div: 50 },
@@ -852,13 +852,19 @@ var SINT = (function(){
 /* ── Stato e calcolo ── */
 function params(){ var c=S.config||{}; return {inizio:c.inizio||'2026-01',mesi:+c.mesi||12,ires:c.ires!=null&&c.ires!==''?+c.ires:24,irap:c.irap!=null&&c.irap!==''?+c.irap:3.9,
   ivaPeriodo:c.ivaPeriodo||'mensile',includeAcquistiSrl:String(c.includeAcquistiSrl)==='true',includeDashboard:String(c.includeDashboard)!=='false',includeRimanenze:String(c.includeRimanenze)!=='false'}; }
-function calc(){ return E.calcola({voci:S.voci,dash:S.dash||{},params:params()}); }
+/* Voci "PROVVISORIA" (es. fattura di competenza dell'anno precedente registrata dallo studio nell'anno): si includono o escludono da tutti i calcoli con un solo interruttore */
+function provvisorie(){ return (S.voci||[]).filter(function(v){ return !v.eliminata&&/^\s*PROVVISORI/i.test(String(v.descrizione||'')); }); }
+function vociCalc(){ if(simS().includiProvvisorie!==false) return S.voci||[]; return (S.voci||[]).filter(function(v){ return !/^\s*PROVVISORI/i.test(String(v.descrizione||'')); }); }
+function provvHtml(){ var P=provvisorie(); if(!P.length) return ''; var on=simS().includiProvvisorie!==false, tot=P.reduce(function(a,v){ return a+(+v.imponibile||0); },0), tip=P.map(function(v){ return String(v.descrizione||'').slice(0,110)+' – '+eur(+v.imponibile||0)+' €'; }).join('\n');
+  return '<label class="norep" title="'+esc(tip)+'" style="display:inline-flex;align-items:center;gap:6px;margin:0 12px 0 0;font-size:13px;cursor:pointer;color:'+(on?'inherit':'var(--wa)')+'"><input type="checkbox" id="provv"'+(on?' checked':'')+' style="width:auto;margin:0"> Includi voci provvisorie ('+P.length+': '+eur(tot)+' €)</label>'; }
+function provvNota(){ var P=provvisorie(); if(!P.length) return ''; var on=simS().includiProvvisorie!==false; return ' · voci provvisorie '+(on?'INCLUSE':'ESCLUSE')+' ('+P.map(function(v){ return String(v.descrizione||'').replace(/^\s*PROVVISORIA\s*-\s*/i,'').slice(0,45)+' '+eur(+v.imponibile||0)+' €'; }).join('; ')+')'; }
+function calc(){ return E.calcola({voci:vociCalc(),dash:S.dash||{},params:params()}); }
 function cls(x){ return x<-0.004?'neg':(x>0.004?'pos':''); }
 
 /* ── Viste ── */
 var TABS=[['riepilogo','Riepilogo'],['pl','P&L mensile'],['cassa','Cassa'],['flussi','Cash flow'],['iva','IVA'],['imposte','Imposte (stima)'],['patrimonio','Stato patrimoniale'],['simulazione','Previsione nov-dic'],['utili','Prelievo utili'],['budget','Budget'],['commercialista','Per il commercialista'],['marini','Marini'],['voci','Voci manuali'],['dashboard','Da Dashboard V6'],['param','Parametri'],['controlli','Controlli'],['storico','Storico']];
 function nav(){ document.getElementById('nav').innerHTML=TABS.map(function(t){return '<button class="'+(S.tab===t[0]?'on':'')+'" data-t="'+t[0]+'">'+t[1]+'</button>';}).join(''); }
-function render(){ nav(); var reg=calc(); S.__reg=reg; var r=reg, SIMO=null; if(S.tab==='pl'&&S.plPrev!==false){ try{ SIMO=simRun(); r=SIMO.res; }catch(e){ r=reg; SIMO=null; } } var f={riepilogo:vRiepilogo,pl:vPL,iva:vIva,imposte:vImposte,patrimonio:vPatrimonio,simulazione:vSimulazione,cassa:vCassa,flussi:vFlussi,utili:vUtili,commercialista:vReport,marini:vMarini,budget:vBudget,voci:vVoci,dashboard:vDash,param:vParam,controlli:vControlli,storico:vStorico}[S.tab]; document.getElementById('main').innerHTML='<div class="bar"><span id="pdfmsg" class="note"></span><button class="p" data-a="pdf" style="margin:0">⬇ Salva PDF</button></div><div class="pdfhead"'+(S.tab==='commercialista'?' style="display:none!important"':'')+'><b>Bilancio SRL — '+esc(TABS.filter(function(t){return t[0]===S.tab;})[0][1])+'</b><div class="note">Tullio Serci S.r.l. · generato il '+new Date().toLocaleDateString('it-IT')+' · importi in euro, IVA esclusa salvo dove indicato</div></div>'+f(r)+(SIMO?cashFlowHtml(SIMO):'');
+function render(){ nav(); var reg=calc(); S.__reg=reg; var r=reg, SIMO=null; if(S.tab==='pl'&&S.plPrev!==false){ try{ SIMO=simRun(); r=SIMO.res; }catch(e){ r=reg; SIMO=null; } } var f={riepilogo:vRiepilogo,pl:vPL,iva:vIva,imposte:vImposte,patrimonio:vPatrimonio,simulazione:vSimulazione,cassa:vCassa,flussi:vFlussi,utili:vUtili,commercialista:vReport,marini:vMarini,budget:vBudget,voci:vVoci,dashboard:vDash,param:vParam,controlli:vControlli,storico:vStorico}[S.tab]; document.getElementById('main').innerHTML='<div class="bar">'+provvHtml()+'<span id="pdfmsg" class="note"></span><button class="p" data-a="pdf" style="margin:0">⬇ Salva PDF</button></div><div class="pdfhead"'+(S.tab==='commercialista'?' style="display:none!important"':'')+'><b>Bilancio SRL — '+esc(TABS.filter(function(t){return t[0]===S.tab;})[0][1])+'</b><div class="note">Tullio Serci S.r.l. · generato il '+new Date().toLocaleDateString('it-IT')+' · importi in euro, IVA esclusa salvo dove indicato'+esc(provvNota())+'</div></div>'+f(r)+(SIMO?cashFlowHtml(SIMO):'');
   if(S.tab==='riepilogo') grafico(r); if(S.tab==='voci') bulkInfo(); }
 function kpi(l,v,c){ return '<div class="kpi card"><span>'+l+'</span><b class="'+(c||'')+'">'+v+' €</b></div>'; }
 function vRiepilogo(r){ var t=r.totali, ok=r.controlli.every(function(c){return c.ok;});
@@ -1104,7 +1110,7 @@ function vBudget(){ var B=budS(), ctx=budCtx(), C=E.budgetCalc(B,ctx), o2=ctx.o,
 function r2b(x){ return Math.round(x*100)/100; }
 /* ── Simulazione di fine anno e prelievo utili ── */
 function simS(){ if(!S.sim){ var raw=null; try{ raw=(S.config&&S.config.sim)?JSON.parse(S.config.sim):null; }catch(e){} S.sim=E.simNorm(raw); } return S.sim; }
-function simRun(){ return E.simula({voci:S.voci,dash:S.dash||{},params:params()},simS()); }
+function simRun(){ return E.simula({voci:vociCalc(),dash:S.dash||{},params:params()},simS()); }
 function numIn(path,val,step){ return '<input type="number" step="'+(step||'0.01')+'" data-sim="'+path+'" value="'+esc(val)+'">'; }
 function simPath(path,val){ var p=path.split('.'), o=simS(); for(var i=0;i<p.length-1;i++) o=o[p[i]]; o[p[p.length-1]]=val; }
 function simKpi(){ var o=simRun(), t=o.res.totali, ok=t.utile>=0;
@@ -1113,7 +1119,7 @@ function simKpi(){ var o=simRun(), t=o.res.totali, ok=t.utile>=0;
    +'<div class="kpi card"><span>Utile dopo imposte stimate</span><b class="'+cls(t.utileNetto)+'">'+eur(t.utileNetto)+' €</b></div></div>'; }
 function simSalva(){ return '<button class="l" data-a="simreset" style="margin-right:8px">Ripristina scenario concordato 07/11</button><button class="l" data-a="simzero" style="margin-right:8px">Azzera previsione (dopo aver importato le voci)</button><button class="p" data-a="salvasim">Salva previsione</button><span id="msg" class="note"></span>'; }
 function vSimulazione(){ var s=simS(), mesi=s.mesi.map(etm);
-  var reg=function(rg,m){ if(!rg.cat) return null; return S.voci.filter(function(v){ return !v.eliminata&&v.categoria===rg.cat&&String(v.competenza).slice(0,7)===m; }).reduce(function(t,v){return t+(+v.imponibile||0);},0); };
+  var reg=function(rg,m){ if(!rg.cat) return null; return vociCalc().filter(function(v){ return !v.eliminata&&v.categoria===rg.cat&&String(v.competenza).slice(0,7)===m; }).reduce(function(t,v){return t+(+v.imponibile||0);},0); };
   var rows='', gr='';
   E.SIM_RIGHE.forEach(function(rg){
     if(rg.gruppo!==gr){ gr=rg.gruppo; rows+='<tr class="t"><td colspan="'+(1+s.mesi.length*2+1)+'" style="text-align:left">'+gr+'</td></tr>'; }
@@ -1150,7 +1156,7 @@ function dmy(d){ return String(d).slice(8,10)+'/'+String(d).slice(5,7)+'/'+Strin
 
 /* ── Pagina Cassa: saldo di banche + movimenti futuri giorno per giorno, legata a P&L previsionale, voci registrate e prelievo utili ── */
 function cIn(path,val,type,w){ return '<input type="'+(type||'text')+'" '+(type==='number'?'step="0.01" ':'')+'data-sim="'+path+'" value="'+esc(val)+'"'+(w?' style="min-width:'+w+'px"':'')+'>'; }
-function cassaRes(o){ var P=E.cassaPiano({voci:S.voci,dash:S.dash||{},params:params()},o), C=P.cfg;
+function cassaRes(o){ var P=E.cassaPiano({voci:vociCalc(),dash:S.dash||{},params:params()},o), C=P.cfg;
   var kp=function(l,v,c){ return '<div class="kpi card"><span>'+l+'</span><b class="'+(c||'')+'">'+eur(v)+' €</b></div>'; };
   var mesiH=P.mesi.map(function(x){ return '<tr><td style="text-align:left">'+etm(x.m)+'</td><td>'+eur(x.entrate)+'</td><td>−'+eur(x.uscite)+'</td><td class="'+cls(x.chiusura-C.soglia)+'">'+eur(x.chiusura)+'</td></tr>'; }).join('');
   var righe=P.righe.map(function(x){ var rs=x.saldo<C.soglia;
@@ -1322,7 +1328,7 @@ function mcCalcola(r){ var P=params(), m0=P.inizio||'2026-01', mesi=r.mesi.map(f
   var mSel=String(S.mariniData||mcFineMese(def)).slice(0,7); if(mSel<m0) mSel=m0; if(mSel>ultimo) mSel=ultimo;
   var cats={}; E.CATEGORIE.forEach(function(c){cats[c.id]=c;});
   var conti={}, voci={}, nonMap=[];
-  (S.voci||[]).forEach(function(v){ if(v.eliminata) return; var c=cats[v.categoria]; if(!c||c.tipo==='sp'||c.nonCosto) return;
+  vociCalc().forEach(function(v){ if(v.eliminata) return; var c=cats[v.categoria]; if(!c||c.tipo==='sp'||c.nonCosto) return;
     var m=String(v.competenza).slice(0,7); if(m<m0||m>mSel) return;
     var imp=+v.imponibile||0, iva=+v.iva||0, val=(c.tipo==='ricavo'||c.finanziario)?imp:imp+(v.detraibile!==false?0:iva);
     var k=mcConto(v); if(!k){ k=c.tipo==='ricavo'?'501.02001':'410.09999'; nonMap.push(v.descrizione); }
@@ -1367,7 +1373,7 @@ function vMarini(r){ var X=mcCalcola(r), C=X.conti, eu=function(x){ return x?eur
    +'<div class="note">Non incluse: F24 (sono pagamenti, non costi), imposte sul reddito, previsioni della pagina Previsione nov-dic.</div></div>'+dett; }
 
 function vReport(){
-  var R=repMesi(), p=params(), s=simS(), rOct=E.calcola({voci:S.voci,dash:S.dash||{},params:Object.assign({},p,{mesi:R.n})}),
+  var R=repMesi(), p=params(), s=simS(), rOct=E.calcola({voci:vociCalc(),dash:S.dash||{},params:Object.assign({},p,{mesi:R.n})}),
       o=simRun(), rf=o.res, u=o.utili, fl=o.flusso, a=rOct.totali, t=rf.totali, fine=fineMese(R.m), anno=R.all[R.all.length-1].slice(0,4), ultimo=rOct.mesi[rOct.mesi.length-1]||{};
   var oggi=new Date().toLocaleDateString('it-IT');
   var cc=function(x){ return '<td class="'+cls(x)+'">'+eur(x)+'</td>'; };
@@ -1439,6 +1445,7 @@ async function pdfCommercialista(){ var sc0=[0,0], pm=document.getElementById('p
     await w.save();
     window.scrollTo(sc0[0],sc0[1]); document.body.classList.remove('pdfmode'); if(pm){ pm.textContent='PDF scaricato: '+nome; pm.className='note ok'; }
   }catch(e){ window.scrollTo(sc0[0],sc0[1]); document.body.classList.remove('pdfmode'); if(pm){ pm.textContent='Download diretto non riuscito ('+e.message+'): apro la stampa, scegli "Salva come PDF".'; pm.className='note ko'; } setTimeout(function(){ window.print(); },400); } }
+document.addEventListener('change',function(e){ if(!e.target||e.target.id!=='provv') return; simS().includiProvvisorie=e.target.checked; render(); (async function(){ var m=document.getElementById('pdfmsg'); try{ S.config=await call('apiSalvaConfig',{sim:JSON.stringify(simS())}); m=document.getElementById('pdfmsg'); if(m){ m.textContent=e.target.checked?'Voci provvisorie incluse':'Voci provvisorie escluse'; m.className='note ok'; } }catch(x){ m=document.getElementById('pdfmsg'); if(m){ m.textContent='Salvataggio non riuscito: '+x.message; m.className='note ko'; } } })(); });
 document.addEventListener('change',function(e){ if(e.target&&e.target.id==='repmese'){ S.repMese=e.target.value; render(); } if(e.target&&e.target.id==='marinidata'){ S.mariniData=e.target.value; render(); } if(e.target&&e.target.id==='marinidett'){ S.mariniDett=e.target.checked; render(); } if(e.target&&e.target.id==='marininote'){ simS().mariniNote=e.target.value; var dn=e.target.parentNode.querySelector('.onlyrep'); if(dn) dn.textContent=e.target.value; (async function(){ var m=document.getElementById('marinimsg'); try{ S.config=await call('apiSalvaConfig',{sim:JSON.stringify(simS())}); if(m){ m.textContent='Note salvate'; m.className='note ok norep'; } }catch(x){ if(m){ m.textContent='Salvataggio non riuscito: '+x.message; m.className='note neg norep'; } } })(); } });
 function vDash(r){ var d=S.dash||{}, ch=Object.keys(d.chiusure||{}).sort();
   return '<div class="card"><b>Dati letti dalla Dashboard V6 (sola lettura)</b><div class="note">Letti il '+esc(d.letto_il||'—')+'. Mese con chiusura = valori della chiusura (immutabili); mesi senza chiusura = fatture intercompany approvate.</div></div>'
