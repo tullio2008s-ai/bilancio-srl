@@ -659,7 +659,7 @@ table.fit{min-width:0!important;width:100%!important;font-size:9.4px}table.fit.w
     return { mesi: 18, cassa: '', soglia: 3000, usaFido: false, marg: '', margM: {}, adler: '', adlerFine: '', iva: '', ivaM: {}, straord: {}, acconto: '', imposte: '',
       ivaModo: 'ravv', avvisoMese: '2027-09', isa: true, rate: '', fam: 6000, altreNette: '', contaFigli: false, quotaFam: '',
       pers: [{ gs: 24, altri: 10500, deduz: '', netto: 3000, nettiM: {}, tetto: 50000 }, { gs: 33.72, altri: 0, deduz: '', netto: 3000, nettiM: {}, tetto: 50000 }],
-      addReg: 1.23, addCom: 0.7, div: [], approvazione: '2027-05-31', legale: 1.6 };
+      addReg: 1.23, addCom: 0.7, div: [], approvazione: '2027-05-31', legale: 1.6, lipe: false };
   }
   function strategiaNorm(x) {
     var d = strategiaDefault(); if (!x || typeof x !== 'object') return d;
@@ -667,7 +667,7 @@ table.fit{min-width:0!important;width:100%!important;font-size:9.4px}table.fit.w
     o.pers = [0, 1].map(function (i) { var s = (x.pers && x.pers[i]) || {}, r = Object.assign({}, d.pers[i], s); r.nettiM = s.nettiM && typeof s.nettiM === 'object' && !Array.isArray(s.nettiM) ? s.nettiM : {}; return r; });
     ['margM', 'ivaM', 'straord'].forEach(function (k) { if (!o[k] || typeof o[k] !== 'object' || Array.isArray(o[k])) o[k] = {}; });
     o.div = Array.isArray(x.div) ? x.div.map(function (v) { return { data: String((v && v.data) || ''), lordo: v && v.lordo !== undefined ? v.lordo : 0 }; }) : [];
-    o.mesi = Math.min(30, Math.max(6, parseInt(o.mesi, 10) || 18)); o.isa = o.isa !== false && o.isa !== 'false'; o.usaFido = o.usaFido === true || o.usaFido === 'true'; o.contaFigli = o.contaFigli === true || o.contaFigli === 'true';
+    o.mesi = Math.min(30, Math.max(6, parseInt(o.mesi, 10) || 18)); o.isa = o.isa !== false && o.isa !== 'false'; o.usaFido = o.usaFido === true || o.usaFido === 'true'; o.contaFigli = o.contaFigli === true || o.contaFigli === 'true'; o.lipe = o.lipe === true || o.lipe === 'true';
     return o;
   }
   function stAltreNette(c, par) { return c.altreNette !== '' && c.altreNette !== null && c.altreNette !== undefined ? num(c.altreNette) : r2(c.pers.reduce(function (t, p) { var R0 = Math.max(0, num(p.altri) - num(p.deduz)); return t + Math.max(0, num(p.altri) - stTasse(R0, false, par)); }, 0) / 12); }
@@ -1846,7 +1846,7 @@ function stGrafico(R,ctx){ var M=R.mesi, W=1200, H=320, pl=62, pr=14, pt=24, pb=
 function stDecisioni(R,ctx){ var c=R.cfg, M=R.mesi, d=[], nm=ctx.nomi, r=R.righe, tot=function(a){ return a.reduce(function(t,x){ return t+x; },0); };
   var arrTot=ctx.arretrati.reduce(function(t,x){ return t+x.imp; },0);
   if(c.ivaModo==='ravv'){ var pm=M.map(function(m,i){ return r.ivaArr[i]>0.5?etm(m)+' '+eur(r.ivaArr[i]):null; }).filter(Boolean);
-    d.push('<b>IVA arretrata ('+eur(arrTot)+' €): ravvedimento</b> – paga '+(pm.length?pm.join(', '):'—')+' €'+(R.chiusoIn?'; chiusa a '+etm(R.chiusoIn):'; <span class="neg">non si chiude nel periodo</span>')+'. Sanzioni e interessi: '+eur(R.extraArr)+' €. Prima di pagare servono le liquidazioni ufficiali e le LIPE.'); }
+    d.push('<b>IVA arretrata ('+eur(arrTot)+' €): ravvedimento</b> – paga '+(pm.length?pm.join(', '):'—')+' €'+(R.chiusoIn?'; chiusa a '+etm(R.chiusoIn):'; <span class="neg">non si chiude nel periodo</span>')+'. Sanzioni e interessi: '+eur(R.extraArr)+' €. Prima di pagare servono le liquidazioni IVA ufficiali dello studio.'); }
   else { var av=M.map(function(m,i){ return r.avviso[i]>0.5?etm(m):null; }).filter(Boolean); d.push('<b>IVA arretrata ('+eur(arrTot)+' €): avviso bonario</b> – 20 rate trimestrali da '+(av[0]||'—')+' ('+eur(r.avviso.find(function(x){ return x>0; })||0)+' € a rata, in totale '+eur(R.avvisoTot)+' €). Sanzione 1/3 del 25% (8,33%) più interessi: costa '+eur(R.avvisoTot-arrTot)+' € e dura 5 anni, ma diluisce la cassa. Il mese di arrivo dell\'avviso è un\'ipotesi.'); }
   var I=R.imposte; d.push('<b>IRES e IRAP '+(+R.anno-1)+' (stima '+eur(I.T26)+' €)</b> – a fine giugno '+R.anno+' saldo + 1° acconto = '+eur(I.T26*(1+I.p1))+' €'+(R.rate>1?' in '+R.rate+' rate mensili (interessi '+eur(R.interessiRate)+' €)':' in un\'unica soluzione')+'; 2° acconto a novembre '+eur(I.T26*I.p2)+' € (non rateizzabile). Acconti col metodo storico'+(I.T27<I.T26?' (puoi ridurli col metodo previsionale: imposte '+R.anno+' stimate '+eur(I.T27)+' €)':'')+'.');
   var P=R.persone[R.anno]||[]; d.push('<b>Famiglia: '+eur(R.famMedia)+' € netti al mese</b> (obiettivo '+eur(+c.fam)+' €) – '+P.map(function(p,j){ return nm[j]+' '+eur(c.pers[j].netto)+' € netti/mese (lordo '+eur(p.lordo/12)+' €, aliquota marginale '+p.marginale+'%)'; }).join('; ')+'; altre entrate nette '+eur(R.altreNette)+' €/mese.');
@@ -1901,7 +1901,7 @@ function vStrategia(){ var ctx=stCtx(), c=stCfg(), R=E.strategia(ctx,c), M=R.mes
    +stCampo('Margine operativo al mese, escluso Adler €',stIn('marg',c.marg,{ph:auto(ctx.margMedio)}),'media '+ctx.mesiStorico+' mesi 2026, prima di compensi e contributi')+stCampo('Adler al mese €',stIn('adler',c.adler,{ph:auto(ctx.adlerMedio)}))+stCampo('Adler fino a (mese di servizio)',stIn('adlerFine',c.adlerFine,{type:'month'}),'vuoto = continua')
    +stCampo('IVA netta incassata al mese €',stIn('iva',c.iva,{ph:auto(ctx.ivaMedia)}))+stCampo('Acconto IVA 27/12/'+(+R.anno-1)+' €',stIn('acconto',c.acconto,{ph:auto(R.acconto26)}),'88% di dicembre')
    +stCampo('Quota dividendi a '+esc(nm[0])+' + '+esc(nm[1])+' %',stIn('quotaFam',c.quotaFam,{ph:'automatico: '+ctx.quotaFamAuto+'%'}))+stCampo('Conta i figli come famiglia',stIn('contaFigli',String(c.contaFigli),{sel:sino}))
-   +stCampo('Approvazione bilancio '+(+R.anno-1),stIn('approvazione',c.approvazione,{type:'date'}))+stCampo('Mesi del piano',stIn('mesi',String(c.mesi),{sel:[6,9,12,15,18,24].map(function(n){ return [String(n),n+' mesi']; })}))
+   +stCampo('Invio LIPE',stIn('lipe',String(c.lipe),{sel:sino}),'se No, le Istruzioni non le riportano')+stCampo('Approvazione bilancio '+(+R.anno-1),stIn('approvazione',c.approvazione,{type:'date'}))+stCampo('Mesi del piano',stIn('mesi',String(c.mesi),{sel:[6,9,12,15,18,24].map(function(n){ return [String(n),n+' mesi']; })}))
    +stCampo('Addizionale regionale %',stIn('addReg',+c.addReg),'Sardegna 1,23%')+stCampo('Addizionale comunale %',stIn('addCom',+c.addCom),'da verificare')+stCampo('Interesse legale %',stIn('legale',+c.legale))+'</div>'
    +'<div style="margin-top:10px"><b style="font-size:13px">Dividendi programmati</b> '+(c.div.length?'':'<span class="note">nessuno</span>')+c.div.map(function(d,i){ return '<div style="display:flex;gap:8px;align-items:center;margin-top:4px">'+stIn('div.'+i+'.data',d.data,{type:'date',style:'max-width:190px;margin:0'})+stIn('div.'+i+'.lordo',+d.lordo,{style:'max-width:150px;margin:0'})+'<span class="note">€ lordi</span><button class="l" data-a="stdivdel" data-id="'+i+'">×</button></div>'; }).join('')+' <button class="l" data-a="stdivadd" style="margin-top:4px">+ Aggiungi dividendo</button></div></div>';
   var ipot='<div class="note">Ipotesi: '+R.anno+' simile al 2026 (margine medio dei mesi 2026, senza dipendenti né ammortamenti); Adler incassato il 4 del secondo mese dopo il servizio; IVA corrente pagata alla scadenza; IRPEF '+R.anno+' con le regole 2026 (23/33/43%, detrazione per redditi assimilati); imposte '+R.anno+' stimate col 24% di IRES e il 3,9% di IRAP. Le cifre IVA arretrata vengono dalla consolle: si paga sulle liquidazioni ufficiali.</div>';
@@ -1919,7 +1919,7 @@ function vStrategia(){ var ctx=stCtx(), c=stCfg(), R=E.strategia(ctx,c), M=R.mes
    +'<tr><td style="text-align:left">Fido</td><td>'+eur(ctx.fido)+'</td></tr></tbody></table>'+ipot+'</div>'
    +'<div class="card tw"><b>Compensi: IRPEF e scaglioni</b>'+ptab+'</div>'
    +'<div class="card tw"><b>Compenso o dividendo?</b>'+cmp+'</div>'
-   +'<div class="card tw"><b>IVA arretrata: piano di pagamento</b>'+arrT+'<div class="note">Ravvedimento: sanzione del 25% ridotta a 1/10 entro 30 giorni, 1/9 entro 90, 1/8 entro il 30/04 dell\'anno dopo, 1/7 entro il 30/04 successivo, poi 1/6; interessi legali. Il ravvedimento non è più possibile se arriva prima una comunicazione dell\'Agenzia: inviare le LIPE accelera i controlli.</div></div>'; }
+   +'<div class="card tw"><b>IVA arretrata: piano di pagamento</b>'+arrT+'<div class="note">Ravvedimento: sanzione del 25% ridotta a 1/10 entro 30 giorni, 1/9 entro 90, 1/8 entro il 30/04 dell\'anno dopo, 1/7 entro il 30/04 successivo, poi 1/6; interessi legali. Il ravvedimento non è più possibile se arriva prima una comunicazione dell\'Agenzia (con le LIPE inviate i controlli arrivano prima; senza, il debito emerge con la dichiarazione IVA del 30/04).</div></div>'; }
 var stTimer;
 function stSalva(){ clearTimeout(stTimer); stTimer=setTimeout(async function(){ var m=document.getElementById('stmsg'); try{ S.config=await call('apiSalvaConfig',{sim:JSON.stringify(simS())}); m=document.getElementById('stmsg'); if(m){ m.textContent='Strategia salvata'; m.className='note ok'; } }catch(e){ m=document.getElementById('stmsg'); if(m){ m.textContent='Salvataggio non riuscito: '+e.message; m.className='note ko'; } } },700); }
 function stSet(k,txt){ var c=stCfg(), t=String(txt).trim(), nv=function(){ var n=plParse(t); return n===null?undefined:n; };
@@ -1928,7 +1928,7 @@ function stSet(k,txt){ var c=stCfg(), t=String(txt).trim(), nv=function(){ var n
   var p=k.split('.');
   if(p[0]==='pers'){ var pp=c.pers[+p[1]]; if((p[2]==='deduz'||p[2]==='tetto')&&t===''){ pp[p[2]]=''; return true; } var v2=nv(); if(v2===undefined) return false; pp[p[2]]=v2; if(p[2]==='netto') pp.nettiM={}; return true; }
   if(p[0]==='div'){ var d=c.div[+p[1]]; if(!d) return false; if(p[2]==='data'){ d.data=t; return true; } var v3=nv(); if(v3===undefined) return false; d.lordo=v3; return true; }
-  if(['isa','usaFido','contaFigli'].indexOf(k)>=0){ c[k]=t==='true'; return true; }
+  if(['isa','usaFido','contaFigli','lipe'].indexOf(k)>=0){ c[k]=t==='true'; return true; }
   if(['ivaModo','avvisoMese','adlerFine','approvazione'].indexOf(k)>=0){ c[k]=t; return true; }
   if(k==='rate'){ c.rate=t===''?'':parseInt(t,10); return true; }
   if(k==='mesi'){ c.mesi=parseInt(t,10)||18; return true; }
@@ -1962,7 +1962,7 @@ function vIstruzioni(){ var ctx=stCtx(), c=stCfg(), R=E.strategia(ctx,c), M=R.me
     if(altriInc>0.5) add(ultG,'Altri incassi previsti (vendite Amazon, corrispettivi)',altriInc,'entrata');
     Object.keys(f24).forEach(function(g){ var L=f24[g], t=L.reduce(function(a,x){ return a-x.importo; },0); add(+g,'<b>Paga l\'F24</b><ul style="margin:2px 0 0 16px;padding:0">'+L.map(function(x){ return '<li>'+esc(x.desc)+': '+eur(-x.importo)+' €</li>'; }).join('')+'</ul>',t,''); });
     var mm=+m.slice(5,7), y=m.slice(0,4);
-    if(mm===11){ add(30,'<b>LIPE</b> del 3° trimestre '+y+' e invio tardivo del 1° e 2° trimestre con ravvedimento (intermediario abilitato)',null,'con lo studio'); }
+    if(mm===11&&c.lipe){ add(30,'<b>LIPE</b> del 3° trimestre '+y+' e invio tardivo del 1° e 2° trimestre con ravvedimento (intermediario abilitato)',null,'con lo studio'); }
     if(mm===12){ if(ctx.ivaNov>0.5) add(16,'<b>Paga l\'F24</b>: IVA di novembre '+y+' – cod. 6011 anno '+y,ctx.ivaNov,'non era nella pagina Cassa'); if(R.acconto26>0.5) add(27,'<b>Acconto IVA</b> – cod. 6013',R.acconto26,'metodo storico 88%: verifica il metodo con lo studio');
       add(15,'Fatture e documenti di novembre: integrazione o autofattura dell\'acquisto della macchina laser (TD18 o TD19) e fattura Adler di novembre',null,'entro il 15'); }
     az.sort(function(a,b){ return a.g-b.g; });
@@ -1998,12 +1998,12 @@ function vIstruzioni(){ var ctx=stCtx(), c=stCfg(), R=E.strategia(ctx,c), M=R.me
     // acconto IVA
     if(r.accIva[i]>0.5) add(27,'<b>Acconto IVA</b> – cod. 6013 (metodo storico: 88% della liquidazione di dicembre dell\'anno prima)',r.accIva[i],'');
     // adempimenti con lo studio
-    var std=[]; if(mm===1) std.push([25,'Intrastat servizi del 4° trimestre (fatture Adler), se trimestrale']); if(mm===2) std.push([28,'LIPE del 4° trimestre '+(+m.slice(0,4)-1)+' (oppure nella dichiarazione IVA)']);
+    var std=[]; if(mm===1) std.push([25,'Intrastat servizi del 4° trimestre (fatture Adler), se trimestrale']); if(mm===2&&c.lipe) std.push([28,'LIPE del 4° trimestre '+(+m.slice(0,4)-1)+' (oppure nella dichiarazione IVA)']);
     if(mm===3) std.push([16,'Certificazione Unica dei compensi agli amministratori; eventuale saldo IVA annuale '+(+m.slice(0,4)-1)]);
-    if(mm===4) std.push([25,'Intrastat servizi del 1° trimestre'],[30,'<b>Dichiarazione IVA '+m.slice(0,4)+'</b> (anno '+(+m.slice(0,4)-1)+'): ultimo giorno per ravvedere l\'IVA arretrata a 1/8']);
+    if(mm===4) std.push([25,'Intrastat servizi del 1° trimestre'],[30,'<b>Dichiarazione IVA '+m.slice(0,4)+'</b> (anno '+(+m.slice(0,4)-1)+', con le liquidazioni di tutti i mesi): ultimo giorno per ravvedere l\'IVA arretrata a 1/8']);
     if(m===String(c.approvazione).slice(0,7)) std.push([+String(c.approvazione).slice(8,10)||30,'Assemblea dei soci: approvazione del bilancio '+(+m.slice(0,4)-1)+' e destinazione dell\'utile']);
-    if(mm===5) std.push([31,'LIPE del 1° trimestre']); if(mm===7) std.push([25,'Intrastat servizi del 2° trimestre']); if(mm===9) std.push([30,'LIPE del 2° trimestre']);
-    if(mm===10) std.push([25,'Intrastat servizi del 3° trimestre'],[31,'Dichiarazioni Redditi SC, IRAP e 770']); if(mm===11) std.push([30,'LIPE del 3° trimestre']);
+    if(mm===5&&c.lipe) std.push([31,'LIPE del 1° trimestre']); if(mm===7) std.push([25,'Intrastat servizi del 2° trimestre']); if(mm===9&&c.lipe) std.push([30,'LIPE del 2° trimestre']);
+    if(mm===10) std.push([25,'Intrastat servizi del 3° trimestre'],[31,'Dichiarazioni Redditi SC, IRAP e 770']); if(mm===11&&c.lipe) std.push([30,'LIPE del 3° trimestre']);
     std.forEach(function(x){ add(x[0],x[1],null,'con lo studio'); });
     az.sort(function(a,b){ return a.g-b.g; });
     var usc=az.filter(function(a){ return a.imp&&a.nota!=='entrata'; }).reduce(function(t,a){ return t+a.imp; },0), sotto=r.chiusura[i]<(+c.soglia||0)-0.5;
