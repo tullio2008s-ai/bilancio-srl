@@ -79,7 +79,7 @@ table.fit{min-width:0!important;width:100%!important;font-size:9.4px}table.fit.w
 .pbk{break-before:page;page-break-before:always}}
 .note{font-size:12px;color:var(--mu)}.hid{display:none}
 </style></head><body>
-<header><h1>Bilancio SRL <small>Tullio Serci S.r.l. · gestionale riservato</small></h1><small id="versione" title="Versione della consolle: se non vedi la data dell'ultimo aggiornamento, ricarica" style="opacity:.85;margin-right:10px">versione 14/11/2026 20:10</small><small id="utente"></small><button class="l" id="exit" data-a="logout" style="color:#fff;border-color:#fff8">Esci</button></header>
+<header><h1>Bilancio SRL <small>Tullio Serci S.r.l. · gestionale riservato</small></h1><small id="versione" title="Versione della consolle: se non vedi la data dell'ultimo aggiornamento, ricarica" style="opacity:.85;margin-right:10px">versione 14/11/2026 20:30</small><small id="utente"></small><button class="l" id="exit" data-a="logout" style="color:#fff;border-color:#fff8">Esci</button></header>
 <div id="demo" class="demo hid">MODALITÀ DEMO: dati sintetici salvati solo in questo browser. Nessun dato reale.</div>
 <nav id="nav"></nav>
 <main id="main"></main>
@@ -2321,8 +2321,9 @@ function agPrimaNota(t){ var st=agStato(), fino=st.pnRegistrataFino||'2026-10-31
     m.g='spa'; m.c=AG_CAT[cat]; mov.push(m); });
   var gr={}; mov.forEach(function(m){ var mm=m.d.slice(0,7), k=m.g==='comm'?'PN-'+m.cat+'-'+mm:'SPA-'+mm+'-'+m.c; if(!gr[k]) gr[k]={k:k,m:mm,g:m.g,cat:m.cat,c:m.c||'oneri_bancari',imp:0,mov:[]}; gr[k].imp+=m.imp; gr[k].mov.push(m); });
   var esist={}; (S.voci||[]).forEach(function(v){ if(!v.eliminata&&v.riferimento) esist[String(v.riferimento)]=v; });
-  var righe=Object.keys(gr).sort().map(function(k){ var g=gr[k], imp=Math.round(g.imp*100)/100, ex=esist[k], esito=ex?(Math.abs((+ex.imponibile||0)-imp)<0.005?'uguale':'aggiorna'):'nuova';
-    return {sel:esito!=='uguale',esito:esito,ex:ex||null,mov:g.mov,v:{categoria:g.c,data:g.g==='comm'?g.m+'-28':agFine(g.m),competenza:g.m,
+  /* data = ultimo movimento del gruppo (non fine mese): sono spese già uscite dalla banca, la cassa non deve contarle di nuovo dopo il saldo */
+  var righe=Object.keys(gr).sort().map(function(k){ var g=gr[k], imp=Math.round(g.imp*100)/100, ex=esist[k], dt=g.mov.reduce(function(a,m){ return m.d>a?m.d:a; },''), esito=ex?(Math.abs((+ex.imponibile||0)-imp)<0.005&&String(ex.data).slice(0,10)===dt?'uguale':'aggiorna'):'nuova';
+    return {sel:esito!=='uguale',esito:esito,ex:ex||null,mov:g.mov,v:{categoria:g.c,data:dt,competenza:g.m,
       descrizione:g.g==='comm'?agTitolo(g.cat)+' '+g.m+' (prima nota, raggruppato)':'Spese senza e-fattura '+g.m+' ('+g.c+')',imponibile:imp,iva:0,detraibile:false,riferimento:k,
       note:'fonte: prima nota Sibill ('+g.mov.length+' movimenti), caricata il '+agFmt(agOggi())+(g.g==='spa'?'; si ricalcola a ogni caricamento: se arriva la fattura il movimento esce da qui':'')}}; });
   var I=agIndice(), vist={}; conFatt.forEach(function(c){ var k=agNorm(c.nf), v=((I.ref[k]||[]).concat(I.tok[k]||[])).filter(function(x){ return !x.eliminata&&agTipo(x)==='costo'; })[0]; if(!v||vist[v.id]) return; var rc=agRiclassifica(v,c.cat,'prima nota'); if(rc){ vist[v.id]=1; righe.push(rc); } });
