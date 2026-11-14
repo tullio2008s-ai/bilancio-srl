@@ -8,9 +8,9 @@
 header{padding:12px 16px;background:linear-gradient(100deg,#1f3f8f 0%,#6a1b9a 55%,#c2185b 100%);color:#fff;display:flex;gap:10px;align-items:center;flex-wrap:wrap;box-shadow:0 2px 8px rgba(106,27,154,.25)}
 header h1{font-size:18px;margin:0;flex:1}header small{opacity:.85}
 .demo{background:#a86400;color:#fff;padding:6px 16px;font-size:13px}
-nav{display:grid;grid-template-columns:repeat(10,minmax(0,1fr));gap:6px;padding:8px 12px;background:var(--card);border-bottom:1px solid var(--ln)}
-nav button{border:0;background:linear-gradient(180deg,#d81b60,#ad1457);color:#fff;padding:7px 6px;border-radius:10px;font:inherit;font-size:13px;font-weight:600;line-height:1.15;cursor:pointer;white-space:normal;text-align:center;min-height:38px;box-shadow:0 2px 4px rgba(173,20,87,.25);transition:transform .08s,filter .15s,box-shadow .15s}nav button:nth-child(n+11){background:linear-gradient(180deg,#8e24aa,#6a1b9a);box-shadow:0 2px 4px rgba(106,27,154,.25)}nav button:hover{filter:brightness(1.12);transform:translateY(-1px);box-shadow:0 4px 10px rgba(173,20,87,.35)}
-nav button.on,nav button.on:nth-child(n+11){background:linear-gradient(180deg,#2e9e5b,#1b7a43);color:#fff;box-shadow:0 0 0 3px rgba(46,158,91,.35),0 3px 8px rgba(27,122,67,.35);transform:translateY(-1px)}@media(max-width:1000px){nav{grid-template-columns:repeat(5,minmax(0,1fr))}}
+nav{display:grid;grid-template-columns:repeat(11,minmax(0,1fr));gap:6px;padding:8px 12px;background:var(--card);border-bottom:1px solid var(--ln)}
+nav button{border:0;background:linear-gradient(180deg,#d81b60,#ad1457);color:#fff;padding:7px 6px;border-radius:10px;font:inherit;font-size:13px;font-weight:600;line-height:1.15;cursor:pointer;white-space:normal;text-align:center;min-height:38px;box-shadow:0 2px 4px rgba(173,20,87,.25);transition:transform .08s,filter .15s,box-shadow .15s}nav button:nth-child(n+12){background:linear-gradient(180deg,#8e24aa,#6a1b9a);box-shadow:0 2px 4px rgba(106,27,154,.25)}nav button:hover{filter:brightness(1.12);transform:translateY(-1px);box-shadow:0 4px 10px rgba(173,20,87,.35)}
+nav button.on,nav button.on:nth-child(n+12){background:linear-gradient(180deg,#2e9e5b,#1b7a43);color:#fff;box-shadow:0 0 0 3px rgba(46,158,91,.35),0 3px 8px rgba(27,122,67,.35);transform:translateY(-1px)}@media(max-width:1000px){nav{grid-template-columns:repeat(5,minmax(0,1fr))}}
 main{padding:12px 16px;max-width:1760px;margin:auto}
 .card{background:var(--card);border:1px solid var(--ln);border-radius:12px;padding:14px;margin-bottom:12px}
 .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
@@ -1015,7 +1015,7 @@ var eur = function(x){ return IT.format(Math.round((x||0)*100)/100); };
 var MESI = ['gen','feb','mar','apr','mag','giu','lug','ago','set','ott','nov','dic'];
 var etm = function(m){ return MESI[+m.slice(5,7)-1]+' '+m.slice(2,4); };
 var esc = function(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); };
-var S = {voci:[], config:{}, dash:null, tab:'riepilogo', edit:null, storico:[]};
+var S = {voci:[], config:{}, dash:null, tab:'oggi', edit:null, storico:[]};
 
 /* ── Backend: Apps Script reale oppure demo locale ── */
 var API = window.BILANCIO_API || '', DEMO = !API, TOKEN = '';
@@ -1075,9 +1075,9 @@ function calc(){ return E.calcola({voci:vociCalc(),dash:S.dash||{},params:params
 function cls(x){ return x<-0.004?'neg':(x>0.004?'pos':''); }
 
 /* ── Viste ── */
-var TABS=[['riepilogo','Riepilogo'],['strategia','Strategia'],['istruzioni','Istruzioni'],['compdiv','Compenso o dividendo'],['pl','P&L mensile'],['cassa','Cassa'],['flussi','Cash flow'],['iva','IVA'],['imposte','Imposte (stima)'],['patrimonio','Stato patrimoniale'],['simulazione','Previsione nov-dic'],['utili','Prelievo utili'],['budget','Budget'],['commercialista','Per il commercialista'],['marini','Marini'],['voci','Voci manuali'],['dashboard','Da Dashboard V6'],['param','Parametri'],['controlli','Controlli'],['storico','Storico']];
+var TABS=[['oggi','Oggi'],['riepilogo','Riepilogo'],['strategia','Strategia'],['istruzioni','Istruzioni'],['compdiv','Compenso o dividendo'],['pl','P&L mensile'],['cassa','Cassa'],['flussi','Cash flow'],['iva','IVA'],['imposte','Imposte (stima)'],['patrimonio','Stato patrimoniale'],['simulazione','Previsione nov-dic'],['utili','Prelievo utili'],['budget','Budget'],['commercialista','Per il commercialista'],['marini','Marini'],['voci','Voci manuali'],['dashboard','Da Dashboard V6'],['param','Parametri'],['controlli','Controlli'],['storico','Storico']];
 function nav(){ document.getElementById('nav').innerHTML=TABS.map(function(t){return '<button class="'+(S.tab===t[0]?'on':'')+'" data-t="'+t[0]+'">'+t[1]+'</button>';}).join(''); }
-function render(){ nav(); var reg=calc(); S.__reg=reg; var r=reg, SIMO=null; if(S.tab==='pl'&&S.plPrev!==false){ try{ SIMO=simRun(); r=SIMO.res; }catch(e){ r=reg; SIMO=null; } } var f={riepilogo:vRiepilogo,strategia:vStrategia,istruzioni:vIstruzioni,compdiv:vCompDiv,pl:vPL,iva:vIva,imposte:vImposte,patrimonio:vPatrimonio,simulazione:vSimulazione,cassa:vCassa,flussi:vFlussi,utili:vUtili,commercialista:vReport,marini:vMarini,budget:vBudget,voci:vVoci,dashboard:vDash,param:vParam,controlli:vControlli,storico:vStorico}[S.tab]; document.getElementById('main').innerHTML='<div class="bar">'+provvHtml()+'<span id="pdfmsg" class="note"></span><button class="p" data-a="pdf" style="margin:0">⬇ Salva PDF</button></div><div class="pdfhead"'+(S.tab==='commercialista'?' style="display:none!important"':'')+'><b>Bilancio SRL — '+esc(TABS.filter(function(t){return t[0]===S.tab;})[0][1])+'</b><div class="note">Tullio Serci S.r.l. · generato il '+new Date().toLocaleDateString('it-IT')+' · importi in euro, IVA esclusa salvo dove indicato'+esc(provvNota())+'</div></div>'+f(r)+(SIMO?cashFlowHtml(SIMO):'');
+function render(){ nav(); var reg=calc(); S.__reg=reg; var r=reg, SIMO=null; if(S.tab==='pl'&&S.plPrev!==false){ try{ SIMO=simRun(); r=SIMO.res; }catch(e){ r=reg; SIMO=null; } } var f={oggi:vOggi,riepilogo:vRiepilogo,strategia:vStrategia,istruzioni:vIstruzioni,compdiv:vCompDiv,pl:vPL,iva:vIva,imposte:vImposte,patrimonio:vPatrimonio,simulazione:vSimulazione,cassa:vCassa,flussi:vFlussi,utili:vUtili,commercialista:vReport,marini:vMarini,budget:vBudget,voci:vVoci,dashboard:vDash,param:vParam,controlli:vControlli,storico:vStorico}[S.tab]; document.getElementById('main').innerHTML='<div class="bar">'+provvHtml()+'<span id="pdfmsg" class="note"></span><button class="p" data-a="pdf" style="margin:0">⬇ Salva PDF</button></div><div class="pdfhead"'+(S.tab==='commercialista'?' style="display:none!important"':'')+'><b>Bilancio SRL — '+esc(TABS.filter(function(t){return t[0]===S.tab;})[0][1])+'</b><div class="note">Tullio Serci S.r.l. · generato il '+new Date().toLocaleDateString('it-IT')+' · importi in euro, IVA esclusa salvo dove indicato'+esc(provvNota())+'</div></div>'+f(r)+(SIMO?cashFlowHtml(SIMO):'');
   if(S.tab==='riepilogo') grafico(r); if(S.tab==='voci') bulkInfo(); marcaTabelle(); }
 function marcaRisultati(){ [].forEach.call(document.querySelectorAll('#main .kpi'),function(k){ var b=k.querySelector('b'); k.classList.toggle('kpos',!!(b&&(b.classList.contains('pos')||b.classList.contains('ok')))); k.classList.toggle('kneg',!!(b&&(b.classList.contains('neg')||b.classList.contains('ko')))); });
   [].forEach.call(document.querySelectorAll('#main table tr.t td'),function(td){ if(td.classList.contains('pos')||td.classList.contains('neg')) return; var b=td.querySelector('b.pos,b.neg,b.ok,b.ko'); if(b&&td.children.length===1) td.classList.add(b.classList.contains('pos')||b.classList.contains('ok')?'pos':'neg'); }); }
@@ -2025,7 +2025,8 @@ document.addEventListener('keydown',function(e){ if(e.key==='Enter'&&e.target.da
 /* ── Pagina ISTRUZIONI: cosa fare mese per mese, ricavato dalla Strategia ── */
 var MESI_LUNGHI=['gennaio','febbraio','marzo','aprile','maggio','giugno','luglio','agosto','settembre','ottobre','novembre','dicembre'];
 function istMese(m){ return MESI_LUNGHI[+m.slice(5,7)-1]+' '+m.slice(0,4); }
-function vIstruzioni(){ var ctx=stCtx(), c=stCfg(), R=E.strategia(ctx,c), M=R.mesi, r=R.righe, nm=ctx.nomi, soci=simS().soci||[], fine=(+R.anno)+'-12';
+var IST=null;
+function vIstruzioni(){ var ctx=stCtx(), c=stCfg(), R=E.strategia(ctx,c), M=R.mesi, r=R.righe, nm=ctx.nomi, soci=simS().soci||[], fine=(+R.anno)+'-12'; IST={R:R,ctx:ctx,c:c,mesi:[]};
   var rI=ctx.imposte2026>0?ctx.ires2026/ctx.imposte2026:0.5, blocchi=[];
   var g16=function(m){ return m.slice(5)==='08'?'20':'16'; }, gg=function(d,m){ return d+'/'+m.slice(5)+'/'+m.slice(0,4); };
   // mesi prima della Strategia (da oggi a dicembre dell'anno prima): movimenti della pagina Cassa + IVA + scadenze
@@ -2048,6 +2049,7 @@ function vIstruzioni(){ var ctx=stCtx(), c=stCfg(), R=E.strategia(ctx,c), M=R.me
       add(15,'Documenti (nessun pagamento): integrazione IVA dell\'acquisto della macchina laser, già pagata (TD18 o TD19), e fattura Adler di novembre',null,'entro il 15'); }
     az.sort(function(a,b){ return a.g-b.g; });
     var usc=az.filter(function(a){ return a.imp&&a.nota!=='entrata'; }).reduce(function(t,a){ return t+a.imp; },0);
+    (function(){ var cm=(ctx.cassaMesi||[]).filter(function(x){ return x.m===m; })[0]; IST.mesi.push({m:m,az:az,pre:true,ini:cm?cm.chiusura-cm.entrate+cm.uscite:null,usc:cm?cm.uscite:usc,fin:cm?cm.chiusura:null}); })();
     blocchi.push('<div class="card" style="break-inside:avoid;page-break-inside:avoid"><div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap"><b style="font-size:16px;text-transform:capitalize">'+istMese(m)+(m===oggi.slice(0,7)?' (da oggi)':'')+'</b>'+(function(){ var cm=(ctx.cassaMesi||[]).filter(function(x){ return x.m===m; })[0]||{entrate:0,uscite:0,chiusura:null}, oggiM=String(ctx.dataCassa).slice(0,7)===m, fin=cm.chiusura===null?null:cm.chiusura, ini=fin===null?null:fin-cm.entrate+cm.uscite;
         return '<span class="pill '+(fin!==null&&fin<R.sogliaEff?'pneg':'ppos')+'" style="font-size:13.5px">'+(oggiM?'Cassa al '+String(ctx.dataCassa).split('-').reverse().join('/'):'Cassa a inizio mese')+': <b>'+(ini===null?'—':eur(ini)+' €')+'</b> · Spese del mese: <b>'+eur(cm.uscite)+' €</b> · Cassa a fine mese: <b class="'+(fin!==null&&fin<R.sogliaEff?'neg':'pos')+'">'+(fin===null?'—':eur(fin)+' €')+'</b></span>'; })()+'</div>'
       +'<table class="fit" style="min-width:0;margin-top:6px"><thead><tr><th style="text-align:left;width:9%">Giorno</th><th style="text-align:left">Cosa fare</th><th style="width:13%">Importo €</th><th style="text-align:left;width:17%">Note</th></tr></thead><tbody>'
@@ -2096,6 +2098,7 @@ function vIstruzioni(){ var ctx=stCtx(), c=stCfg(), R=E.strategia(ctx,c), M=R.me
     std.forEach(function(x){ add(x[0],x[1],null,'con lo studio'); });
     az.sort(function(a,b){ return a.g-b.g; });
     var usc=az.filter(function(a){ return a.imp&&a.nota!=='entrata'; }).reduce(function(t,a){ return t+a.imp; },0)-fuori, sotto=r.chiusura[i]<R.sogliaEff-0.5;
+    IST.mesi.push({m:m,az:az,ini:r.apertura[i],usc:r.apertura[i]+r.adler[i]+r.inc[i]+Math.max(0,r.straord[i])-r.chiusura[i],fin:r.chiusura[i]});
     blocchi.push('<div class="card" style="break-inside:avoid;page-break-inside:avoid"><div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap"><b style="font-size:16px;text-transform:capitalize">'+istMese(m)+'</b><span class="pill '+(sotto?'pneg':'ppos')+'" style="font-size:13.5px">Cassa a inizio mese: <b>'+eur(r.apertura[i])+' €</b> · Spese del mese: <b>'+eur(r.apertura[i]+r.adler[i]+r.inc[i]+Math.max(0,r.straord[i])-r.chiusura[i])+' €</b> · Cassa a fine mese: <b class="'+(sotto?'neg':'pos')+'">'+eur(r.chiusura[i])+' €</b></span></div>'
       +'<table class="fit" style="min-width:0;margin-top:6px"><thead><tr><th style="text-align:left;width:9%">Giorno</th><th style="text-align:left">Cosa fare</th><th style="width:13%">Importo €</th><th style="text-align:left;width:17%">Note</th></tr></thead><tbody>'
       +az.map(function(a){ return '<tr><td style="text-align:left">'+gg(String(a.g).padStart(2,'0'),m)+'</td><td style="text-align:left;white-space:normal">'+a.cosa+'</td><td>'+(a.imp?(a.nota==='entrata'?'+':'')+eur(a.imp):'')+'</td><td style="text-align:left;white-space:normal" class="note">'+(a.nota==='entrata'?'incasso atteso':esc(a.nota))+'</td></tr>'; }).join('')+'</tbody></table></div>'); });
@@ -2179,6 +2182,52 @@ document.addEventListener('change',function(e){ var k=e.target&&e.target.dataset
   if(k==='addizionali'||k==='inail') az[k]=t; else { var v=t===''?'':plParse(t); if(v===null) return; if(k.indexOf('lordo.')===0){ az.lordo=az.lordo||['','']; az.lordo[+k.split('.')[1]]=v; } else az[k]=v; }
   cdSalva(); setTimeout(function(){ var a=document.activeElement, kk=a&&a.dataset&&a.dataset.az; render(); if(kk){ var el=document.querySelector('[data-az="'+kk+'"]'); if(el){ el.focus(); if(el.select) el.select(); } } },0); });
 document.addEventListener('keydown',function(e){ if(e.key==='Enter'&&e.target.dataset&&e.target.dataset.az&&e.target.tagName==='INPUT') e.target.blur(); });
+/* ── Pagina OGGI: la fotografia al giorno di consultazione (stessi calcoli di Istruzioni e Strategia) ── */
+function vOggi(r){ vIstruzioni(); var I=IST, R=I.R, ctx=I.ctx, oggi=new Date().toISOString().slice(0,10), mOggi=oggi.slice(0,7), entro=new Date(Date.now()+30*864e5).toISOString().slice(0,10);
+  var dataAz=function(mm,a){ return mm+'-'+String(a.g).padStart(2,'0'); }, fmtD=function(d){ return d.split('-').reverse().join('/'); };
+  var tutte=[]; I.mesi.forEach(function(x){ x.az.forEach(function(a){ tutte.push({d:dataAz(x.m,a),a:a,m:x.m}); }); }); tutte.sort(function(p,q){ return p.d<q.d?-1:p.d>q.d?1:0; });
+  var entrata=function(a){ return a.nota==='entrata'; }, conta=function(a){ return a.imp&&!/già nel margine/.test(a.nota||''); };
+  // cassa oggi
+  var cassaOggi=+ctx.saldoCassa||0; (ctx.righeCassa||[]).forEach(function(x){ if(x.data<=oggi) cassaOggi=x.saldo; });
+  var mc=I.mesi.filter(function(x){ return x.m===mOggi; })[0];
+  if(mc&&!mc.pre){ cassaOggi=mc.ini; tutte.forEach(function(t){ if(t.m===mOggi&&t.d<=oggi&&conta(t.a)) cassaOggi+=entrata(t.a)?t.a.imp:-t.a.imp; }); }
+  var giorniSaldo=Math.round((Date.parse(oggi)-Date.parse(ctx.dataCassa||oggi))/864e5);
+  // questo mese
+  var restMese=tutte.filter(function(t){ return t.m===mOggi&&t.d>=oggi&&conta(t.a); }), inMese=restMese.filter(function(t){ return entrata(t.a); }).reduce(function(s,t){ return s+t.a.imp; },0), outMese=restMese.filter(function(t){ return !entrata(t.a); }).reduce(function(s,t){ return s+t.a.imp; },0);
+  var fineMese=mc?mc.fin:null;
+  // prossimo F24
+  var f24=tutte.filter(function(t){ return t.d>=oggi&&/Paga l.F24/.test(t.a.cosa); })[0];
+  // scadenze nei prossimi 30 giorni
+  var prossime=tutte.filter(function(t){ return t.d>=oggi&&t.d<=entro; });
+  // prossimi mesi
+  var mesi=I.mesi.filter(function(x){ return x.m>=mOggi; }).slice(0,6), minM=mesi.reduce(function(a,x){ return x.fin!==null&&(a===null||x.fin<a.fin)?x:a; },null);
+  // allerte
+  var al=[];
+  if(giorniSaldo>7) al.push('Il saldo di cassa è fermo al '+fmtD(ctx.dataCassa)+' ('+giorniSaldo+' giorni fa): aggiornalo nella pagina Cassa (saldo e data), così tutti i numeri ripartono dal reale.');
+  if(R.arrTot>0.5){ var pr=tutte.filter(function(t){ return t.d>=oggi&&/ravvedimento IVA di|ravvedimento dell.acconto/.test(t.a.cosa); })[0]; al.push('IVA arretrata da pagare: '+eur(R.arrTot)+' € (piano: '+(R.cfg.ivaPiano==='rate'?R.cfg.ivaRateN+' rate':'appena la cassa lo permette')+(pr?', prossima rata il '+fmtD(pr.d):'')+'). Serve la liquidazione ufficiale dello studio prima di pagare.'); }
+  R.avvisi.forEach(function(x){ al.push(x); });
+  var ctl=(r.controlli||[]).filter(function(c){ return !c.ok; }); if(ctl.length) al.push(ctl.length+' controlli incrociati non tornano: '+ctl.slice(0,3).map(function(c){ return c.nome; }).join('; ')+(ctl.length>3?'…':'')+' (pagina Controlli).');
+  var adl=tutte.filter(function(t){ return t.d>=oggi&&t.d<=entro&&/fattura Adler/.test(t.a.cosa)&&!t.a.imp; })[0]; if(adl) al.push('Entro il '+fmtD(adl.d)+': '+adl.a.cosa.replace(/<[^>]+>/g,'')+'.');
+  if(provvisorie().length&&simS().includiProvvisorie!==false) al.push('Nei conti sono incluse voci provvisorie ('+provvisorie().length+'): '+provvisorie().map(function(v){ return String(v.descrizione).slice(0,60); }).join('; ')+'.');
+  if(minM&&minM.fin<R.sogliaEff) al.push('Nei prossimi mesi la cassa scende sotto il minimo consentito: '+eur(minM.fin)+' € a '+istMese(minM.m)+'.');
+  var kp=kpi('Cassa oggi (stima)',eur(cassaOggi),cassaOggi<0?'neg':'pos')+kpi('Disponibile con il fido',eur(cassaOggi+ctx.fido),cassaOggi+ctx.fido<(+R.cfg.soglia||0)?'neg':'pos')
+    +(f24?'<div class="kpi card"><span>Prossimo F24 ('+fmtD(f24.d)+')</span><b>'+eur(f24.a.imp)+' €</b></div>':'')
+    +kpi('Ancora da incassare in '+MESI_LUNGHI[+mOggi.slice(5)-1],eur(inMese),'pos')+kpi('Ancora da pagare in '+MESI_LUNGHI[+mOggi.slice(5)-1],eur(outMese))
+    +(fineMese!==null?kpi('Cassa prevista a fine mese',eur(fineMese),fineMese<R.sogliaEff?'neg':'pos'):'');
+  var riga=function(t){ var e=entrata(t.a); return '<tr><td style="text-align:left">'+fmtD(t.d)+'</td><td style="text-align:left;white-space:normal">'+t.a.cosa+'</td><td class="'+(t.a.imp?(e?'pos':''):'')+'">'+(t.a.imp?(e?'+':'−')+eur(t.a.imp):'')+'</td><td style="text-align:left" class="note">'+(e?'incasso atteso':esc(t.a.nota||''))+'</td></tr>'; };
+  var tabMesi='<table class="fit cdt" style="min-width:600px"><thead><tr><th style="text-align:left">Mese</th><th>Cassa a inizio mese</th><th>Spese del mese</th><th>Cassa a fine mese</th></tr></thead><tbody>'+mesi.map(function(x){ return '<tr class="t"><td style="text-align:left;text-transform:capitalize">'+istMese(x.m)+'</td><td>'+(x.ini===null?'—':eur(x.ini))+'</td><td>'+eur(x.usc)+'</td><td class="'+(x.fin===null?'':(x.fin<R.sogliaEff?'neg':'pos'))+'">'+(x.fin===null?'—':eur(x.fin))+'</td></tr>'; }).join('')+'</tbody></table>';
+  var guida='<ul style="margin:6px 0 0 18px;padding:0;line-height:1.5"><li><b>Ogni giorno</b> (2 minuti): questa pagina. Se hai incassato o pagato qualcosa di importante, aggiorna saldo e data nella pagina <b>Cassa</b>.</li>'
+    +'<li><b>Ogni settimana</b>: <b>Istruzioni</b> (cosa pagare e incassare nel mese) e <b>Cassa</b> (movimenti giorno per giorno e minimo del mese).</li>'
+    +'<li><b>A metà mese</b>, prima del 16: l\'F24 nelle <b>Istruzioni</b>, da confrontare con quello dello studio; fatture Adler entro il 15.</li>'
+    +'<li><b>A fine mese</b>: importa le voci del mese ed esporta i dati; poi <b>P&amp;L mensile</b> (utile del mese), <b>Controlli</b> (devono tornare tutti) e <b>Strategia</b> (cassa, IVA, compensi).</li>'
+    +'<li><b>Ogni trimestre</b> o quando cambia qualcosa: <b>Strategia</b> → "Proponi strategia", <b>Compenso o dividendo</b>, pagina <b>Marini</b> per il confronto con lo studio.</li></ul>';
+  return '<div class="card"><b>Oggi, '+new Date().toLocaleDateString('it-IT',{weekday:'long',day:'numeric',month:'long',year:'numeric'})+'</b><div class="note" style="margin-top:4px">La fotografia di oggi: cassa, cosa pagare e incassare, scadenze e allerte. Gli stessi numeri di Istruzioni e Strategia. Saldo di partenza: '+eur(ctx.saldoCassa)+' € al '+fmtD(ctx.dataCassa)+'.</div></div>'
+   +'<div class="kpis">'+kp+'</div>'
+   +(al.length?'<div class="card"><b>Allerte</b><div class="wa" style="margin-top:6px">'+al.map(function(x){ return '• '+x; }).join('<br>')+'</div></div>':'<div class="card"><b class="pos">Nessuna allerta</b></div>')
+   +(f24?'<div class="card"><b>Prossimo F24: '+fmtD(f24.d)+' – '+eur(f24.a.imp)+' €</b><div style="margin-top:4px">'+f24.a.cosa.replace(/<b>Paga l.F24<\/b>/,'')+'</div></div>':'')
+   +'<div class="card tw"><b>Scadenze dei prossimi 30 giorni</b><table class="fit cdt" style="min-width:600px;margin-top:6px"><thead><tr><th style="text-align:left;width:10%">Data</th><th style="text-align:left">Cosa fare</th><th style="width:14%">Importo €</th><th style="text-align:left;width:16%">Note</th></tr></thead><tbody>'+(prossime.map(riga).join('')||'<tr><td colspan="4">Nessuna scadenza</td></tr>')+'</tbody></table></div>'
+   +'<div class="card tw"><b>Cassa nei prossimi mesi</b>'+tabMesi+(minM?'<div class="note" style="margin-top:4px">Minimo: '+eur(minM.fin)+' € a '+istMese(minM.m)+' (minimo consentito: '+eur(R.sogliaEff)+' €'+(R.cfg.usaFido?', cioè disponibile con il fido '+eur(+R.cfg.soglia)+' €':'')+').</div>':'')+'</div>'
+   +'<div class="card"><b>Cosa guardare e quando</b>'+guida+'</div>'; }
 document.addEventListener('input',simAgg); document.addEventListener('change',simAgg);
 document.addEventListener('change',function(e){ var k=e.target.dataset&&e.target.dataset.pl; if(!k) return; var q=k.split('|'); plSet(q[0],q[1],e.target.value); plSalva(); clearTimeout(plRT); plRT=setTimeout(plRender,350); });
 document.addEventListener('change',function(e){ var k=e.target.dataset&&e.target.dataset.bud; if(!k) return; budSet(k,e.target.value); budSalva(); setTimeout(function(){ var a=document.activeElement, kk=a&&a.dataset&&a.dataset.bud; render(); if(kk){ var el=document.querySelector('[data-bud="'+kk+'"]'); if(el){ el.focus(); if(el.select) el.select(); } } },0); });
