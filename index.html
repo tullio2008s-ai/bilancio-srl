@@ -1692,7 +1692,10 @@ async function importaPacchetto(o){
   (sp.operazioni||[]).forEach(function(op){ var et=op.nota||(op.op+' '+(op.lista||op.percorso));
     if(op.op==='imposta'){ var cur=prendi(op.percorso); if(JSON.stringify(cur)===JSON.stringify(op.valore)){ righe.push('✓ '+et+': già a posto'); return; } opsOk.push(op); righe.push('⚙ '+et); return; }
     var L=prendi(op.lista); if(!Array.isArray(L)){ righe.push('✗ '+et+': elenco non trovato'); return; }
-    if(op.op==='aggiungi'){ if(L.some(function(x){ return typeof op.voce!=='object'?ugualeV(x,op.voce):Object.keys(op.voce).every(function(k){ return ugualeV(x[k],op.voce[k]); }); })){ righe.push('✓ '+et+': già presente'); return; } opsOk.push(op); righe.push('⚙ '+et); return; }
+    if(op.op==='aggiungi'){ var chiavi=typeof op.voce==='object'?(op.chiave||Object.keys(op.voce)):null, es=L.filter(function(x){ return chiavi?chiavi.every(function(k){ return ugualeV(x[k],op.voce[k]); }):ugualeV(x,op.voce); });
+      if(es.length){ var uguale2=!chiavi||Object.keys(op.voce).every(function(k){ return ugualeV(es[0][k],op.voce[k]); });
+        if(uguale2||!op.aggiorna){ righe.push('✓ '+et+': già presente'); return; } op.op='modifica'; op._h=es[0]; op.campi=op.voce; opsOk.push(op); righe.push('⚙ '+et+' (aggiornato)'); return; }
+      opsOk.push(op); righe.push('⚙ '+et); return; }
     if(op.op==='modifica'){ var h=L.filter(function(x){ return Object.keys(op.dove||{}).every(function(k){ return ugualeV(x[k],op.dove[k]); }); });
       if(h.length!==1){ var gia=L.filter(function(x){ return Object.keys(op.campi||{}).every(function(k){ return ugualeV(x[k],op.campi[k]); }) && Object.keys(op.dove||{}).every(function(k){ return op.campi[k]!==undefined||ugualeV(x[k],op.dove[k]); }); });
         righe.push(gia.length===1?'✓ '+et+': già a posto':'✗ '+et+': '+(h.length?h.length+' righe trovate':'riga non trovata')+' – non modificata'); return; }
