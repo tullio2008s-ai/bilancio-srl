@@ -2227,6 +2227,11 @@ function agTitolo(s){ return String(s).toLowerCase().replace(/(^|\s)\S/g,functio
 function agTab(wb,chiave){ var t=null; wb.SheetNames.some(function(n){ var rows=XLSX.utils.sheet_to_json(wb.Sheets[n],{header:1,raw:true,defval:''});
   for(var i=0;i<Math.min(rows.length,30);i++){ if(rows[i].some(function(c){ return String(c).trim()===chiave; })){ var h={}; rows[i].forEach(function(c,j){ h[String(c).trim()]=j; }); t={nome:n,h:h,r:rows.slice(i+1)}; return true; } } return false; }); return t; }
 function agCol(t,r,n){ return t.h[n]===undefined?'':r[t.h[n]]; }
+/* Riclassifica: se in Sibill hai cambiato la categoria di una spesa già registrata, propone lo stesso cambio nella consolle (solo tra le categorie di costo "normali") */
+var AG_RICL={}; Object.keys(AG_CAT).forEach(function(k){ AG_RICL[AG_CAT[k]]=1; });
+function agRiclassifica(v,catS,fonte,fino){ if(!v||v.eliminata||agTipo(v)!=='costo'||/riclassificata/.test(String(v.note||''))) return null;   /* già riclassificata: vale l'ultima scelta confermata */ var nc=AG_CAT[catS]; if(!nc||nc===v.categoria||!AG_RICL[v.categoria]) return null;
+  var nv=Object.assign({},v,{categoria:nc,note:(String(v.note||'').replace(/\s*· riclassificata.*$/,'')+' · riclassificata da '+catNome(v.categoria)+' a '+catNome(nc)+' come in Sibill ('+fonte+', '+agFmt(agOggi())+')').trim()});
+  return {sel:!fino||String(v.data).slice(0,10)>fino,esito:'riclassifica',ex:v,v:nv,nota:catNome(v.categoria)+' → '+catNome(nc)+' (in Sibill: '+catS.toLowerCase()+')'}; }
 
 /* ── 1. Saldo banche ── */
 var AG_CONTI=['Banca Sella','Intesa Sanpaolo','Conto Sibill','PayPal','Stripe'];
@@ -2259,8 +2264,13 @@ function agFatture(t){ var I=agIndice(), usate={}, da=new Date(Date.now()-75*864
   docs.sort(function(a,b){ return a.d<b.d?-1:a.d>b.d?1:0; });
   // 1° passaggio: abbinamento per numero (riferimento o numero scritto nella descrizione), anche con voci eliminate (se l'hai cancellata non torna)
   docs.forEach(function(x){ x.em=/^EMESS/i.test(String(agCol(t,x.r,'Emesso/Ricevuto'))); x.tipo=x.em?'ricavo':'costo'; var k=agNorm(x.num);
-    var h=(I.ref[k]||[]).concat(I.tok[k]||[]).filter(function(v){ return agTipo(v)===x.tipo; }); if(h.length){ x.gia=h[0]; h.forEach(segna); } });
-  docs.forEach(function(x){ if(x.gia){ gia++; return; }
+    var h=(I.ref[k]||[]).concat(I.tok[k]||[]).filter(function(v){ return agTipo(v)===x.tipo; });
+    if(h.length&&k.length<6){ /* numeri corti (es. "4"): stesso numero di fornitori diversi, serve anche lo stesso importo o la stessa controparte */
+      var i0=agNum(agCol(t,x.r,'Imponibile')), imp=Math.abs(i0), w=(String(agCol(t,x.r,'Nome controparte')).toUpperCase().match(/[A-Z]{3,}/)||[''])[0];
+      h=h.filter(function(v){ return Math.abs(Math.abs(+v.imponibile||0)-imp)<0.01||(w&&String(v.descrizione||'').toUpperCase().indexOf(w)>=0); }); }
+    if(h.length){ x.gia=h[0]; h.forEach(segna); } });
+  var ricl=[], vist={};
+  docs.forEach(function(x){ if(x.gia){ gia++; if(!x.em&&!vist[x.gia.id]&&!/PAYSOLUTION/i.test(String(agCol(t,x.r,'Nome controparte')))){ var rc=agRiclassifica(x.gia,String(agCol(t,x.r,'Categoria')).trim().toUpperCase(),'documenti',agStato().pnRegistrataFino||'2026-10-31'); if(rc){ vist[x.gia.id]=1; ricl.push(rc); } } return; }
     var r=x.r, cp=String(agCol(t,r,'Nome controparte')).trim(), catS=String(agCol(t,r,'Categoria')).trim().toUpperCase(), auto=/AUTOFATT/i.test(x.td), nc=/NOTA DI CREDITO/i.test(x.td);
     var i0=agNum(agCol(t,r,'Imponibile')), v0=agNum(agCol(t,r,'IVA')), imp=Math.round((x.em?i0:-i0)*100)/100, iva=auto?0:Math.round((x.em?v0:-v0)*100)/100, causale=String(agCol(t,r,'Causale e annotazioni')||'').trim();
     var cat=x.em?(/PAYSOLUTION/i.test(cp)?'intercompany_ricavo':/ADLER/i.test(cp)?'servizi':(/RAJ15/i.test(x.num)||catS==='GETTONIERE AMAZON')?'vendite_amazon':'vendite'):(/PAYSOLUTION/i.test(cp)?'intercompany_costo':(AG_CAT[catS]||'altri'));
@@ -2283,16 +2293,17 @@ function agFatture(t){ var I=agIndice(), usate={}, da=new Date(Date.now()-75*864
       note:'fonte: Sibill documenti '+(x.em?'emessi':'ricevuti')+(auto?' (reverse charge, IVA neutra)':'')+', caricati il '+agFmt(agOggi())}}); });
   var ult=docs.length?docs[docs.length-1].d:'', mesi={}; righe.forEach(function(r){ if(r.sel) mesi[r.v.competenza]=1; });
   var prev=I.voci.filter(function(v){ return !v.eliminata&&!usate[v.id]&&mesi[String(v.competenza).slice(0,7)]&&/^PREVISIONE/i.test(String(v.descrizione||''))&&agTipo(v)==='costo'; });
+  righe=righe.concat(ricl);
   return {tipo:'fatture',righe:righe,gia:gia,vecchie:vecchie,tot:docs.length,fino:ult,prevAperte:prev}; }
 
 /* ── 3. Prima nota Sibill: commissioni bancarie e spese senza fattura, raggruppate per mese ── */
-function agPrimaNota(t){ var st=agStato(), fino=st.pnRegistrataFino||'2026-10-31', mov=[], scart={}, ignote=[], ult='', fatt=0, abb=0;
+function agPrimaNota(t){ var st=agStato(), fino=st.pnRegistrataFino||'2026-10-31', conFatt=[], mov=[], scart={}, ignote=[], ult='', fatt=0, abb=0;
   var vv=(S.voci||[]).filter(function(v){ return !v.eliminata&&agTipo(v)==='costo'; });
   t.r.forEach(function(r){ var d=agData(agCol(t,r,'Data Contabile')); if(!d) return; if(d>ult) ult=d; if(d<=fino) return;
     var cat=String(agCol(t,r,'Categoria')).trim().toUpperCase(), imp=Math.round((agNum(agCol(t,r,'Addebiti'))-agNum(agCol(t,r,'Accrediti')))*100)/100; if(!imp) return;
     var nf=String(agCol(t,r,'Numero fattura')).trim(), ric=String(agCol(t,r,'Tipo riconciliazione')).trim(), desc=String(agCol(t,r,'Descrizione')||agCol(t,r,'Controparte')).trim().slice(0,70), conto=String(agCol(t,r,'Nome conto')||agCol(t,r,'Istituto')).trim();
     var m={d:d,cat:cat,imp:imp,desc:desc,conto:conto};
-    if(nf||ric){ fatt++; return; }
+    if(nf||ric){ fatt++; if(nf&&AG_CAT[cat]&&!AG_PN_ESCL.test(cat)) conFatt.push({nf:nf,cat:cat}); return; }
     if(/COMMISSIONI/.test(cat)&&cat!=='COMMISSIONI A RIVENDITORE'&&cat!=='COMMISSIONI SIBILL'){ m.g='comm'; mov.push(m); return; }
     if(!cat){ ignote.push(m); return; }
     if(AG_PN_ESCL.test(cat)||!AG_CAT[cat]){ if(!AG_CAT[cat]&&!AG_PN_ESCL.test(cat)) ignote.push(m); else scart[cat]=(scart[cat]||0)+1; return; }
@@ -2306,6 +2317,7 @@ function agPrimaNota(t){ var st=agStato(), fino=st.pnRegistrataFino||'2026-10-31
     return {sel:esito!=='uguale',esito:esito,ex:ex||null,mov:g.mov,v:{categoria:g.c,data:g.g==='comm'?g.m+'-28':agFine(g.m),competenza:g.m,
       descrizione:g.g==='comm'?agTitolo(g.cat)+' '+g.m+' (prima nota, raggruppato)':'Spese senza e-fattura '+g.m+' ('+g.c+')',imponibile:imp,iva:0,detraibile:false,riferimento:k,
       note:'fonte: prima nota Sibill ('+g.mov.length+' movimenti), caricata il '+agFmt(agOggi())+(g.g==='spa'?'; si ricalcola a ogni caricamento: se arriva la fattura il movimento esce da qui':'')}}; });
+  var I=agIndice(), vist={}; conFatt.forEach(function(c){ var k=agNorm(c.nf), v=((I.ref[k]||[]).concat(I.tok[k]||[])).filter(function(x){ return !x.eliminata&&agTipo(x)==='costo'; })[0]; if(!v||vist[v.id]) return; var rc=agRiclassifica(v,c.cat,'prima nota'); if(rc){ vist[v.id]=1; righe.push(rc); } });
   return {tipo:'pn',righe:righe,fino:ult,da:fino,fatt:fatt,abb:abb,scart:scart,ignote:ignote}; }
 
 /* ── 4. Paghe: prospetto contabile (A01 competenze, A08/A09 trattenute, D totale contributi ditta) e cedolini (LUL) ── */
@@ -2359,7 +2371,7 @@ async function agLeggi(files){ AG.msg=''; AG.ko=false; var p=AG.p; try{
 
 /* ── conferma: scrive le voci e le impostazioni ── */
 async function agApplica(){ var P=AG.prev; if(!P) return; var sel=P.righe.filter(function(r){ return r.sel; }), nuove=[], mod=[];
-  sel.forEach(function(r){ if(r.esito==='sostituisce'||r.esito==='aggiorna'){ mod.push(r); } else if(r.esito!=='uguale') nuove.push(r.v); });
+  sel.forEach(function(r){ if(r.esito==='sostituisce'||r.esito==='aggiorna'||r.esito==='riclassifica'){ mod.push(r); } else if(r.esito!=='uguale') nuove.push(r.v); });
   var sm=simS(), st=agStato(), extra=[];
   if(P.tipo==='paghe'&&P.azzera.length) extra.push('Previsione: tolgo le stime già sostituite dai dati reali ('+P.azzera.map(function(a){ return a.k+' '+agEtm(a.M)+' '+eur(a.v); }).join('; ')+')');
   var ps=P.tipo==='fatture'?sel.filter(function(r){ return /^intercompany/.test(r.v.categoria); }).map(function(r){ return r.v.riferimento; }).filter(function(k){ return (sm.cassa.esclusi||[]).indexOf(k)<0; }):[];
@@ -2407,7 +2419,7 @@ function agCard(){ var st=agStato(), oggi=agOggi();
   return '<div class="card norep"><b>Aggiorna i dati</b><div class="note" style="margin-top:2px">Cosa devi dare alla consolle e quando. Scegli cosa caricare:</div>'+bott
     +(AG.msg?'<div class="'+(AG.ko?'wa':'okbox')+'" style="margin-top:6px">'+esc(AG.msg)+'</div>':'')
     +(pan?'<div class="agpan">'+pan+'</div>':'')+'<details style="margin-top:6px"'+(!AG.p&&anyOld?' open':'')+'><summary class="note" style="cursor:pointer">Cosa caricare e quando</summary>'+tab+'</details></div>'; }
-function agEsito(r){ var m={nuova:['ppos','nuova'],sostituisce:['ppos','sostituisce la previsione'],aggiorna:['ppos','aggiorna'],uguale:['','già uguale'],doppione:['pneg','forse già presente'],capex:['pneg','bene strumentale?'],diverso:['pneg','da controllare']}[r.esito]||['',r.esito];
+function agEsito(r){ var m={riclassifica:['ppos','riclassifica'],nuova:['ppos','nuova'],sostituisce:['ppos','sostituisce la previsione'],aggiorna:['ppos','aggiorna'],uguale:['','già uguale'],doppione:['pneg','forse già presente'],capex:['pneg','bene strumentale?'],diverso:['pneg','da controllare']}[r.esito]||['',r.esito];
   return '<span class="pill '+m[0]+'">'+m[1]+'</span>'+(r.ex&&r.esito!=='uguale'&&r.esito!=='aggiorna'?'<div class="note">'+esc(String(r.ex.descrizione||'').slice(0,70))+' · '+eur(+r.ex.imponibile||0)+'</div>':'')+(r.esito==='aggiorna'&&r.ex?'<div class="note">ora '+eur(+r.ex.imponibile||0)+'</div>':'')+(r.nota?'<div class="note">'+esc(r.nota)+'</div>':''); }
 function agAnteprima(P){ var catOpt=function(i,c){ return '<select data-ag="r|'+i+'|categoria">'+E.CATEGORIE.filter(function(x){ return x.tipo==='ricavo'||x.tipo==='costo'; }).map(function(x){ return '<option value="'+x.id+'"'+(x.id===c?' selected':'')+'>'+esc(x.nome)+'</option>'; }).join('')+'</select>'; };
   var nSel=P.righe.filter(function(r){ return r.sel&&r.esito!=='uguale'; }).length, h='<div style="margin-top:8px"><b>Anteprima</b> <span class="note">('+esc(P.file||'')+')</span></div>';
