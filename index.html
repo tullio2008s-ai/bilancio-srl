@@ -80,7 +80,7 @@ table.fit{min-width:0!important;width:100%!important;font-size:9.4px}table.fit.w
 .pbk{break-before:page;page-break-before:always}}
 .note{font-size:12px;color:var(--mu)}.hid{display:none}
 </style></head><body>
-<header><h1>Bilancio SRL <small>Tullio Serci S.r.l. · gestionale riservato</small></h1><small id="versione" title="Versione della consolle: se non vedi la data dell'ultimo aggiornamento, ricarica" style="opacity:.85;margin-right:10px">versione 14/11/2026 22:00</small><small id="utente"></small><button class="l" id="exit" data-a="logout" style="color:#fff;border-color:#fff8">Esci</button></header>
+<header><h1>Bilancio SRL <small>Tullio Serci S.r.l. · gestionale riservato</small></h1><small id="versione" title="Versione della consolle: se non vedi la data dell'ultimo aggiornamento, ricarica" style="opacity:.85;margin-right:10px">versione 14/11/2026 22:20</small><small id="utente"></small><button class="l" id="exit" data-a="logout" style="color:#fff;border-color:#fff8">Esci</button></header>
 <div id="demo" class="demo hid">MODALITÀ DEMO: dati sintetici salvati solo in questo browser. Nessun dato reale.</div>
 <nav id="nav"></nav>
 <main id="main"></main>
@@ -2482,6 +2482,24 @@ document.addEventListener('input',function(e){ var k=e.target&&e.target.dataset&
   if(q[0]==='r'&&AG.prev){ var r=AG.prev.righe[+q[1]]; if(!r) return; if(q[2]==='sel') r.sel=e.target.checked; else r.v[q[2]]=e.target.value; } });
 document.addEventListener('change',function(e){ var k=e.target&&e.target.dataset&&e.target.dataset.ag; if(!k) return; var q=k.split('|'); if(q[0]==='r'&&AG.prev){ var r=AG.prev.righe[+q[1]]; if(!r) return; if(q[2]==='sel') r.sel=e.target.checked; else r.v[q[2]]=e.target.value; var b=document.querySelector('[data-a="agok"]'); if(b) b.textContent='Conferma e aggiorna la consolle ('+AG.prev.righe.filter(function(x){ return x.sel&&x.esito!=='uguale'; }).length+')'; } });
 
+/* ── Guida fissa nella pagina Oggi: dove si scrivono gli input e cosa cambiano ── */
+function agComeSiLavora(){ var ok='<td style="text-align:center;color:var(--ok);font-weight:700">✔</td>', no='<td style="text-align:center;color:#999">✘</td>', t=function(x){ return '<td style="text-align:center;white-space:normal">'+x+'</td>'; };
+  var R=[['<b>Oggi → Aggiorna i dati</b>','Saldo banche, fatture Sibill, prima nota, paghe',ok,ok,ok],
+    ['<b>Voci manuali</b>','Le singole voci: correggere, eliminare, aggiungere un costo o un ricavo, le voci "PREVISIONE"',t('✔ se la data è da oggi in poi'),ok,ok],
+    ['<b>Previsione nov-dic</b>','Quanto deve ancora arrivare nel mese per categoria (pubblicità, abbonamenti, Matteo, vendite…)',ok,t('✔ con "con previsione"'),no],
+    ['<b>Cassa</b>','Movimenti a mano: incassi Paysolution (30% MOL, rate materiali), compensi netti, quota Rosanna; date di incasso Adler',ok,no,no],
+    ['<b>Strategia</b>','Dal 2027: incassi e spese mese per mese, rate IVA, compensi, dividendi',t('✔ da gennaio 2027'),no,no],
+    ['<b>Prelievo utili</b>','Dividendi e data di pagamento',ok,no,no]];
+  return '<div class="card"><details><summary style="cursor:pointer"><b>Come si lavora nella consolle: dove scrivo i dati e cosa cambiano</b></summary>'
+   +'<div class="note" style="margin-top:6px">Oggi, Riepilogo e P&amp;L sono pagine di <b>risultato</b>: non si scrive lì, si scrive nelle pagine qui sotto.</div>'
+   +'<table style="table-layout:fixed;width:100%;max-width:1100px;margin-top:6px"><colgroup><col style="width:19%"><col style="width:45%"><col style="width:12%"><col style="width:12%"><col style="width:12%"></colgroup><thead><tr><th style="text-align:left">Dove scrivi</th><th style="text-align:left">Cosa ci metti</th><th style="text-align:center">Oggi</th><th style="text-align:center">P&amp;L</th><th style="text-align:center">Riepilogo</th></tr></thead><tbody>'
+   +R.map(function(r){ return '<tr><td style="text-align:left">'+r[0]+'</td><td style="text-align:left;white-space:normal">'+r[1]+'</td>'+r[2]+r[3]+r[4]+'</tr>'; }).join('')+'</tbody></table>'
+   +'<div style="margin-top:8px;font-size:13px;line-height:1.5"><b>Le tre pagine che guardi</b><ul style="margin:2px 0 0 18px;padding:0">'
+   +'<li><b>Oggi</b> è <b>cassa</b>: soldi che entrano ed escono, IVA compresa, alla data del pagamento.</li>'
+   +'<li><b>P&amp;L mensile</b> è <b>competenza</b>: ricavi e costi del mese, IVA esclusa; voci registrate più le stime di nov-dic se è attivo "con previsione" (le celle evidenziate di nov-dic si possono scrivere anche lì: è come scriverle in Previsione nov-dic).</li>'
+   +'<li><b>Riepilogo</b> mostra <b>solo il registrato</b>, senza stime: lo cambiano le voci e la casella "Includi voci provvisorie". Per questo una stima compare in Oggi e nel P&amp;L ma non nel Riepilogo.</li></ul>'
+   +'<b>Due trappole</b><ul style="margin:2px 0 0 18px;padding:0"><li>La pagina <b>Cash flow</b> non alimenta niente: è un foglio a parte. Le stime di incasso che contano vanno in <b>Cassa</b>, tra i movimenti a mano.</li><li>La pagina <b>Budget</b> (esercizio 2027) non cambia Oggi.</li></ul>'
+   +'<b>Regola pratica</b><ul style="margin:2px 0 0 18px;padding:0"><li>Pagamento o incasso <b>già avvenuto o certo</b> → <b>Voci manuali</b> o <b>Aggiorna i dati</b>.</li><li><b>Incasso futuro stimato</b> (Paysolution, clienti) → <b>Cassa</b>.</li><li><b>Spesa futura stimata</b> del mese → <b>Previsione nov-dic</b>; dal 2027 → <b>Strategia</b>.</li></ul></div></details></div>'; }
 /* ── Pagina OGGI: la fotografia al giorno di consultazione (stessi calcoli di Istruzioni e Strategia) ── */
 function vOggi(r){ vIstruzioni(); var I=IST, R=I.R, ctx=I.ctx, oggi=new Date().toISOString().slice(0,10), mOggi=oggi.slice(0,7), entro=new Date(Date.now()+30*864e5).toISOString().slice(0,10);
   var dataAz=function(mm,a){ return mm+'-'+String(a.g).padStart(2,'0'); }, fmtD=function(d){ return d.split('-').reverse().join('/'); };
@@ -2536,7 +2554,7 @@ function vOggi(r){ vIstruzioni(); var I=IST, R=I.R, ctx=I.ctx, oggi=new Date().t
    +(f24?'<div class="card"><b>Prossimo F24: '+fmtD(f24.d)+' – '+eur(f24.a.imp)+' €</b><div style="margin-top:4px">'+f24.a.cosa.replace(/<b>Paga l.F24<\/b>/,'')+'</div></div>':'')
    +'<div class="card tw"><b>Scadenze dei prossimi 30 giorni</b><table class="fit sc" style="min-width:600px;margin-top:6px"><thead><tr><th style="text-align:left">Data</th><th style="text-align:left">Cosa fare</th><th>Importo €</th><th style="text-align:left">Note</th></tr></thead><tbody>'+(prossime.map(riga).join('')||'<tr><td colspan="4">Nessuna scadenza</td></tr>')+'</tbody></table></div>'
    +'<div class="card tw"><b>Cassa nei prossimi mesi</b>'+tabMesi+(minM?'<div class="note" style="margin-top:4px">Minimo: '+eur(minM.fin)+' € a '+istMese(minM.m)+' (minimo consentito: '+eur(R.sogliaEff)+' €'+(R.cfg.usaFido?', cioè disponibile con il fido '+eur(+R.cfg.soglia)+' €':'')+').</div>':'')+'</div>'
-   +'<div class="card"><b>Cosa guardare e quando</b>'+guida+'</div>'; }
+   +'<div class="card"><b>Cosa guardare e quando</b>'+guida+'</div>'+agComeSiLavora(); }
 document.addEventListener('input',simAgg); document.addEventListener('change',simAgg);
 document.addEventListener('change',function(e){ var k=e.target.dataset&&e.target.dataset.pl; if(!k) return; var q=k.split('|'); plSet(q[0],q[1],e.target.value); plSalva(); clearTimeout(plRT); plRT=setTimeout(plRender,350); });
 document.addEventListener('change',function(e){ var k=e.target.dataset&&e.target.dataset.bud; if(!k) return; budSet(k,e.target.value); budSalva(); setTimeout(function(){ var a=document.activeElement, kk=a&&a.dataset&&a.dataset.bud; render(); if(kk){ var el=document.querySelector('[data-bud="'+kk+'"]'); if(el){ el.focus(); if(el.select) el.select(); } } },0); });
