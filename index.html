@@ -1496,10 +1496,25 @@ async function importaPacchetto(o){
   var tutte=Array.isArray(o.voci)?o.voci:[], nuove=tutte.filter(function(v){ return !(v.riferimento&&esist[String(v.riferimento)]); }), gia=tutte.length-nuove.length, mods=[], righe=[], dett=function(v){ return eur(+v.imponibile||0)+' € ('+(v.competenza||'')+')'; };
   (o.modifiche||[]).forEach(function(m){ var hit=(S.voci||[]).filter(function(x){ return !x.eliminata&&String(x.riferimento||'')===String(m.riferimento); });
     if(hit.length!==1){ righe.push('✗ '+m.riferimento+': '+(hit.length?hit.length+' voci trovate':'non trovata')+' – non modificata'); return; }
-    mods.push({v:hit[0],c:m.campi||{}}); righe.push('✎ '+m.riferimento+': '+eur(+hit[0].imponibile||0)+' → '+(m.campi&&m.campi.imponibile!==undefined?eur(+m.campi.imponibile):'invariato')+' €'); });
+    var c0=m.campi||{}, uguale=Object.keys(c0).every(function(k){ return typeof c0[k]==='number'?Math.abs(nn(hit[0][k])-c0[k])<0.005:String(hit[0][k]==null?'':hit[0][k])===String(c0[k]); });
+    if(uguale){ righe.push('✓ '+m.riferimento+': già a posto'); return; }
+    mods.push({v:hit[0],c:c0}); righe.push('✎ '+m.riferimento+': '+eur(+hit[0].imponibile||0)+' → '+(m.campi&&m.campi.imponibile!==undefined?eur(+m.campi.imponibile):'invariato')+' €'); });
   var sp=o.sim||{}, sm=simS(), togli=(sp.rimuoviPrelievi||[]).filter(function(r){ return (sm.prelievi||[]).some(function(p){ return p.data===r.data&&Math.abs(nn(p.lordo)-nn(r.lordo))<0.01; }); });
   if(sp.laserAttiva!==undefined&&!!sp.laserAttiva!==!!sm.laser.attiva) righe.push('⚙ Previsione: cessione macchina laser '+(sp.laserAttiva?'inclusa':'esclusa'));
   togli.forEach(function(r){ righe.push('⚙ Prelievo utili del '+r.data+' ('+eur(nn(r.lordo))+' € lordi) eliminato'); });
+  var prendi=function(path){ var x=sm; String(path).split('.').forEach(function(k){ x=x==null?x:x[k]; }); return x; };
+  var ugualeV=function(a,b){ return typeof b==='number'?Math.abs(nn(a)-b)<0.005:String(a==null?'':a).toUpperCase()===String(b).toUpperCase(); };
+  var opsOk=[];
+  (sp.operazioni||[]).forEach(function(op){ var et=op.nota||(op.op+' '+(op.lista||op.percorso));
+    if(op.op==='imposta'){ var cur=prendi(op.percorso); if(JSON.stringify(cur)===JSON.stringify(op.valore)){ righe.push('✓ '+et+': già a posto'); return; } opsOk.push(op); righe.push('⚙ '+et); return; }
+    var L=prendi(op.lista); if(!Array.isArray(L)){ righe.push('✗ '+et+': elenco non trovato'); return; }
+    if(op.op==='aggiungi'){ if(L.some(function(x){ return typeof op.voce!=='object'?ugualeV(x,op.voce):Object.keys(op.voce).every(function(k){ return ugualeV(x[k],op.voce[k]); }); })){ righe.push('✓ '+et+': già presente'); return; } opsOk.push(op); righe.push('⚙ '+et); return; }
+    if(op.op==='modifica'){ var h=L.filter(function(x){ return Object.keys(op.dove||{}).every(function(k){ return ugualeV(x[k],op.dove[k]); }); });
+      if(h.length!==1){ var gia=L.filter(function(x){ return Object.keys(op.campi||{}).every(function(k){ return ugualeV(x[k],op.campi[k]); }) && Object.keys(op.dove||{}).every(function(k){ return op.campi[k]!==undefined||ugualeV(x[k],op.dove[k]); }); });
+        righe.push(gia.length===1?'✓ '+et+': già a posto':'✗ '+et+': '+(h.length?h.length+' righe trovate':'riga non trovata')+' – non modificata'); return; }
+      if(Object.keys(op.campi||{}).every(function(k){ return ugualeV(h[0][k],op.campi[k]); })){ righe.push('✓ '+et+': già a posto'); return; }
+      op._h=h[0]; opsOk.push(op); righe.push('⚙ '+et); return; }
+    righe.push('✗ '+et+': operazione sconosciuta'); });
   var txt=(o.titolo?o.titolo+'\n\n':'')+'Voci da aggiungere: '+nuove.length+(gia?' ('+gia+' già presenti, saltate)':'')+'\n'+nuove.map(function(v){ return '+ '+String(v.descrizione||'').slice(0,70)+' – '+dett(v); }).join('\n')+(righe.length?'\n\n'+righe.join('\n'):'')+'\n\nConfermi?';
   if(!confirm(txt)) { msg('Aggiornamento annullato: nessuna modifica'); return; }
   var out=[];
@@ -1508,6 +1523,7 @@ async function importaPacchetto(o){
     Object.keys(c).forEach(function(k){ nv[k]=c[k]; }); await call('apiSalvaVoce',voceVersoServer(nv)); }
   if(mods.length) out.push(mods.length+' voci modificate');
   var simCambia=false; if(sp.laserAttiva!==undefined&&!!sp.laserAttiva!==!!sm.laser.attiva){ sm.laser.attiva=!!sp.laserAttiva; simCambia=true; }
+  opsOk.forEach(function(op){ if(op.op==='imposta'){ simPath(op.percorso,JSON.parse(JSON.stringify(op.valore))); } else if(op.op==='aggiungi'){ prendi(op.lista).push(JSON.parse(JSON.stringify(op.voce))); } else if(op.op==='modifica'){ Object.keys(op.campi||{}).forEach(function(k){ op._h[k]=op.campi[k]; }); } simCambia=true; });
   if(togli.length){ sm.prelievi=sm.prelievi.filter(function(p){ return !togli.some(function(r){ return p.data===r.data&&Math.abs(nn(p.lordo)-nn(r.lordo))<0.01; }); }); simCambia=true; }
   if(simCambia){ S.config=await call('apiSalvaConfig',{sim:JSON.stringify(sm)}); out.push('impostazioni salvate'); }
   await ricarica(); render(); msg('Aggiornamento applicato: '+(out.join('; ')||'nessuna modifica necessaria'));
