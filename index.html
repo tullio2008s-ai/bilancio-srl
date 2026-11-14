@@ -79,7 +79,7 @@ table.fit{min-width:0!important;width:100%!important;font-size:9.4px}table.fit.w
 .pbk{break-before:page;page-break-before:always}}
 .note{font-size:12px;color:var(--mu)}.hid{display:none}
 </style></head><body>
-<header><h1>Bilancio SRL <small>Tullio Serci S.r.l. · gestionale riservato</small></h1><small id="versione" title="Versione della consolle: se non vedi la data dell'ultimo aggiornamento, ricarica" style="opacity:.85;margin-right:10px">versione 14/11/2026 20:30</small><small id="utente"></small><button class="l" id="exit" data-a="logout" style="color:#fff;border-color:#fff8">Esci</button></header>
+<header><h1>Bilancio SRL <small>Tullio Serci S.r.l. · gestionale riservato</small></h1><small id="versione" title="Versione della consolle: se non vedi la data dell'ultimo aggiornamento, ricarica" style="opacity:.85;margin-right:10px">versione 14/11/2026 21:00</small><small id="utente"></small><button class="l" id="exit" data-a="logout" style="color:#fff;border-color:#fff8">Esci</button></header>
 <div id="demo" class="demo hid">MODALITÀ DEMO: dati sintetici salvati solo in questo browser. Nessun dato reale.</div>
 <nav id="nav"></nav>
 <main id="main"></main>
@@ -586,6 +586,7 @@ table.fit{min-width:0!important;width:100%!important;font-size:9.4px}table.fit.w
     (input.voci || []).forEach(function (v) {
       if (v.eliminata) return; var c = cats[v.categoria]; if (!c || (c.tipo !== 'ricavo' && c.tipo !== 'costo')) return;
       if (nonCash[v.categoria]) return;
+      if (/^(Rettifica |Allineamento )/i.test(String(v.descrizione || ''))) return;   /* rettifiche contabili (riconciliazioni, interessi per competenza): non sono pagamenti */
       var ref = String(v.riferimento || '') + ' ' + String(v.descrizione || '');
       if (C.esclusi.some(function (x) { return x && ref.indexOf(x) >= 0; })) return;
       var imp = num(v.imponibile), iva = num(v.iva), tot = c.tipo === 'ricavo' ? imp + iva : -((c.f24 || c.nonCosto) ? imp : imp + iva);
@@ -2041,12 +2042,12 @@ function vIstruzioni(){ var ctx=stCtx(), c=stCfg(), R=E.strategia(ctx,c), M=R.me
   while(mp<primo){ pre.push(mp); mp=stMesePiu(mp); }
   pre.forEach(function(m){ var az=[], add=function(giorno,cosa,imp,nota){ az.push({g:giorno,cosa:cosa,imp:imp,nota:nota||''}); };
     var rr=(ctx.righeCassa||[]).filter(function(x){ return x.data.slice(0,7)===m&&x.data>=oggi; }), f24={};
-    var spese=0, altriInc=0, ultG=1;
+    var spese=0, altriInc=0, ultG=1, dSp=[];
     rr.forEach(function(x){ var g=+x.data.slice(8,10); ultG=Math.max(ultG,g); if(/^F24/i.test(x.desc)&&x.importo<0){ (f24[g]=f24[g]||[]).push(x); return; }
       var chiave=x.fonte==='Manuale'||/ADLER|PAYSOLUTION|ROYALTY/i.test(x.desc);
-      if(!chiave){ if(x.importo<0) spese-=x.importo; else altriInc+=x.importo; return; }
+      if(!chiave){ if(x.importo<0){ spese-=x.importo; dSp.push(x); } else altriInc+=x.importo; return; }
       add(g,(x.importo>0?'Controlla l\'incasso: ':'Paga: ')+esc(x.desc.replace(/^Previsione:\s*/i,'')),Math.abs(x.importo),x.importo>0?'entrata':(x.fonte==='Manuale'?'movimento inserito a mano':(/ROYALTY/i.test(x.desc)?'netto al percettore, ritenuta con F24 il 16 del mese dopo':''))); });
-    if(spese>0.5) add(ultG,'Spese correnti previste (fornitori, pubblicità, abbonamenti, commissioni)',spese,'stima della Previsione');
+    if(spese>0.5) add(ultG,'Spese correnti previste (fornitori, pubblicità, abbonamenti, commissioni)<ul style="margin:2px 0 0 16px;padding:0;font-size:12px">'+dSp.map(function(x){ return '<li>'+x.data.split('-').reverse().slice(0,2).join('/')+' '+esc(String(x.desc).replace(/^Previsione:\s*/i,'stima: ').replace(/^PREVISIONE - /,'stima: '))+': '+eur(-x.importo)+' €</li>'; }).join('')+'</ul>',spese,'stime della Previsione nov-dic e voci registrate (IVA compresa)');
     if(altriInc>0.5) add(ultG,'Altri incassi previsti (vendite Amazon, corrispettivi)',altriInc,'entrata');
     Object.keys(f24).forEach(function(g){ var L=f24[g], t=L.reduce(function(a,x){ return a-x.importo; },0); add(+g,'<b>Paga l\'F24</b><ul style="margin:2px 0 0 16px;padding:0">'+L.map(function(x){ return '<li>'+esc(x.desc)+': '+eur(-x.importo)+' €</li>'; }).join('')+'</ul>',t,''); });
     var mm=+m.slice(5,7), y=m.slice(0,4);
@@ -2366,6 +2367,19 @@ function agPaghe(cont,lul){ var righe=[], esist={}; (S.voci||[]).forEach(functio
   var nomi=(IST&&IST.ctx&&IST.ctx.nomi)||[];
   return {tipo:'paghe',righe:righe,cont:cont,lul:lul,azzera:az,nomi:nomi}; }
 
+/* ── La Previsione nov-dic è "quanto deve ancora arrivare" oltre al registrato: le voci caricate dai file la riducono (una sola volta per voce) ── */
+var AG_NETTA_NO={compensi:1,contributi:1,stipendi:1,royalties:1,f24:1};
+function agNettaCalc(){ var sm=simS(), st=agStato(), fatte=st.nettate; if(Array.isArray(fatte)){ var o={}; fatte.forEach(function(id){ o[id]=null; }); fatte=o; } fatte=fatte||{};
+  var righe=JSON.parse(JSON.stringify(sm.righe)), cambi={}, ids={};
+  (S.voci||[]).forEach(function(v){ if(v.eliminata||!/caricat[ai] il/.test(String(v.note||''))) return; var M=String(v.competenza).slice(0,7), i=(sm.mesi||[]).indexOf(M); if(i<0) return;
+    var imp=+v.imponibile||0, gia=v.id in fatte?(fatte[v.id]===null?imp:+fatte[v.id]||0):0, resto=Math.round((imp-gia)*100)/100; if(Math.abs(resto)<0.005) return; ids[v.id]=imp;   /* solo la parte non ancora tolta (le voci della prima nota crescono nel mese) */
+    var pn=/^(SPA|PN)-/.test(String(v.riferimento||'')), rr=E.SIM_RIGHE.filter(function(rg){ return rg.cat===v.categoria&&!AG_NETTA_NO[rg.id]&&!rg.soloCassa&&!(pn&&rg.id==='collab'); }); if(!rr.length||resto<=0) return;
+    rr.forEach(function(rg){ if(resto<=0) return; var cur=+righe[rg.id][i]||0; if(cur<=0) return; var tolto=Math.min(cur,resto); righe[rg.id][i]=Math.round((cur-tolto)*100)/100; resto-=tolto; var k=rg.id+'|'+i; if(!cambi[k]) cambi[k]={rg:rg,i:i,M:M,da:cur}; cambi[k].a=righe[rg.id][i]; }); });
+  return {righe:righe,cambi:Object.keys(cambi).map(function(k){ return cambi[k]; }),ids:ids,fatte:fatte}; }
+async function agNettaApplica(chiedi){ var N=agNettaCalc(); if(!Object.keys(N.ids).length) return 0; var sm=simS(), st=agStato();
+  if(N.cambi.length&&chiedi&&!confirm('Previsione: tolgo dalle stime del mese le voci vere già caricate, altrimenti contano due volte:\n'+N.cambi.map(function(c){ return '• '+c.rg.nome+' '+agEtm(c.M)+': '+eur(c.da)+' → '+eur(c.a); }).join('\n')+'\n\nConfermi?')) return -1;
+  sm.righe=N.righe; Object.keys(N.ids).forEach(function(id){ N.fatte[id]=N.ids[id]; }); st.nettate=N.fatte; S.config=await call('apiSalvaConfig',{sim:JSON.stringify(sm)}); return N.cambi.length; }
+
 /* ── lettura del file scelto ── */
 async function agLeggi(files){ AG.msg=''; AG.ko=false; var p=AG.p; try{
   if(!files||!files.length) return;
@@ -2396,7 +2410,8 @@ async function agApplica(){ var P=AG.prev; if(!P) return; var sel=P.righe.filter
   if(P.tipo==='fatture'){ ps.forEach(function(k){ sm.cassa.esclusi.push(k); }); st.fatture={il:agOggi(),fino:P.fino}; }
   if(P.tipo==='pn'){ st.pn={il:agOggi(),fino:P.fino}; }
   S.config=await call('apiSalvaConfig',{sim:JSON.stringify(sm)});
-  AG.prev=null; AG.p=''; AG.msg='Aggiornamento fatto: '+nuove.length+' voci aggiunte, '+mod.length+' aggiornate'+(P.tipo==='paghe'&&P.lul.length?', '+P.lul.length+' cedolini salvati':'')+'. I numeri di tutte le pagine sono ricalcolati.'; AG.ko=false; await ricarica(); }
+  await ricarica(); var nc=await agNettaApplica(true);
+  AG.prev=null; AG.p=''; AG.msg='Aggiornamento fatto: '+nuove.length+' voci aggiunte, '+mod.length+' aggiornate'+(nc>0?', previsione del mese ridotta su '+nc+' righe':'')+(P.tipo==='paghe'&&P.lul.length?', '+P.lul.length+' cedolini salvati':'')+'. I numeri di tutte le pagine sono ricalcolati.'; AG.ko=false; await ricarica(); }
 
 /* ── pannello nella pagina Oggi ── */
 var AG_FONTI=[
@@ -2452,6 +2467,7 @@ async function agAzione(a,id){ try{
   else if(a==='agannulla'){ AG.prev=null; AG.msg=''; render(); }
   else if(a==='agok'){ await agApplica(); }
   else if(a==='agsaldo'){ await agSaldoSalva(); }
+  else if(a==='agnetta'){ var n=await agNettaApplica(true); if(n>=0){ AG.msg='Previsione allineata alle voci caricate ('+n+' righe ridotte).'; AG.ko=false; render(); } }
   else if(a==='agconto'){ AG.conti.push({nome:'Nuovo conto',saldo:''}); render(); agSaldoTot(); }
   }catch(e){ AG.msg=e.message||String(e); AG.ko=true; render(); } }
 document.addEventListener('change',function(e){ if(e.target&&e.target.id==='agfile') agLeggi(e.target.files); });
@@ -2490,6 +2506,7 @@ function vOggi(r){ vIstruzioni(); var I=IST, R=I.R, ctx=I.ctx, oggi=new Date().t
   var adl=tutte.filter(function(t){ return t.d>=oggi&&t.d<=entro&&/fattura Adler/.test(t.a.cosa)&&!t.a.imp; })[0]; if(adl) al.push('Entro il '+fmtD(adl.d)+': '+adl.a.cosa.replace(/<[^>]+>/g,'')+'.');
   if(provvisorie().length&&simS().includiProvvisorie!==false) al.push('Nei conti sono incluse voci provvisorie ('+provvisorie().length+'): '+provvisorie().map(function(v){ return String(v.descrizione).slice(0,60); }).join('; ')+'.');
   agAllerte().forEach(function(x){ al.push(x); });
+  var NT=agNettaCalc(); if(NT.cambi.length) al.push('La Previsione conta ancora per intero spese che hai già caricato dai file: '+NT.cambi.map(function(c){ return c.rg.nome.toLowerCase()+' '+agEtm(c.M)+' '+eur(c.da)+' → '+eur(c.a); }).join('; ')+'. <button class="p" data-a="agnetta" style="padding:2px 10px;margin-left:6px">Allinea la previsione</button>');
   if(minM&&minM.fin<R.sogliaEff) al.push('Nei prossimi mesi la cassa scende sotto il minimo consentito: '+eur(minM.fin)+' € a '+istMese(minM.m)+'.');
   var kp=kpi('Cassa oggi senza fido (stima)',eur(cassaOggi),cassaOggi<0?'neg':'pos')+kpi('Disponibile con il fido',eur(cassaOggi+ctx.fido),cassaOggi+ctx.fido<(+R.cfg.soglia||0)?'neg':'pos')
     +(f24?'<div class="kpi card"><span>Prossimo F24 ('+fmtD(f24.d)+')</span><b>'+eur(f24.a.imp)+' €</b></div>':'')
