@@ -79,7 +79,7 @@ table.fit{min-width:0!important;width:100%!important;font-size:9.4px}table.fit.w
 .pbk{break-before:page;page-break-before:always}}
 .note{font-size:12px;color:var(--mu)}.hid{display:none}
 </style></head><body>
-<header><h1>Bilancio SRL <small>Tullio Serci S.r.l. · gestionale riservato</small></h1><small id="versione" title="Versione della consolle: se non vedi la data dell'ultimo aggiornamento, ricarica" style="opacity:.85;margin-right:10px">versione 14/11/2026 21:00</small><small id="utente"></small><button class="l" id="exit" data-a="logout" style="color:#fff;border-color:#fff8">Esci</button></header>
+<header><h1>Bilancio SRL <small>Tullio Serci S.r.l. · gestionale riservato</small></h1><small id="versione" title="Versione della consolle: se non vedi la data dell'ultimo aggiornamento, ricarica" style="opacity:.85;margin-right:10px">versione 14/11/2026 21:30</small><small id="utente"></small><button class="l" id="exit" data-a="logout" style="color:#fff;border-color:#fff8">Esci</button></header>
 <div id="demo" class="demo hid">MODALITÀ DEMO: dati sintetici salvati solo in questo browser. Nessun dato reale.</div>
 <nav id="nav"></nav>
 <main id="main"></main>
@@ -586,7 +586,9 @@ table.fit{min-width:0!important;width:100%!important;font-size:9.4px}table.fit.w
     (input.voci || []).forEach(function (v) {
       if (v.eliminata) return; var c = cats[v.categoria]; if (!c || (c.tipo !== 'ricavo' && c.tipo !== 'costo')) return;
       if (nonCash[v.categoria]) return;
-      if (/^(Rettifica |Allineamento )/i.test(String(v.descrizione || ''))) return;   /* rettifiche contabili (riconciliazioni, interessi per competenza): non sono pagamenti */
+      if (/^(Rettifica |Allineamento )/i.test(String(v.descrizione || ''))) return;
+      /* movimenti già avvenuti in banca (prima nota) e fatture che Sibill dà già pagate/incassate: sono già nel saldo, non sono movimenti futuri */
+      if (/^(SPA|PN)-/.test(String(v.riferimento || '')) || /fonte: prima nota/i.test(String(v.note || '')) || /già (pagata|incassata) in Sibill/i.test(String(v.note || ''))) return;   /* rettifiche contabili (riconciliazioni, interessi per competenza): non sono pagamenti */
       var ref = String(v.riferimento || '') + ' ' + String(v.descrizione || '');
       if (C.esclusi.some(function (x) { return x && ref.indexOf(x) >= 0; })) return;
       var imp = num(v.imponibile), iva = num(v.iva), tot = c.tipo === 'ricavo' ? imp + iva : -((c.f24 || c.nonCosto) ? imp : imp + iva);
@@ -2299,7 +2301,7 @@ function agFatture(t){ var I=agIndice(), usate={}, da=new Date(Date.now()-75*864
     if(sost&&esito==='nuova'){ esito='sostituisce'; segna(sost); }
     var desc=x.em?((nc?'Nota di credito ':'Fattura ')+x.num+' - '+cp+(cat==='servizi'?' (competenza '+comp+')':'')):(cp+' - '+(catS||x.td)+(causale&&catS===''?' '+causale.slice(0,40):''));
     righe.push({sel:sel,esito:esito,ex:sost,nota:nota,num:x.num,cp:cp,catS:catS,v:{categoria:cat,data:x.d,competenza:comp,descrizione:desc,imponibile:imp,iva:iva,detraibile:true,riferimento:x.num,
-      note:'fonte: Sibill documenti '+(x.em?'emessi':'ricevuti')+(auto?' (reverse charge, IVA neutra)':'')+', caricati il '+agFmt(agOggi())}}); });
+      note:'fonte: Sibill documenti '+(x.em?'emessi':'ricevuti')+(auto?' (reverse charge, IVA neutra)':'')+(/^(PAGATO|INCASSATO)$/i.test(String(agCol(t,r,'Stato fattura')).trim())?', già '+(x.em?'incassata':'pagata')+' in Sibill':'')+', caricati il '+agFmt(agOggi())}}); });
   var ult=docs.length?docs[docs.length-1].d:'', mesi={}; righe.forEach(function(r){ if(r.sel) mesi[r.v.competenza]=1; });
   var prev=I.voci.filter(function(v){ return !v.eliminata&&!usate[v.id]&&mesi[String(v.competenza).slice(0,7)]&&/^PREVISIONE/i.test(String(v.descrizione||''))&&agTipo(v)==='costo'; });
   righe=righe.concat(ricl);
@@ -2514,13 +2516,20 @@ function vOggi(r){ vIstruzioni(); var I=IST, R=I.R, ctx=I.ctx, oggi=new Date().t
     +(fineMese!==null?kpi('Cassa prevista a fine mese',eur(fineMese),fineMese<R.sogliaEff?'neg':'pos'):'');
   var riga=function(t){ var e=entrata(t.a); return '<tr><td style="text-align:left">'+fmtD(t.d)+'</td><td style="text-align:left;white-space:normal">'+(t===f24?'<b>Paga l\'F24</b> – righe nel riquadro "Prossimo F24" qui sopra':t.a.cosa)+'</td><td class="'+(t.a.imp?(e?'pos':''):'')+'">'+(t.a.imp?(e?'+':'−')+eur(t.a.imp):'')+'</td><td style="text-align:left" class="note">'+(e?'incasso atteso':esc(t.a.nota||''))+'</td></tr>'; };
   var tabMesi='<table class="fit cdt" style="min-width:600px"><thead><tr><th style="text-align:left">Mese</th><th>Cassa a inizio mese</th><th>Spese del mese</th><th>Cassa a fine mese</th></tr></thead><tbody>'+mesi.map(function(x){ return '<tr class="t"><td style="text-align:left;text-transform:capitalize">'+istMese(x.m)+'</td><td>'+(x.ini===null?'—':eur(x.ini))+'</td><td>'+eur(x.usc)+'</td><td class="'+(x.fin===null?'':(x.fin<R.sogliaEff?'neg':'pos'))+'">'+(x.fin===null?'—':eur(x.fin))+'</td></tr>'; }).join('')+'</tbody></table>';
+  /* da cosa sono fatti "ancora da incassare" e "ancora da pagare": i movimenti uno per uno, con la pagina dove si correggono */
+  var fonteTxt=function(x){ return x.fonte==='Manuale'?'scritto a mano: pagina Cassa, movimenti a mano':x.fonte==='Previsione'?'stima: pagina Previsione nov-dic':x.fonte==='Previsione (voce)'?'voce PREVISIONE: Voci manuali':x.fonte==='Prelievo utili'?'pagina Prelievo utili':'voce registrata: Voci manuali'; };
+  var rMese=(ctx.righeCassa||[]).filter(function(x){ return x.data.slice(0,7)===mOggi&&x.data>=oggi; }), dettMese='';
+  if(rMese.length){ var tabD=function(L){ return '<table class="fit cdt" style="min-width:600px;margin-top:4px"><thead><tr><th style="text-align:left;width:10%">Data</th><th style="text-align:left">Movimento</th><th style="width:13%">Importo €</th><th style="text-align:left;width:27%">Da dove viene (dove si corregge)</th></tr></thead><tbody>'+L.map(function(x){ return '<tr><td style="text-align:left">'+fmtD(x.data)+'</td><td style="text-align:left;white-space:normal">'+esc(x.desc)+'</td><td class="'+(x.importo>0?'pos':'')+'">'+eur(x.importo)+'</td><td style="text-align:left;white-space:normal" class="note">'+fonteTxt(x)+'</td></tr>'; }).join('')+'</tbody></table>'; };
+    var dU=rMese.filter(function(x){ return x.importo<0; }), dE=rMese.filter(function(x){ return x.importo>0; });
+    dettMese='<div class="card norep"><details><summary style="cursor:pointer"><b>Da cosa sono fatti "Ancora da incassare" e "Ancora da pagare" in '+MESI_LUNGHI[+mOggi.slice(5)-1]+'</b> <span class="note">(ogni movimento e dove si corregge: se uno è già avvenuto o non esiste, correggilo lì)</span></summary>'
+      +'<div style="margin-top:6px"><b>Da pagare</b> ('+eur(-dU.reduce(function(a,x){ return a+x.importo; },0))+' €)</div>'+tabD(dU)+'<div style="margin-top:8px"><b>Da incassare</b> ('+eur(dE.reduce(function(a,x){ return a+x.importo; },0))+' €)</div>'+tabD(dE)+'</details></div>'; }
   var guida='<ul style="margin:6px 0 0 18px;padding:0;line-height:1.5"><li><b>Ogni giorno</b> (2 minuti): questa pagina. Se hai incassato o pagato qualcosa di importante, aggiorna saldo e data nella pagina <b>Cassa</b>.</li>'
     +'<li><b>Ogni settimana</b>: <b>Istruzioni</b> (cosa pagare e incassare nel mese) e <b>Cassa</b> (movimenti giorno per giorno e minimo del mese).</li>'
     +'<li><b>A metà mese</b>, prima del 16: l\'F24 nelle <b>Istruzioni</b>, da confrontare con quello dello studio; fatture Adler entro il 15.</li>'
     +'<li><b>A fine mese</b>: importa le voci del mese ed esporta i dati; poi <b>P&amp;L mensile</b> (utile del mese), <b>Controlli</b> (devono tornare tutti) e <b>Strategia</b> (cassa, IVA, compensi).</li>'
     +'<li><b>Ogni trimestre</b> o quando cambia qualcosa: <b>Strategia</b> → "Proponi strategia", <b>Compenso o dividendo</b>, pagina <b>Marini</b> per il confronto con lo studio.</li></ul>';
   return '<div class="card"><b>Oggi, '+new Date().toLocaleDateString('it-IT',{weekday:'long',day:'numeric',month:'long',year:'numeric'})+'</b><div class="note" style="margin-top:4px">La fotografia di oggi: cassa, cosa pagare e incassare, scadenze e allerte. Gli stessi numeri di Istruzioni e Strategia. Saldo di partenza: '+eur(ctx.saldoCassa)+' € al '+fmtD(ctx.dataCassa)+'.</div></div>'
-   +agCard()+'<div class="kpis">'+kp+'</div>'
+   +agCard()+'<div class="kpis">'+kp+'</div>'+dettMese
    +(al.length?'<div class="card"><b>Allerte</b><div class="wa" style="margin-top:6px">'+al.map(function(x){ return '• '+x; }).join('<br>')+'</div></div>':'<div class="card"><b class="pos">Nessuna allerta</b></div>')
    +(f24?'<div class="card"><b>Prossimo F24: '+fmtD(f24.d)+' – '+eur(f24.a.imp)+' €</b><div style="margin-top:4px">'+f24.a.cosa.replace(/<b>Paga l.F24<\/b>/,'')+'</div></div>':'')
    +'<div class="card tw"><b>Scadenze dei prossimi 30 giorni</b><table class="fit sc" style="min-width:600px;margin-top:6px"><thead><tr><th style="text-align:left">Data</th><th style="text-align:left">Cosa fare</th><th>Importo €</th><th style="text-align:left">Note</th></tr></thead><tbody>'+(prossime.map(riga).join('')||'<tr><td colspan="4">Nessuna scadenza</td></tr>')+'</tbody></table></div>'
