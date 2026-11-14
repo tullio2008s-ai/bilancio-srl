@@ -80,7 +80,7 @@ table.fit{min-width:0!important;width:100%!important;font-size:9.4px}table.fit.w
 .pbk{break-before:page;page-break-before:always}}
 .note{font-size:12px;color:var(--mu)}.hid{display:none}
 </style></head><body>
-<header><h1>Bilancio SRL <small>Tullio Serci S.r.l. · gestionale riservato</small></h1><small id="versione" title="Versione della consolle: se non vedi la data dell'ultimo aggiornamento, ricarica" style="opacity:.85;margin-right:10px">versione 14/11/2026 22:20</small><small id="utente"></small><button class="l" id="exit" data-a="logout" style="color:#fff;border-color:#fff8">Esci</button></header>
+<header><h1>Bilancio SRL <small>Tullio Serci S.r.l. · gestionale riservato</small></h1><small id="versione" title="Versione della consolle: se non vedi la data dell'ultimo aggiornamento, ricarica" style="opacity:.85;margin-right:10px">versione 14/11/2026 23:00</small><small id="utente"></small><button class="l" id="exit" data-a="logout" style="color:#fff;border-color:#fff8">Esci</button></header>
 <div id="demo" class="demo hid">MODALITÀ DEMO: dati sintetici salvati solo in questo browser. Nessun dato reale.</div>
 <nav id="nav"></nav>
 <main id="main"></main>
@@ -1034,8 +1034,12 @@ try { TOKEN = sessionStorage.getItem('bsrl_t') || ''; } catch (e) {}
    e un'etichetta [[cat:...]] nelle note; la pagina le ricompone quando legge le voci. */
 var CAT_BASE={vendite_amazon:'vendite',corrispettivi:'vendite',interessi_attivi:'vendite',f24_iva2025:'f24_ritenute',f24_acconto_iva:'f24_ritenute',f24_saldo_iva:'f24_ritenute',f24_irpef_stipendi:'f24_ritenute',f24_irpef_compensi:'f24_ritenute',f24_inps:'f24_ritenute',f24_gs_inps:'f24_ritenute',f24_altre:'f24_ritenute'};
 var TOKCAT=/\s*\[\[cat:([a-z0-9_]+)\]\]/;
-function voceDaServer(v){ var m=TOKCAT.exec(String(v.note||'')); if(m&&CAT_BASE[m[1]]){ v=Object.assign({},v); v.categoria=m[1]; v.note=String(v.note||'').replace(TOKCAT,''); } return v; }
-function voceVersoServer(v){ var b=CAT_BASE[v.categoria]; if(!b) return v; v=Object.assign({},v); v.note=(String(v.note||'').replace(TOKCAT,'')+' [[cat:'+v.categoria+']]').trim(); v.categoria=b; return v; }
+/* [[src:...]] nelle note = fonte della voce (file Sibill, prima nota, paghe, pacchetto, manuale, modificata a mano) */
+var TOKSRC=/\s*\[\[src:([a-z0-9_-]+)\]\]/;
+function voceDaServer(v){ var m=TOKCAT.exec(String(v.note||'')); if(m&&CAT_BASE[m[1]]){ v=Object.assign({},v); v.categoria=m[1]; v.note=String(v.note||'').replace(TOKCAT,''); }
+  var q=TOKSRC.exec(String(v.note||'')); if(q){ v=Object.assign({},v); v.src=q[1]; v.note=String(v.note||'').replace(TOKSRC,''); } return v; }
+function voceVersoServer(v){ v=Object.assign({},v); var n=String(v.note||'').replace(TOKCAT,'').replace(TOKSRC,''); if(v.src) n=(n+' [[src:'+v.src+']]').trim(); v.note=n; delete v.src;
+  var b=CAT_BASE[v.categoria]; if(!b) return v; v.note=(v.note+' [[cat:'+v.categoria+']]').trim(); v.categoria=b; return v; }
 async function call(fn){
   var args = [].slice.call(arguments,1);
   if (DEMO) return demoApi(fn,args);
@@ -1213,11 +1217,48 @@ function formVoce(sp){ var oggi=new Date().toISOString(), e=S.edit||(sp?{categor
    +'<label>Descrizione</label><input id="f_descrizione" value="'+esc(e.descrizione)+'"><div class="g"><div><label>Riferimento / allegato</label><input id="f_riferimento" value="'+esc(e.riferimento)+'"></div><div><label>Note</label><input id="f_note" value="'+esc(e.note)+'"></div></div>'
    +'<button class="p" data-a="salva">Salva</button>'+(e.id?'<button class="l" data-a="annulla">Annulla modifica</button>':'')
    +'<button class="l" data-a="esporta">Esporta dati (file per riconciliazione)</button> '+'<button class="l" data-a="importa">Importa da file JSON</button><input type="file" id="imp" accept=".json" class="hid"><div id="msg" class="note"></div></div>'; }
-function elencoVoci(sp){ var rows=S.voci.filter(function(v){ var c=E.CATEGORIE.filter(function(x){return x.id===v.categoria;})[0]; return ((c&&c.tipo)==='sp')===!!sp; }).sort(function(a,b){return (b.competenza+b.data).localeCompare(a.competenza+a.data);}).map(function(v){
-   return '<tr style="'+(v.eliminata?'opacity:.45;text-decoration:line-through':'')+'"><td>'+esc(v.competenza)+'</td><td style="text-align:left">'+esc(catNome(v.categoria))+'</td><td style="text-align:left">'+esc(v.descrizione)+'</td><td>'+eur(v.imponibile)+'</td>'+(sp?'':'<td>'+eur(v.iva)+'</td><td>'+eur(+v.imponibile+(+v.iva||0))+'</td>')+'<td>'
-   +(v.eliminata?'<button class="l" data-a="rip" data-id="'+v.id+'">Ripristina</button>':'<button class="l" data-a="mod" data-id="'+v.id+'">Modifica</button> <button class="l" data-a="del" data-id="'+v.id+'">Elimina</button>')+'</td></tr>'; }).join('');
-  var cg=sp?'<colgroup><col style="width:75px"><col style="width:230px"><col style="width:520px"><col style="width:110px"><col style="width:180px"></colgroup>':'<colgroup><col style="width:75px"><col style="width:200px"><col style="width:520px"><col style="width:100px"><col style="width:80px"><col style="width:100px"><col style="width:180px"></colgroup>';
-  return '<div class="card tw"><table class="vv" style="table-layout:fixed;width:'+(sp?1115:1255)+'px">'+cg+'<tr><th>Mese</th><th style="text-align:left">Categoria</th><th style="text-align:left">Descrizione</th><th>'+(sp?'Saldo':'Imponibile')+'</th>'+(sp?'':'<th>IVA</th><th>Totale</th>')+'<th></th></tr>'+(rows||'<tr><td colspan="7">Nessuna voce</td></tr>')+'</table></div>'; }
+/* ── Fonte di ogni voce: dai segni [[src:]] (voci nuove) o, per le voci storiche, da riferimento/note/descrizione ── */
+var VF={fonte:'',testo:'',cat:'',da:'',a:'',elim:false,sbloccate:{}};
+var VF_FONTI={file:'Importate da file (autorevoli)',stima:'Stime e previsioni',rett:'Rettifiche calcolate',mano:'Scritte o modificate a mano',sp:'Saldi patrimoniali',ignota:'Origine non registrata'};
+function voceFonte(v){ var n=String(v.note||''), r=String(v.riferimento||''), d=String(v.descrizione||''), c=String(v.categoria||''), src=v.src||'';
+  var F=function(g,nome,col,auto){ return {g:g,nome:nome,col:col,auto:!!auto}; };
+  if(src==='modificata') return F('mano','File, modificata a mano','#e65100',false);
+  if(src==='manuale') return F('mano','Scritta a mano','#1565c0',false);
+  if(/^PREVISIONE|da emettere|^PROVVISORI/i.test(d)) return F('stima','Stima / previsione','#ef6c00',false);
+  if(src==='sibill-doc'||/fonte: (Sibill )?documenti/i.test(n)) return F('file','Fattura Sibill','#2e7d32',true);
+  if(src==='primanota'||/^(PN|SPA|IMP)-/.test(r)||/fonte: prima nota/i.test(n)) return F('file','Prima nota Sibill','#2e7d32',true);
+  if(src==='paghe'||/^D\d+-(AMM|DIP|INPS|TFR)/.test(r)||/^F24P-/.test(r)||/prospetto contabile|Contabile \(commercialista\)/i.test(n)) return F('file','Paghe dello studio','#2e7d32',true);
+  if(/^F24/i.test(d)||/Paga F24/i.test(n)) return F('file','F24 dello studio','#2e7d32',true);
+  if(/Bilancio .*depositato/i.test(n)) return F('file','Bilancio depositato','#2e7d32',true);
+  if(/^sp_/.test(c)) return F('sp','Saldo patrimoniale','#6a1b9a',false);
+  if(/^(ALLIN|INT-COMP|ROY|RIC|MAR|LASER)-/.test(r)||/^(Rettifica|Allineamento|Storno|Royalt)/i.test(d)||/riclassific|Allineamento/i.test(n)) return F('rett','Rettifica calcolata','#7b1fa2',false);
+  if(/^(Fattura|Nota di credito|Corrispettivo|Rimborso corrispettivo)/i.test(d)&&!n) return F('file','Import iniziale (fatture e corrispettivi)','#2e7d32',true);
+  if(/^Interessi/i.test(d)&&c==='interessi_attivi') return F('rett','Calcolo interessi mutuo','#7b1fa2',false);
+  if(src==='pacchetto') return F('rett','Pacchetto di aggiornamento','#7b1fa2',false);
+  return F('ignota','Origine non registrata','#757575',false); }
+function vfFiltra(sp){ var t=VF.testo.toUpperCase(); return S.voci.filter(function(v){ var c=E.CATEGORIE.filter(function(x){return x.id===v.categoria;})[0]; if(((c&&c.tipo)==='sp')!==!!sp) return false;
+  if(v.eliminata&&!VF.elim) return false; var m=String(v.competenza).slice(0,7); if(VF.da&&m<VF.da) return false; if(VF.a&&m>VF.a) return false; if(VF.cat&&v.categoria!==VF.cat) return false;
+  if(VF.fonte&&voceFonte(v).g!==VF.fonte) return false; if(t&&(String(v.descrizione||'')+' '+String(v.riferimento||'')+' '+String(v.note||'')+' '+catNome(v.categoria)).toUpperCase().indexOf(t)<0) return false; return true; }); }
+function elencoVoci(sp){ var L=vfFiltra(sp).sort(function(a,b){return (b.competenza+b.data).localeCompare(a.competenza+a.data);});
+  var dt=function(x){ return x?String(x).slice(0,10).split('-').reverse().join('/'):''; };
+  var rows=L.slice(0,400).map(function(v){ var f=voceFonte(v), lock=f.auto&&!VF.sbloccate[v.id]&&!v.eliminata;
+    var az=v.eliminata?'<button class="l" data-a="rip" data-id="'+v.id+'">Ripristina</button>':(lock?'<span title="Dato importato da file: autorevole" style="font-size:12px;color:#2e7d32">🔒 da file</span> <button class="l" data-a="sblocca" data-id="'+v.id+'" title="Sblocca per correggere un errore del file">Sblocca</button>':'<button class="l" data-a="mod" data-id="'+v.id+'">Modifica</button> <button class="l" data-a="del" data-id="'+v.id+'">Elimina</button>');
+    var sotto=[v.riferimento?'rif. '+esc(v.riferimento):'',v.note?esc(String(v.note).slice(0,160)):''].filter(Boolean).join(' · ');
+    return '<tr style="'+(v.eliminata?'opacity:.45;text-decoration:line-through':'')+'"><td>'+esc(v.competenza)+'</td><td style="text-align:left"><span class="pill" style="background:'+f.col+'1a;color:'+f.col+';border:1px solid '+f.col+'55;font-size:11px;white-space:normal">'+f.nome+'</span><div class="note" style="font-size:10.5px">'+(v.creato_il?'inserita il '+dt(v.creato_il):'')+(v.aggiornato_il&&String(v.aggiornato_il).slice(0,10)!==String(v.creato_il).slice(0,10)?'<br>modificata il '+dt(v.aggiornato_il):'')+'</div></td>'
+      +'<td style="text-align:left">'+esc(catNome(v.categoria))+'</td><td style="text-align:left">'+esc(v.descrizione)+(sotto?'<div class="note" style="font-size:11px">'+sotto+'</div>':'')+'</td><td>'+eur(v.imponibile)+'</td>'+(sp?'':'<td>'+eur(v.iva)+'</td><td>'+eur(+v.imponibile+(+v.iva||0))+'</td>')+'<td>'+az+'</td></tr>'; }).join('');
+  var cg=sp?'<colgroup><col style="width:75px"><col style="width:150px"><col style="width:200px"><col style="width:470px"><col style="width:110px"><col style="width:190px"></colgroup>':'<colgroup><col style="width:72px"><col style="width:150px"><col style="width:175px"><col style="width:470px"><col style="width:95px"><col style="width:75px"><col style="width:95px"><col style="width:190px"></colgroup>';
+  var tutte=S.voci.filter(function(v){ var c=E.CATEGORIE.filter(function(x){return x.id===v.categoria;})[0]; return !v.eliminata&&((c&&c.tipo)==='sp')===!!sp; }), cnt={}; tutte.forEach(function(v){ var g=voceFonte(v).g; cnt[g]=(cnt[g]||0)+1; });
+  var chips='<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">'+[''].concat(Object.keys(VF_FONTI)).filter(function(g){ return !g||cnt[g]; }).map(function(g){ return '<button class="l'+(VF.fonte===g?' p':'')+'" data-a="vff" data-id="'+g+'" style="padding:3px 10px">'+(g?VF_FONTI[g]+' ('+cnt[g]+')':'Tutte ('+tutte.length+')')+'</button>'; }).join('')+'</div>';
+  var cs=E.CATEGORIE.filter(function(c){return (c.tipo==='sp')===!!sp;});
+  var filtri='<div class="card norep"><b>Elenco delle voci</b><div class="note">Ogni voce dice <b>da dove viene</b>. Quelle <span style="color:#2e7d32;font-weight:700">🔒 da file</span> (fatture e prima nota Sibill, paghe, F24 dello studio, bilancio) sono <b>autorevoli</b>: non si toccano, salvo errore del file (Sblocca). Quelle <span style="color:#1565c0;font-weight:700">scritte a mano</span>, le <span style="color:#ef6c00;font-weight:700">stime</span> e le <span style="color:#7b1fa2;font-weight:700">rettifiche</span> sono modificabili.</div>'+chips
+    +'<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:end;margin-top:8px"><div><label>Cerca</label><input id="vf_t" data-vf="testo" value="'+esc(VF.testo)+'" placeholder="testo, fornitore, numero…" style="width:220px"></div>'
+    +'<div><label>Categoria</label><select data-vf="cat"><option value="">Tutte</option>'+cs.map(function(c){ return '<option value="'+c.id+'"'+(VF.cat===c.id?' selected':'')+'>'+esc(c.nome)+'</option>'; }).join('')+'</select></div>'
+    +'<div><label>Da mese</label><input type="month" data-vf="da" value="'+esc(VF.da)+'"></div><div><label>A mese</label><input type="month" data-vf="a" value="'+esc(VF.a)+'"></div>'
+    +'<label style="display:inline-flex;align-items:center;gap:5px;font-size:13px"><input type="checkbox" data-vf="elim" style="width:auto"'+(VF.elim?' checked':'')+'> mostra anche le eliminate</label>'
+    +'<button class="l" data-a="vfreset">Togli i filtri</button></div><div class="note" style="margin-top:6px">'+L.length+' voci'+(L.length>400?' (mostro le prime 400: restringi i filtri)':'')+' · imponibile '+eur(L.filter(function(v){return !v.eliminata;}).reduce(function(a,v){ return a+(+v.imponibile||0); },0))+' €</div></div>';
+  return filtri+'<div class="card tw"><table class="vv" style="table-layout:fixed;width:'+(sp?1195:1322)+'px">'+cg+'<tr><th>Mese</th><th style="text-align:left">Fonte</th><th style="text-align:left">Categoria</th><th style="text-align:left">Descrizione</th><th>'+(sp?'Saldo':'Imponibile')+'</th>'+(sp?'':'<th>IVA</th><th>Totale</th>')+'<th></th></tr>'+(rows||'<tr><td colspan="8">Nessuna voce con questi filtri</td></tr>')+'</table></div>'; }
+document.addEventListener('change',function(e){ var k=e.target&&e.target.dataset&&e.target.dataset.vf; if(!k) return; VF[k]=k==='elim'?e.target.checked:e.target.value; render(); });
+document.addEventListener('keydown',function(e){ if(e.key==='Enter'&&e.target&&e.target.dataset&&e.target.dataset.vf==='testo'){ VF.testo=e.target.value; render(); var el=document.getElementById('vf_t'); if(el){ el.focus(); el.setSelectionRange(el.value.length,el.value.length); } } });
 function bulkVoci(cat,da,a){ return S.voci.filter(function(v){ if(v.eliminata) return false; var c=E.CATEGORIE.filter(function(x){return x.id===v.categoria;})[0]; if(!c||c.tipo==='sp') return false;
   if(cat==='__ricavi'){ if(c.tipo!=='ricavo'||c.finanziario) return false; } else if(v.categoria!==cat) return false; var m=String(v.competenza).slice(0,7); return m>=da&&m<=a; }); }
 function bulkInfo(){ var cat=document.getElementById('b_cat'); if(!cat) return; var L=bulkVoci(cat.value,val('b_da'),val('b_a')), t=L.reduce(function(s,v){return s+(+v.imponibile||0);},0);
@@ -1708,8 +1749,13 @@ async function azione(a,id){
   try{
     if(a==='salva'){ var v={id:(S.edit&&S.edit.id)||'',categoria:val('f_categoria'),data:val('f_data'),competenza:val('f_competenza'),imponibile:+val('f_imponibile'),iva:+val('f_iva')||0,detraibile:val('f_detraibile')==='1',descrizione:val('f_descrizione'),riferimento:val('f_riferimento'),note:val('f_note')};
       if(!v.data||!v.competenza||isNaN(v.imponibile)||val('f_imponibile')===''){ msg('Compila data, competenza e imponibile',1); return; }
+      var vecchia=S.edit&&S.edit.id?S.edit:null, fv=vecchia?voceFonte(vecchia):null; v.src=!vecchia?'manuale':(fv&&fv.auto?'modificata':(vecchia.src||'manuale'));
+      if(vecchia&&fv&&fv.auto&&!/modificata a mano/.test(v.note)) v.note=(v.note?v.note+' · ':'')+'modificata a mano il '+new Date().toLocaleDateString('it-IT')+' (era: '+fv.nome+')';
       await call('apiSalvaVoce',voceVersoServer(v)); S.edit=null; await ricarica(); }
-    else if(a==='mod'){ S.edit=S.voci.filter(function(x){return x.id===id;})[0]; render(); }
+    else if(a==='vff'){ VF.fonte=id||''; render(); }
+    else if(a==='vfreset'){ VF.fonte='';VF.testo='';VF.cat='';VF.da='';VF.a='';VF.elim=false; render(); }
+    else if(a==='mod'){ S.edit=S.voci.filter(function(x){return x.id===id;})[0]; render(); window.scrollTo(0,0); }
+    else if(a==='sblocca'){ var vs=S.voci.filter(function(x){return x.id===id;})[0], fs=voceFonte(vs); if(confirm('Questa voce viene da: '+fs.nome+'. È un dato autorevole: modificala solo se il file è sbagliato.\nSe la modifichi resterà segnata come "modificata a mano".\n\nSbloccare?')){ VF.sbloccate[id]=1; render(); } }
     else if(a==='annulla'){ S.edit=null; render(); }
     else if(a==='del'){ if(confirm('Eliminare la voce? Resta nello storico e si può ripristinare.')){ await call('apiEliminaVoce',id,false); await ricarica(); } }
     else if(a==='rip'){ await call('apiEliminaVoce',id,true); await ricarica(); }
@@ -1776,9 +1822,9 @@ async function importaPacchetto(o){
   var txt=(o.titolo?o.titolo+'\n\n':'')+'Voci da aggiungere: '+nuove.length+(gia?' ('+gia+' già presenti, saltate)':'')+'\n'+nuove.map(function(v){ return '+ '+String(v.descrizione||'').slice(0,70)+' – '+dett(v); }).join('\n')+(righe.length?'\n\n'+righe.join('\n'):'')+'\n\nConfermi?';
   if(!confirm(txt)) { msg('Aggiornamento annullato: nessuna modifica'); return; }
   var out=[];
-  if(nuove.length){ var n=await call('apiImportaVoci',nuove.map(voceVersoServer)); out.push(typeof n==='object'?(n.importate+' voci aggiunte, '+n.saltate+' già presenti'):(n+' voci aggiunte')); }
+  if(nuove.length){ var n=await call('apiImportaVoci',nuove.map(function(v){ return voceVersoServer(Object.assign({src:'pacchetto'},v)); })); out.push(typeof n==='object'?(n.importate+' voci aggiunte, '+n.saltate+' già presenti'):(n+' voci aggiunte')); }
   for(var i=0;i<mods.length;i++){ var v=mods[i].v, c=mods[i].c, nv={id:v.id,categoria:v.categoria,data:v.data,competenza:v.competenza,imponibile:+v.imponibile,iva:+v.iva||0,detraibile:!!v.detraibile,descrizione:v.descrizione||'',riferimento:v.riferimento||'',note:v.note||''};
-    Object.keys(c).forEach(function(k){ nv[k]=c[k]; }); await call('apiSalvaVoce',voceVersoServer(nv)); }
+    if(v.src) nv.src=v.src; Object.keys(c).forEach(function(k){ nv[k]=c[k]; }); await call('apiSalvaVoce',voceVersoServer(nv)); }
   if(mods.length) out.push(mods.length+' voci modificate');
   var simCambia=false; if(sp.laserAttiva!==undefined&&!!sp.laserAttiva!==!!sm.laser.attiva){ sm.laser.attiva=!!sp.laserAttiva; simCambia=true; }
   opsOk.forEach(function(op){ if(op.op==='imposta'){ simPath(op.percorso,JSON.parse(JSON.stringify(op.valore))); } else if(op.op==='aggiungi'){ prendi(op.lista).push(JSON.parse(JSON.stringify(op.voce))); } else if(op.op==='modifica'){ Object.keys(op.campi||{}).forEach(function(k){ op._h[k]=op.campi[k]; }); } simCambia=true; });
@@ -2405,9 +2451,10 @@ async function agApplica(){ var P=AG.prev; if(!P) return; var sel=P.righe.filter
   if(ps.length) extra.push('Cassa: le fatture Paysolution ('+ps.join(', ')+') restano fuori dalla cassa: conta il netto mensile che inserisci tu');
   if(!nuove.length&&!mod.length&&!extra.length&&P.tipo!=='paghe'){ AG.msg='Niente da aggiornare: è tutto già nella consolle.'; AG.ko=false; AG.prev=null; AG.p=''; render(); return; }
   if(!confirm('Aggiungo '+nuove.length+' voci e ne aggiorno '+mod.length+'.'+(P.tipo==='paghe'&&P.lul.length?' Salvo i dati di '+P.lul.length+' cedolini (netto, IRPEF, imponibile da inizio anno).':'')+(extra.length?'\n\n'+extra.join('\n'):'')+'\n\nConfermi?')) return;
+  var srcT={fatture:'sibill-doc',pn:'primanota',paghe:'paghe'}[P.tipo]; nuove.forEach(function(v){ v.src=srcT; });
   if(nuove.length) await call('apiImportaVoci',nuove.map(voceVersoServer));
   for(var i=0;i<mod.length;i++){ var r=mod[i], v=r.ex, nv={id:v.id,categoria:v.categoria,data:v.data,competenza:v.competenza,imponibile:+v.imponibile,iva:+v.iva||0,detraibile:!!v.detraibile,descrizione:v.descrizione||'',riferimento:v.riferimento||'',note:v.note||''};
-    ['categoria','data','competenza','imponibile','iva','detraibile','riferimento','note'].forEach(function(k){ nv[k]=r.v[k]; }); if(r.v.descrizione) nv.descrizione=r.v.descrizione; await call('apiSalvaVoce',voceVersoServer(nv)); }
+    ['categoria','data','competenza','imponibile','iva','detraibile','riferimento','note'].forEach(function(k){ nv[k]=r.v[k]; }); if(r.v.descrizione) nv.descrizione=r.v.descrizione; nv.src=r.esito==='riclassifica'?(v.src||srcT):srcT; await call('apiSalvaVoce',voceVersoServer(nv)); }
   if(P.tipo==='paghe'){ P.azzera.forEach(function(a){ sm.righe[a.k][a.i]=0; }); if(!sm.paghe||typeof sm.paghe!=='object') sm.paghe={};
     P.lul.forEach(function(l){ var M=l.mese; if(!sm.paghe[M]) sm.paghe[M]={}; sm.paghe[M][l.nome]={lordo:l.lordo,netto:l.netto,trattenute:l.trattenute,impMese:l.impMese,irpefMese:l.irpefMese,impAnno:l.impAnno,inps:l.inps}; });
     var ms=P.cont.map(function(x){ return x.mese; }).concat(P.lul.map(function(x){ return x.mese; })).sort(); st.paghe={il:agOggi(),fino:ms[ms.length-1]||''}; }
