@@ -863,14 +863,28 @@ function render(){ nav(); var reg=calc(); S.__reg=reg; var r=reg, SIMO=null; if(
 function kpi(l,v,c){ return '<div class="kpi card"><span>'+l+'</span><b class="'+(c||'')+'">'+v+' €</b></div>'; }
 function vRiepilogo(r){ var t=r.totali, ok=r.controlli.every(function(c){return c.ok;});
   return '<div class="note" style="margin-bottom:6px">Tutti gli importi sono in € e IVA ESCLUSA, salvo dove indicato (IVA, cassa e crediti/debiti).</div><div class="kpis">'+kpi('Ricavi (IVA esclusa)',eur(t.ricavi))+kpi('Costi (IVA esclusa)',eur(t.costi))+kpi('Utile ante imposte',eur(t.utile),cls(t.utile))+'<div class="kpi card"><span>Margine utile sul fatturato</span><b class="'+cls(t.utile)+'">'+pct(t.utile,t.ricavi)+'</b></div>'+kpi('Imposte stimate',eur(t.imposte))+kpi('Utile stimato dopo imposte',eur(t.utileNetto),cls(t.utileNetto))+kpi('IVA da versare nel periodo',eur(t.ivaVersare))+kpi('Credito IVA residuo',eur(t.ivaCreditoFinale))+'</div>'
-  +'<div class="card"><b>Utile cumulato per mese</b><svg id="gr" viewBox="0 0 640 180" width="100%"></svg></div>'
+  +'<div class="card"><b>Utile del mese e utile cumulato</b><svg id="gr" viewBox="0 0 1200 340" width="100%" role="img" aria-label="Utile del mese e utile cumulato"></svg><div class="note">'+'<span style="display:inline-block;width:11px;height:11px;background:#1a7f4b;opacity:.55;border-radius:2px;margin:0 4px -1px 0"></span>Utile del mese (barre) <span style="display:inline-block;width:18px;height:3px;background:#2f6fb3;margin:0 4px 3px 12px"></span>Utile cumulato (linea, valore sui punti)'+'</div></div>'
   +'<div class="card"><span class="'+(ok?'ok':'ko')+'">'+(ok?'✔ Tutti i controlli incrociati tornano':'✖ Controlli incrociati falliti: vedi scheda Controlli')+'</span>'
   +(r.avvisi.length?'<div class="wa note">'+r.avvisi.map(esc).join('<br>')+'</div>':'')
   +(!r.params.includeAcquistiSrl&&r.memoAcquistiSrl?'<div class="note">Acquisti materiali SRL per '+eur(r.memoAcquistiSrl)+' € NON inclusi nel P&L (magazzino/rimanenze da definire): attivabili in Parametri.</div>':'')
   +'<div class="note">Bilancio gestionale a ipotesi: imposte e IVA sono stime. Il bilancio ufficiale resta quello del commercialista.</div></div>'; }
-function grafico(r){ var svg=document.getElementById('gr'); if(!svg) return; var v=r.mesi.map(function(m){return m.utileCum;}), mx=Math.max.apply(null,v.concat([1])), mn=Math.min.apply(null,v.concat([0])), W=640,H=180,pb=22,n=v.length,bw=W/n,sc=(H-pb-10)/(mx-mn||1),z=10+mx*sc,h='';
-  v.forEach(function(x,i){ var hh=Math.abs(x)*sc, y=x>=0?z-hh:z; h+='<rect x="'+(i*bw+4)+'" y="'+y+'" width="'+(bw-8)+'" height="'+Math.max(hh,1)+'" fill="'+(x>=0?'#1a7f4b':'#b3261e')+'"/><text x="'+(i*bw+bw/2)+'" y="'+(H-6)+'" font-size="10" text-anchor="middle" fill="#888">'+etm(r.mesi[i].m).slice(0,3)+'</text>'; });
-  svg.innerHTML=h+'<line x1="0" x2="'+W+'" y1="'+z+'" y2="'+z+'" stroke="#888" stroke-width=".5"/>'; }
+function grafico(r){ var svg=document.getElementById('gr'); if(!svg) return;
+  var M=r.mesi, W=1200, H=340, pl=62, pr=14, pt=26, pb=30, n=M.length, bw=(W-pl-pr)/n, um=M.map(function(m){return m.utile;}), uc=M.map(function(m){return m.utileCum;});
+  var mx=Math.max.apply(null,um.concat(uc,[0])), mn=Math.min.apply(null,um.concat(uc,[0])); if(mx<=mn) mx=mn+1;
+  var rg=mx-mn, st=Math.pow(10,Math.floor(Math.log10(rg/5))); [1,2,2.5,5,10].some(function(f){ if(rg/(st*f)<=6){ st=st*f; return true; } return false; });
+  var lo=Math.floor(mn/st)*st, hi=Math.ceil(mx/st)*st; if(hi===lo) hi=lo+st;
+  var Y=function(v){ return pt+(hi-v)/(hi-lo)*(H-pt-pb); }, k=function(v){ return (Math.round(v/100)/10).toLocaleString('it-IT')+'k'; }, h='';
+  for(var tv=lo; tv<=hi+st/2; tv+=st) h+='<line x1="'+pl+'" x2="'+(W-pr)+'" y1="'+Y(tv)+'" y2="'+Y(tv)+'" stroke="#e3e6ea" stroke-width=".8"/><text x="'+(pl-8)+'" y="'+(Y(tv)+4)+'" font-size="12" text-anchor="end" fill="#667">'+eur(tv).replace(/,00$/,'')+'</text>';
+  var y0=Y(0), pts=[];
+  M.forEach(function(m,i){ var x0=pl+i*bw, c=x0+bw/2, v=um[i], yv=Y(v);
+    h+='<rect x="'+(x0+bw*.2)+'" y="'+Math.min(y0,yv)+'" width="'+(bw*.6)+'" height="'+Math.max(Math.abs(yv-y0),1)+'" fill="'+(v>=0?'#1a7f4b':'#b3261e')+'" opacity=".55"><title>'+etm(m.m)+': utile del mese '+eur(v)+' €</title></rect>';
+    var ly=v>=0?Math.min(y0,yv)-4:Math.max(y0,yv)+12; if(Math.abs(ly-(Y(uc[i])-10))>16&&Math.abs(ly-Y(uc[i]))>12) h+='<text x="'+c+'" y="'+ly+'" font-size="10" text-anchor="middle" fill="'+(v>=0?'#1a7f4b':'#b3261e')+'">'+k(v)+'</text>';
+    h+='<text x="'+c+'" y="'+(H-9)+'" font-size="12" text-anchor="middle" fill="#556">'+etm(m.m).slice(0,3)+'</text>'; pts.push(c+','+Y(uc[i])); });
+  h+='<line x1="'+pl+'" x2="'+(W-pr)+'" y1="'+y0+'" y2="'+y0+'" stroke="#888" stroke-width="1"/>';
+  h+='<polyline points="'+pts.join(' ')+'" fill="none" stroke="#2f6fb3" stroke-width="2.6"/>';
+  M.forEach(function(m,i){ var c=pl+i*bw+bw/2, v=uc[i], col=v>=0?'#2f6fb3':'#b3261e';
+    h+='<circle cx="'+c+'" cy="'+Y(v)+'" r="4.5" fill="'+col+'"><title>'+etm(m.m)+': utile cumulato '+eur(v)+' €</title></circle><text x="'+c+'" y="'+(Y(v)-10)+'" font-size="12" font-weight="700" text-anchor="middle" fill="'+col+'" stroke="#fff" stroke-width="3" paint-order="stroke">'+k(v)+'</text>'; });
+  svg.setAttribute('viewBox','0 0 '+W+' '+H); svg.innerHTML=h; }
 var PLRO=false;
 function plRiga(id){ return E.SIM_RIGHE.filter(function(x){return x.cat===id&&!x.soloCassa;})[0]||null; }
 function plEdit(mese){ return !PLRO&&S.plPrev!==false&&simS().mesi.indexOf(mese)>=0; }
