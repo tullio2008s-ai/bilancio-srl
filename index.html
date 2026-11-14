@@ -2235,24 +2235,32 @@ function agRiclassifica(v,catS,fonte,fino){ if(!v||v.eliminata||agTipo(v)!=='cos
 
 /* ── 1. Saldo banche ── */
 var AG_CONTI=['Banca Sella','Intesa Sanpaolo','Conto Sibill','PayPal','Stripe'];
-function agSaldoForm(){ var C=simS().cassa; if(!AG.conti) AG.conti=JSON.parse(JSON.stringify((Array.isArray(C.conti)&&C.conti.length)?C.conti:AG_CONTI.map(function(n){ return {nome:n,saldo:''}; }))); var conti=AG.conti, tot=conti.reduce(function(s,c){ return s+agNum(c.saldo); },0);
-  return '<div class="note">Scrivi il <b>saldo contabile</b> di ogni conto (quello senza il fido: se la banca ti mostra il "disponibile", togli il fido). Gli spazi vuoti contano zero. Puoi rinominare i conti.</div>'
-   +'<table class="fit" style="max-width:560px;margin-top:6px"><thead><tr><th style="text-align:left">Conto</th><th>Saldo €</th></tr></thead><tbody>'
+function agSaldoForm(){ setTimeout(agSaldoTot,0); var C=simS().cassa; if(!AG.conti) AG.conti=JSON.parse(JSON.stringify((Array.isArray(C.conti)&&C.conti.length)?C.conti:AG_CONTI.map(function(n){ return {nome:n,saldo:''}; }))); if(AG.conFido===undefined) AG.conFido=C.saldiConFido!==false; var conti=AG.conti;
+  return '<div class="note">Scrivi il saldo di ogni conto così come lo vedi. Gli spazi vuoti contano zero. Puoi rinominare i conti.</div>'
+   +'<div style="margin-top:6px;display:flex;gap:18px;flex-wrap:wrap;font-size:13px"><b>I saldi che scrivo sono:</b><label style="display:inline-flex;align-items:center;gap:5px;white-space:nowrap"><input type="radio" name="agfm" style="width:auto;margin:0" data-ag="fido|1"'+(AG.conFido?' checked':'')+'> il <b>disponibile</b> come lo mostra la banca (fido compreso)</label><label style="display:inline-flex;align-items:center;gap:5px;white-space:nowrap"><input type="radio" name="agfm" style="width:auto;margin:0" data-ag="fido|0"'+(AG.conFido?'':' checked')+'> il saldo <b>senza</b> fido</label></div>'
+   +'<table class="fit" style="max-width:600px;margin-top:6px"><thead><tr><th style="text-align:left">Conto</th><th>Saldo €</th></tr></thead><tbody>'
    +conti.map(function(c,i){ return '<tr><td class="mod" style="text-align:left"><input type="text" data-ag="conto|'+i+'|nome" value="'+esc(c.nome)+'" style="text-align:left"></td><td class="mod"><input type="text" inputmode="decimal" data-ag="conto|'+i+'|saldo" value="'+(String(c.saldo)===''?'':eurIn(agNum(c.saldo)))+'"></td></tr>'; }).join('')
-   +'<tr class="t"><td style="text-align:left">Totale banche (senza fido)</td><td id="agtot">'+eur(tot)+'</td></tr></tbody></table>'
-   +'<div style="margin-top:6px;display:flex;gap:14px;flex-wrap:wrap;align-items:center"><label>Data del saldo <input type="date" id="agdata" value="'+agOggi()+'"></label><label>Fido Sella € <input type="text" inputmode="decimal" id="agfido" value="'+eurIn(+C.fido||0)+'" style="width:90px"></label>'
+   +'<tr><td style="text-align:left">Totale scritto</td><td id="agscr"></td></tr><tr><td style="text-align:left">Fido</td><td id="agfidor"></td></tr>'
+   +'<tr class="t"><td style="text-align:left"><b>Cassa senza fido</b> (quella che uso in tutta la consolle)</td><td id="agtot"></td></tr><tr><td style="text-align:left">Disponibile con il fido</td><td id="agdisp"></td></tr></tbody></table>'
+   +'<div style="margin-top:6px;display:flex;gap:14px;flex-wrap:wrap;align-items:center"><label>Data del saldo <input type="date" id="agdata" data-ag="data" value="'+agOggi()+'"></label><label>Fido Sella € <input type="text" inputmode="decimal" id="agfido" data-ag="fidoimp" value="'+eurIn(+C.fido||0)+'" style="width:90px"></label>'
    +'<button class="l" data-a="agconto">+ conto</button><button class="p" data-a="agsaldo">Salva il saldo</button></div>'
-   +'<div class="note" style="margin-top:4px">Saldo attuale nella consolle: '+eur(+C.saldo||0)+' € al '+agFmt(C.data)+'.</div>'; }
-function agSaldoTot(){ var t=(AG.conti||[]).reduce(function(s,c){ return s+agNum(c.saldo); },0), el=document.getElementById('agtot'); if(el) el.textContent=eur(t); return t; }
-async function agSaldoSalva(){ var C=simS().cassa, d=(document.getElementById('agdata')||{}).value||agOggi(), tot=Math.round(agSaldoTot()*100)/100, fido=agNum((document.getElementById('agfido')||{}).value);
+   +'<div class="note" style="margin-top:4px">Saldo attuale nella consolle: '+eur(+C.saldo||0)+' € senza fido ('+eur((+C.saldo||0)+(+C.fido||0))+' € con il fido) al '+agFmt(C.data)+'.</div><div id="agchk"></div>'; }
+/* totale senza fido + controllo di plausibilità contro la cassa prevista per quella data */
+function agSaldoTot(){ var scr=(AG.conti||[]).reduce(function(s,c){ return s+agNum(c.saldo); },0), fe=document.getElementById('agfido'), fido=fe?agNum(fe.value):(+simS().cassa.fido||0), t=Math.round((scr-(AG.conFido?fido:0))*100)/100;
+  var set=function(id,v){ var el=document.getElementById(id); if(el) el.textContent=v; }; set('agscr',eur(scr)); set('agfidor',AG.conFido?'− '+eur(fido):'non compreso'); set('agtot',eur(t)); set('agdisp',eur(t+fido));
+  var d=(document.getElementById('agdata')||{}).value||agOggi(), C=simS().cassa, att=+C.saldo||0; ((IST&&IST.ctx&&IST.ctx.righeCassa)||[]).forEach(function(x){ if(x.data<=d) att=+x.saldo; });
+  var dif=t-att, avv=''; if(scr&&fido>0&&dif>fido*0.6&&Math.abs(dif-fido)<Math.abs(dif)) avv='Attenzione: la cassa senza fido verrebbe '+eur(t)+' €, circa '+eur(dif)+' € sopra la previsione per il '+agFmt(d)+' ('+eur(att)+' €). Sembra che il fido sia contato: se hai scritto il disponibile della banca, scegli "il disponibile (fido compreso)".';
+  else if(scr&&fido>0&&-dif>fido*0.6&&Math.abs(dif+fido)<Math.abs(dif)) avv='Attenzione: la cassa senza fido verrebbe '+eur(t)+' €, circa '+eur(-dif)+' € sotto la previsione ('+eur(att)+' €). Forse hai scritto il saldo senza fido ma hai scelto "fido compreso".';
+  var el=document.getElementById('agchk'); if(el) el.innerHTML=avv?'<div class="wa" style="margin-top:6px">'+esc(avv)+'</div>':''; AG.avvSaldo=avv; return t; }
+async function agSaldoSalva(){ var C=simS().cassa, d=(document.getElementById('agdata')||{}).value||agOggi(), tot=agSaldoTot(), fido=agNum((document.getElementById('agfido')||{}).value);
   var vecchia=C.data, saltati=((IST&&IST.ctx&&IST.ctx.righeCassa)||[]).filter(function(x){ return x.data>vecchia&&x.data<=d&&Math.abs(+x.importo||0)>=1; });
   if(!(AG.conti||[]).some(function(c){ return String(c.saldo).trim()!==''; })) throw new Error('Scrivi almeno un saldo');
-  var txt='Nuovo saldo: '+eur(tot)+' € al '+agFmt(d)+' (prima: '+eur(+C.saldo||0)+' € al '+agFmt(vecchia)+').'
+  var txt=(AG.avvSaldo?'⚠ '+AG.avvSaldo+'\n\n':'')+'Cassa senza fido: '+eur(tot)+' € al '+agFmt(d)+' (con il fido: '+eur(tot+fido)+' €). Prima: '+eur(+C.saldo||0)+' € al '+agFmt(vecchia)+'.'
     +(saltati.length?'\n\nQuesti movimenti erano previsti tra il '+agFmt(vecchia)+' e il '+agFmt(d)+'. Se sono già avvenuti sono dentro il nuovo saldo; se NON sono ancora avvenuti, dopo il salvataggio spostali più avanti nella pagina Cassa, altrimenti escono dalla previsione:\n'+saltati.slice(0,15).map(function(x){ return '• '+agFmt(x.data)+' '+String(x.desc).slice(0,60)+' '+eur(x.importo); }).join('\n'):'')+'\n\nConfermi?';
   if(!confirm(txt)) return;
-  C.saldo=tot; C.data=d; C.fido=fido; C.conti=AG.conti.map(function(c){ return {nome:String(c.nome||'').trim(),saldo:String(c.saldo).trim()===''?'':Math.round(agNum(c.saldo)*100)/100}; });
+  C.saldo=tot; C.data=d; C.fido=fido; C.saldiConFido=!!AG.conFido; C.conti=AG.conti.map(function(c){ return {nome:String(c.nome||'').trim(),saldo:String(c.saldo).trim()===''?'':Math.round(agNum(c.saldo)*100)/100}; });
   agStato().saldo={il:agOggi(),fino:d}; S.config=await call('apiSalvaConfig',{sim:JSON.stringify(simS())});
-  AG.p=''; AG.msg='Saldo salvato: '+eur(tot)+' € al '+agFmt(d)+(saltati.length?'. Controlla nella pagina Cassa i '+saltati.length+' movimenti previsti prima di questa data.':''); AG.ko=false; render(); }
+  AG.p=''; AG.msg='Saldo salvato: cassa '+eur(tot)+' € senza fido ('+eur(tot+fido)+' € con il fido) al '+agFmt(d)+(saltati.length?'. Controlla nella pagina Cassa i '+saltati.length+' movimenti previsti prima di questa data.':''); AG.ko=false; render(); }
 
 /* ── 2. Fatture Sibill (export "Documenti": emessi e ricevuti) ── */
 function agIndice(){ var vv=S.voci||[], ref={}, tok={}; vv.forEach(function(v){ var k=agNorm(v.riferimento); if(k) (ref[k]=ref[k]||[]).push(v);
@@ -2438,16 +2446,18 @@ function agAnteprima(P){ var catOpt=function(i,c){ return '<select data-ag="r|'+
   else h+='<div class="okbox" style="margin-top:6px">Nessuna voce nuova: la consolle è già aggiornata con questo file.</div>';
   return h+'<div style="margin-top:8px;display:flex;gap:10px;align-items:center"><button class="p" data-a="agok">Conferma e aggiorna la consolle ('+nSel+')</button><button class="l" data-a="agannulla">Annulla</button></div>'; }
 async function agAzione(a,id){ try{
-  if(a==='agp'){ AG.p=AG.p===id?'':id; AG.prev=null; AG.msg=''; AG.conti=null; render(); }
+  if(a==='agp'){ AG.p=AG.p===id?'':id; AG.prev=null; AG.msg=''; AG.conti=null; AG.conFido=undefined; render(); if(AG.p==='saldo') agSaldoTot(); }
   else if(a==='agscegli'){ var f=document.getElementById('agfile'); if(f){ f.value=''; f.click(); } }
   else if(a==='agannulla'){ AG.prev=null; AG.msg=''; render(); }
   else if(a==='agok'){ await agApplica(); }
   else if(a==='agsaldo'){ await agSaldoSalva(); }
-  else if(a==='agconto'){ AG.conti.push({nome:'Nuovo conto',saldo:''}); render(); }
+  else if(a==='agconto'){ AG.conti.push({nome:'Nuovo conto',saldo:''}); render(); agSaldoTot(); }
   }catch(e){ AG.msg=e.message||String(e); AG.ko=true; render(); } }
 document.addEventListener('change',function(e){ if(e.target&&e.target.id==='agfile') agLeggi(e.target.files); });
 document.addEventListener('input',function(e){ var k=e.target&&e.target.dataset&&e.target.dataset.ag; if(!k) return; var q=k.split('|');
   if(q[0]==='conto'){ AG.conti[+q[1]][q[2]]=e.target.value; agSaldoTot(); return; }
+  if(q[0]==='fido'){ if(e.target.checked){ AG.conFido=q[1]==='1'; agSaldoTot(); } return; }
+  if(q[0]==='fidoimp'||q[0]==='data'){ agSaldoTot(); return; }
   if(q[0]==='r'&&AG.prev){ var r=AG.prev.righe[+q[1]]; if(!r) return; if(q[2]==='sel') r.sel=e.target.checked; else r.v[q[2]]=e.target.value; } });
 document.addEventListener('change',function(e){ var k=e.target&&e.target.dataset&&e.target.dataset.ag; if(!k) return; var q=k.split('|'); if(q[0]==='r'&&AG.prev){ var r=AG.prev.righe[+q[1]]; if(!r) return; if(q[2]==='sel') r.sel=e.target.checked; else r.v[q[2]]=e.target.value; var b=document.querySelector('[data-a="agok"]'); if(b) b.textContent='Conferma e aggiorna la consolle ('+AG.prev.righe.filter(function(x){ return x.sel&&x.esito!=='uguale'; }).length+')'; } });
 
@@ -2480,7 +2490,7 @@ function vOggi(r){ vIstruzioni(); var I=IST, R=I.R, ctx=I.ctx, oggi=new Date().t
   if(provvisorie().length&&simS().includiProvvisorie!==false) al.push('Nei conti sono incluse voci provvisorie ('+provvisorie().length+'): '+provvisorie().map(function(v){ return String(v.descrizione).slice(0,60); }).join('; ')+'.');
   agAllerte().forEach(function(x){ al.push(x); });
   if(minM&&minM.fin<R.sogliaEff) al.push('Nei prossimi mesi la cassa scende sotto il minimo consentito: '+eur(minM.fin)+' € a '+istMese(minM.m)+'.');
-  var kp=kpi('Cassa oggi (stima)',eur(cassaOggi),cassaOggi<0?'neg':'pos')+kpi('Disponibile con il fido',eur(cassaOggi+ctx.fido),cassaOggi+ctx.fido<(+R.cfg.soglia||0)?'neg':'pos')
+  var kp=kpi('Cassa oggi senza fido (stima)',eur(cassaOggi),cassaOggi<0?'neg':'pos')+kpi('Disponibile con il fido',eur(cassaOggi+ctx.fido),cassaOggi+ctx.fido<(+R.cfg.soglia||0)?'neg':'pos')
     +(f24?'<div class="kpi card"><span>Prossimo F24 ('+fmtD(f24.d)+')</span><b>'+eur(f24.a.imp)+' €</b></div>':'')
     +kpi('Ancora da incassare in '+MESI_LUNGHI[+mOggi.slice(5)-1],eur(inMese),'pos')+kpi('Ancora da pagare in '+MESI_LUNGHI[+mOggi.slice(5)-1],eur(outMese))
     +(fineMese!==null?kpi('Cassa prevista a fine mese',eur(fineMese),fineMese<R.sogliaEff?'neg':'pos'):'');
