@@ -80,7 +80,7 @@ table.fit{min-width:0!important;width:100%!important;font-size:9.4px}table.fit.w
 .pbk{break-before:page;page-break-before:always}}
 .note{font-size:12px;color:var(--mu)}.hid{display:none}
 </style></head><body>
-<header><h1>Bilancio SRL <small>Tullio Serci S.r.l. · gestionale riservato</small></h1><small id="versione" title="Versione della consolle: se non vedi la data dell'ultimo aggiornamento, ricarica" style="opacity:.85;margin-right:10px">versione 14/11/2026 23:00</small><small id="utente"></small><button class="l" id="exit" data-a="logout" style="color:#fff;border-color:#fff8">Esci</button></header>
+<header><h1>Bilancio SRL <small>Tullio Serci S.r.l. · gestionale riservato</small></h1><small id="versione" title="Versione della consolle: se non vedi la data dell'ultimo aggiornamento, ricarica" style="opacity:.85;margin-right:10px">versione 17/11/2026 · riserve</small><small id="utente"></small><button class="l" id="exit" data-a="logout" style="color:#fff;border-color:#fff8">Esci</button></header>
 <div id="demo" class="demo hid">MODALITÀ DEMO: dati sintetici salvati solo in questo browser. Nessun dato reale.</div>
 <nav id="nav"></nav>
 <main id="main"></main>
@@ -716,14 +716,15 @@ table.fit{min-width:0!important;width:100%!important;font-size:9.4px}table.fit.w
     return { mesi: 18, cassa: '', soglia: 3000, usaFido: false, marg: '', margM: {}, incM: {}, spM: {}, inc: '', spese: '', adler: '', adlerFine: '', iva: '', ivaM: {}, straord: {}, acconto: '', imposte: '',
       ivaModo: 'ravv', avvisoMese: '2027-09', isa: true, rate: '', fam: 6000, altreNette: '', contaFigli: false, quotaFam: '',
       pers: [{ gs: 24, altri: 10500, deduz: '', netto: 3000, nettiM: {}, tetto: 50000 }, { gs: 33.72, altri: 0, deduz: '', netto: 3000, nettiM: {}, tetto: 50000 }],
-      addReg: 1.23, addCom: 0.7, div: [], approvazione: '2027-05-31', legale: 1.6, lipe: false, ivaPiano: 'rate', ivaRateDa: '', ivaRateN: 3, ivaNovDic: 'rate', acconti: 'storico', materiali: [], modello: '' };
+      addReg: 1.23, addCom: 0.7, div: [], approvazione: '2027-05-31', legale: 1.6, lipe: false, ivaPiano: 'rate', ivaRateDa: '', ivaRateN: 3, ivaNovDic: 'rate', acconti: 'storico', materiali: [], modello: '', debiti: [], ivaArr: {}, scorta: '', imposte27: '' };
   }
   function strategiaNorm(x) {
     var d = strategiaDefault(); if (!x || typeof x !== 'object') return d;
     var o = Object.assign({}, d, x);
     o.pers = [0, 1].map(function (i) { var s = (x.pers && x.pers[i]) || {}, r = Object.assign({}, d.pers[i], s); r.nettiM = s.nettiM && typeof s.nettiM === 'object' && !Array.isArray(s.nettiM) ? s.nettiM : {}; return r; });
-    ['margM', 'ivaM', 'straord', 'incM', 'spM'].forEach(function (k) { if (!o[k] || typeof o[k] !== 'object' || Array.isArray(o[k])) o[k] = {}; });
+    ['margM', 'ivaM', 'straord', 'incM', 'spM', 'ivaArr'].forEach(function (k) { if (!o[k] || typeof o[k] !== 'object' || Array.isArray(o[k])) o[k] = {}; });
     o.div = Array.isArray(x.div) ? x.div.map(function (v) { return { data: String((v && v.data) || ''), lordo: v && v.lordo !== undefined ? v.lordo : 0 }; }) : [];
+    o.debiti = Array.isArray(x.debiti) ? x.debiti.map(function (d) { d = d || {}; return { desc: String(d.desc || ''), rata: d.rata === undefined ? '' : d.rata, da: String(d.da || ''), n: parseInt(d.n, 10) || 1, ogni: parseInt(d.ogni, 10) || 1, tipo: String(d.tipo || 'rate') }; }) : [];
     o.mesi = Math.min(30, Math.max(6, parseInt(o.mesi, 10) || 18)); if (!Array.isArray(o.materiali)) o.materiali = []; o.isa = o.isa !== false && o.isa !== 'false'; o.usaFido = o.usaFido === true || o.usaFido === 'true'; o.contaFigli = o.contaFigli === true || o.contaFigli === 'true'; o.lipe = o.lipe === true || o.lipe === 'true';
     return o;
   }
@@ -748,6 +749,11 @@ table.fit{min-width:0!important;width:100%!important;font-size:9.4px}table.fit.w
     var differita = c.ivaNovDic === 'rate';   // IVA di novembre (16/12) e acconto (27/12) non pagati alla scadenza: entrano nel ravvedimento
     var cassa0 = c.cassa !== '' ? num(c.cassa) : r2(num(ctx.cassa31) - (differita ? 0 : Math.max(0, num(ctx.ivaNov)) + acc26));
     var arrIn = (ctx.arretrati || []).slice(); if (differita) { if (num(ctx.ivaNov) > 0.5) arrIn.push({ m: ctx.meseNov || '2026-11', imp: r2(num(ctx.ivaNov)), scad: (ctx.meseNov ? mesePiu(ctx.meseNov) : '2026-12') + '-16', cod: '6011' }); if (acc26 > 0.5) arrIn.push({ m: (ctx.meseNov ? mesePiu(ctx.meseNov) : '2026-12'), imp: acc26, scad: (ctx.meseNov ? mesePiu(ctx.meseNov) : '2026-12') + '-27', cod: '6013', acconto: true, soloSanz: true }); }
+    arrIn = arrIn.map(function (x) { var k = x.acconto ? 'acconto' : x.m; return c.ivaArr[k] !== undefined && c.ivaArr[k] !== '' && c.ivaArr[k] !== null ? Object.assign({}, x, { imp: num(c.ivaArr[k]), daStudio: true }) : x; });   // importi della liquidazione ufficiale dello studio
+    /* rateizzazioni e altri debiti pregressi (dal commercialista): rata, prima scadenza, numero rate, ogni quanti mesi */
+    var debP = M.map(function () { return 0; }), debDet = M.map(function () { return []; }), debScad = [];
+    c.debiti.forEach(function (d) { var v = num(d.rata); if (!(v > 0) || !/^\d{4}-\d{2}-\d{2}$/.test(d.da)) return; var m0 = d.da.slice(0, 7), g = d.da.slice(8, 10);
+      for (var k = 0; k < d.n; k++) { var mk = m0; for (var z = 0; z < k * d.ogni; z++) mk = mesePiu(mk); debScad.push({ m: mk, v: v, desc: d.desc }); var i = M.indexOf(mk); if (i >= 0) { debP[i] += v; debDet[i].push({ desc: d.desc, v: v, g: g, k: k + 1, n: d.n }); } } });
     var sogliaEff = num(c.soglia) - (c.usaFido ? num(ctx.fido) : 0);
     var qFam = c.contaFigli ? 100 : (c.quotaFam !== '' ? num(c.quotaFam) : num(ctx.quotaFamAuto));
     var altreNette = stAltreNette(c, par);
@@ -768,20 +774,20 @@ table.fit{min-width:0!important;width:100%!important;font-size:9.4px}table.fit.w
     var y1 = String(+ctx.inizio.slice(0, 4)), y2 = String(+y1 + 1), mesi27 = anni[y1] || [];
     var eco27 = { ricavi: 0, compensi: 0, gs: 0 }; mesi27.forEach(function (i) { var m = M[i]; eco27.ricavi += marg(m) + adlerEco(m); eco27.compensi += lordi[0][i] + lordi[1][i]; eco27.gs += gsSoc[0][i] + gsSoc[1][i]; });
     var u27 = (eco27.ricavi - eco27.compensi - eco27.gs) * 12 / Math.max(1, mesi27.length), base27 = (eco27.compensi + eco27.gs) * 12 / Math.max(1, mesi27.length);
-    var T27 = r2(0.24 * Math.max(0, u27) + num(ctx.irapPerc || 3.9) / 100 * Math.max(0, u27 + base27)), Tacc = c.acconti === 'previsionale' ? T27 : T26, acc27 = r2(Tacc * (p1 + p2)), saldo27 = r2(T27 - acc27);
+    var T27 = c.imposte27 !== '' && c.imposte27 !== undefined && c.imposte27 !== null ? r2(num(c.imposte27)) : r2(0.24 * Math.max(0, u27) + num(ctx.irapPerc || 3.9) / 100 * Math.max(0, u27 + base27)), T27calc = r2(0.24 * Math.max(0, u27) + num(ctx.irapPerc || 3.9) / 100 * Math.max(0, u27 + base27)), Tacc = c.acconti === 'previsionale' ? T27 : T26, acc27 = r2(Tacc * (p1 + p2)), saldo27 = r2(T27 - acc27);
     function piano(n) {
-      var tx = M.map(function () { return 0; }), det = M.map(function () { return []; });
-      function giugno(y, totale, lbl) { var i0 = M.indexOf(y + '-06'); if (i0 < 0 || totale <= 0) return 0; var q = totale / n, int = 0;
-        for (var k = 0; k < n; k++) { var i = i0 + k; if (i >= N) break; var v = r2(q * (1 + 0.04 / 12 * k)); int += v - q; tx[i] += v; det[i].push(lbl + (n > 1 ? ' rata ' + (k + 1) + '/' + n : '') + ': ' + v); } return int; }
-      function nov(y, v, lbl) { var i = M.indexOf(y + '-11'); if (i < 0 || v <= 0) return; tx[i] += r2(v); det[i].push(lbl + ': ' + r2(v)); }
-      var int = giugno(y1, T26 + Tacc * p1, 'IRES+IRAP ' + (+y1 - 1) + ' saldo + 1° acconto ' + y1);
+      var tx = M.map(function () { return 0; }), det = M.map(function () { return []; }), quote = M.map(function () { return {}; });   /* quote: parte del versamento (senza interessi) per anno d'imposta */
+      function giugno(y, parti, lbl) { var totale = parti.reduce(function (t, x) { return t + x.v; }, 0), i0 = M.indexOf(y + '-06'); if (i0 < 0 || totale <= 0) return 0; var q = totale / n, int = 0;
+        for (var k = 0; k < n; k++) { var i = i0 + k; if (i >= N) break; var v = r2(q * (1 + 0.04 / 12 * k)); int += v - q; tx[i] += v; parti.forEach(function (x) { quote[i][x.a] = (quote[i][x.a] || 0) + q * x.v / totale; }); det[i].push(lbl + (n > 1 ? ' rata ' + (k + 1) + '/' + n : '') + ': ' + v); } return int; }
+      function nov(y, v, lbl) { var i = M.indexOf(y + '-11'); if (i < 0 || v <= 0) return; tx[i] += r2(v); quote[i][y] = (quote[i][y] || 0) + v; det[i].push(lbl + ': ' + r2(v)); }
+      var int = giugno(y1, [{ a: String(+y1 - 1), v: T26 }, { a: y1, v: Tacc * p1 }], 'IRES+IRAP ' + (+y1 - 1) + ' saldo + 1° acconto ' + y1);
       nov(y1, Tacc * p2, '2° acconto ' + y1);
-      var giu2 = Math.max(0, saldo27 + T27 * p1); int += giugno(y2, giu2, 'IRES+IRAP ' + y1 + ' saldo + 1° acconto ' + y2); nov(y2, T27 * p2, '2° acconto ' + y2);
-      return { tx: tx.map(r2), det: det, interessi: r2(int) };
+      int += giugno(y2, [{ a: y1, v: Math.max(0, saldo27) }, { a: y2, v: T27 * p1 }], 'IRES+IRAP ' + y1 + ' saldo + 1° acconto ' + y2); nov(y2, T27 * p2, '2° acconto ' + y2);
+      return { tx: tx.map(r2), det: det, quote: quote, interessi: r2(int) };
     }
     // flussi di base (senza IVA arretrata)
     function base(n) {
-      var P = piano(n), R = { avvisoTot: 0, accIva: [], inc: [], spese: [], apertura: [], marg: [], adler: [], ivaInc: [], straord: [], ivaVers: [], compNetti: [], f24Comp: [], divNetti: [], f24Div: [], imposte: P.tx, avviso: [], chiusura: [], famiglia: [], divFam: [] };
+      var P = piano(n), R = { avvisoTot: 0, accIva: [], inc: [], spese: [], apertura: [], marg: [], adler: [], ivaInc: [], straord: [], ivaVers: [], compNetti: [], f24Comp: [], divNetti: [], f24Div: [], imposte: P.tx, avviso: [], debiti: debP.map(r2), chiusura: [], famiglia: [], divFam: [] };
       var bal = cassa0, ivaCarry = 0, ritDivPrec = 0, divCum = 0, avvRate = avvisoPiano(); R.avvisoTot = avvRate.tot || 0;
       M.forEach(function (m, i) {
         R.apertura.push(r2(bal));
@@ -798,7 +804,7 @@ table.fit{min-width:0!important;width:100%!important;font-size:9.4px}table.fit.w
         var disp = num(ctx.riserve) + (m >= String(c.approvazione).slice(0, 7) ? num(ctx.utileDistr2026) : 0); if (dl > 0 && divCum > disp + 0.5) avv.push('Dividendi di ' + stFm(m) + ': superano gli utili approvati disponibili (' + r2(disp) + ' €).');
         R.divNetti.push(r2(dl * 0.74)); R.f24Div.push(r2(ritDivPrec)); ritDivPrec = dl * 0.26; R.divFam.push(r2(dl * 0.74 * qFam / 100));
         R.avviso.push(r2(avvRate[i] || 0));
-        bal += a + ad + iv + so - R.ivaVers[i] - cn - f - R.divNetti[i] - R.f24Div[i] - P.tx[i] - R.avviso[i];
+        bal += a + ad + iv + so - R.ivaVers[i] - cn - f - R.divNetti[i] - R.f24Div[i] - P.tx[i] - R.avviso[i] - debP[i];
         R.chiusura.push(r2(bal)); R.famiglia.push(r2(cn + altreNette + R.divFam[i]));
       });
       R.piano = P; return R;
@@ -835,11 +841,28 @@ table.fit{min-width:0!important;width:100%!important;font-size:9.4px}table.fit.w
     if (c.ivaModo === 'ravv' && restoArr > 1) avv.push('IVA arretrata non chiusa nel periodo: restano ' + restoArr + ' € (con questi compensi e queste uscite la cassa non basta).');
     if (c.ivaModo === 'ravv' && chiusoIn && chiusoIn > y1 + '-04') avv.push('IVA arretrata chiusa solo a ' + stFm(chiusoIn) + ': dopo il 30/04/' + y1 + ' la sanzione sale da 1/8 a 1/7.');
     (persone[y1] || []).forEach(function (st, j) { var t = c.pers[j].tetto; if (t !== '' && t !== null && t !== undefined && num(t) > 0 && st.R > num(t) + 1) avv.push((ctx.nomi ? ctx.nomi[j] : 'Persona ' + (j + 1)) + ': reddito IRPEF ' + y1 + ' di ' + st.R + ' €, sopra il tetto di ' + num(t) + ' € (aliquota marginale ' + st.marginale + '%).'); });
+    /* ── Debiti pregressi e riserve fiscali: a fine mese, quanto della cassa è già impegnato e quanto è libero ── */
+    var scorta = c.scorta !== '' && c.scorta !== null && c.scorta !== undefined ? num(c.scorta) : Math.max(0, num(c.soglia)), cum = {}, Ris = [];
+    var annoImp = {}; annoImp[y1] = T27; annoImp[y2] = T27;   /* imposte dell'anno: stima 2027; per l'anno dopo stesso livello */
+    M.forEach(function (m, i) { var Q = B.piano.quote[i] || {}; Object.keys(Q).forEach(function (a) { cum[a] = (cum[a] || 0) + Q[a]; });
+      var dataR = mesePiu(m) + '-16', A = 0;
+      if (c.ivaModo === 'ravv') Rv.items.forEach(function (x) { var pag = x.pagato.filter(function (p) { return p.m <= m; }).reduce(function (t, p) { return t + p.imp; }, 0), resto = Math.max(0, x.imp - pag); if (resto < 0.005) return; var f = stFattoreRavv(x.scad, dataR, c.legale); A += resto * ((x.soloSanz ? 0 : 1) + f.sanz + f.int); });
+      else for (var j = i + 1; j < N; j++) A += B.avviso[j];
+      var Bimp = Math.max(0, T26 - (cum[String(+y1 - 1)] || 0)), Cd = debScad.filter(function (d) { return d.m > m; }).reduce(function (t, d) { return t + d.v; }, 0);
+      var D = i + 1 < N ? Math.max(0, B.ivaVers[i + 1] - (B.accIva[i + 1] || 0)) : Math.max(0, B.ivaInc[i]), y = m.slice(0, 4), E = 0;
+      [y1, y2].forEach(function (a) { var fr = a < y ? 1 : a === y ? +m.slice(5, 7) / 12 : 0; E += Math.max(0, annoImp[a] * fr - (cum[a] || 0)); });
+      var cassa = B.chiusura[i], tot = A + Bimp + Cd + D + E + scorta, disp = Math.max(0, cassa), cop = {};
+      [['A', A], ['B', Bimp], ['C', Cd], ['D', D], ['E', E], ['S', scorta]].forEach(function (z) { var x = Math.min(disp, z[1]); cop[z[0]] = r2(x); disp -= x; });
+      Ris.push({ m: m, cassa: r2(cassa), ivaRes: r2(A), imp26: r2(Bimp), debiti: r2(Cd), iva27: r2(D), imp27: r2(E), scorta: r2(scorta), pregressi: r2(A + Bimp + Cd), correnti: r2(D + E), tot: r2(tot), libera: r2(cassa - tot), coperto: cop, scoperto: r2(Math.max(0, tot - Math.max(0, cassa))) }); });
+    for (var ii = N - 1, mn = Infinity; ii >= 0; ii--) { mn = Math.min(mn, Ris[ii].libera); Ris[ii].prelevabile = r2(Math.max(0, mn)); }
+    var equilibrio = null; for (var e2 = 0; e2 < N; e2++) { if (Ris.slice(e2).every(function (x) { return x.libera >= -0.5; })) { equilibrio = M[e2]; break; } }
+    var pregChiusi = null; for (var e3 = 0; e3 < N; e3++) { if (Ris.slice(e3).every(function (x) { return x.pregressi < 1; })) { pregChiusi = M[e3]; break; } }
     var famAnno = mesi27.reduce(function (t, i) { return t + B.famiglia[i]; }, 0) / Math.max(1, mesi27.length);
     if (famAnno < num(c.fam) - 1) avv.push('Reddito netto della famiglia nel ' + y1 + ': ' + r2(famAnno) + ' € al mese, sotto l\'obiettivo di ' + num(c.fam) + ' €.');
     return { cfg: c, mesi: M, righe: B, arretrati: Rv.items, ivaDett: Rv.dett, impDett: B.piano.det, rate: scelta.n, interessiRate: B.piano.interessi, restoArr: restoArr, extraArr: extraArr, chiusoIn: chiusoIn,
       cassa0: r2(cassa0), acconto26: acc26, differita: differita, arrTot: r2(arrIn.reduce(function (t, x) { return t + (x.soloSanz ? 0 : num(x.imp)); }, 0)), sogliaEff: sogliaEff, minimo: r2(minimo), meseMin: M[iMin], finale: B.chiusura[N - 1], persone: persone, lordi: lordi, netti: netti, gsSoc: gsSoc, altreNette: r2(altreNette), qFam: qFam,
-      imposte: { T26: r2(T26), Tacc: r2(Tacc), previsionale: c.acconti === 'previsionale', p1: p1, p2: p2, T27: T27, acc27: acc27, saldo27: saldo27, utile27: r2(u27) }, famMedia: r2(famAnno), anno: y1, avvisoTot: B.avvisoTot, avvisi: avv };
+      imposte: { T26: r2(T26), Tacc: r2(Tacc), previsionale: c.acconti === 'previsionale', p1: p1, p2: p2, T27: T27, T27calc: T27calc, acc27: acc27, saldo27: saldo27, utile27: r2(u27) }, famMedia: r2(famAnno), anno: y1, avvisoTot: B.avvisoTot, avvisi: avv,
+      riserve: { mesi: Ris, equilibrio: equilibrio, pregressiChiusi: pregChiusi, scorta: r2(scorta), debitiDet: debDet, debitiTot: r2(debScad.filter(function (d) { return d.m >= M[0]; }).reduce(function (t, d) { return t + d.v; }, 0)), arrIn: arrIn } };
   }
   /* Proposta: ripartisce il reddito netto della famiglia sulla fonte che costa meno alla società (prima dell'IRES), passo dopo passo */
   function strategiaProponi(ctx, cfgIn) {
@@ -1089,9 +1112,9 @@ function calc(){ return E.calcola({voci:vociCalc(),dash:S.dash||{},params:params
 function cls(x){ return x<-0.004?'neg':(x>0.004?'pos':''); }
 
 /* ── Viste ── */
-var TABS=[['oggi','Oggi'],['riepilogo','Riepilogo'],['strategia','Strategia'],['istruzioni','Istruzioni'],['compdiv','Compenso o dividendo'],['pl','P&L mensile'],['cassa','Cassa'],['flussi','Cash flow'],['iva','IVA'],['imposte','Imposte (stima)'],['patrimonio','Stato patrimoniale'],['simulazione','Previsione nov-dic'],['utili','Prelievo utili'],['budget','Budget'],['commercialista','Per il commercialista'],['marini','Marini'],['voci','Voci manuali'],['dashboard','Da Dashboard V6'],['param','Parametri'],['controlli','Controlli'],['storico','Storico']];
+var TABS=[['oggi','Oggi'],['riepilogo','Riepilogo'],['strategia','Strategia'],['riserve','Debiti e riserve'],['istruzioni','Istruzioni'],['compdiv','Compenso o dividendo'],['pl','P&L mensile'],['cassa','Cassa'],['flussi','Cash flow'],['iva','IVA'],['imposte','Imposte (stima)'],['patrimonio','Stato patrimoniale'],['simulazione','Previsione nov-dic'],['utili','Prelievo utili'],['budget','Budget'],['commercialista','Per il commercialista'],['marini','Marini'],['voci','Voci manuali'],['dashboard','Da Dashboard V6'],['param','Parametri'],['controlli','Controlli'],['storico','Storico']];
 function nav(){ document.getElementById('nav').innerHTML=TABS.map(function(t){return '<button class="'+(S.tab===t[0]?'on':'')+'" data-t="'+t[0]+'">'+t[1]+'</button>';}).join(''); }
-function render(){ nav(); var reg=calc(); S.__reg=reg; var r=reg, SIMO=null; if(S.tab==='pl'&&S.plPrev!==false){ try{ SIMO=simRun(); r=SIMO.res; }catch(e){ r=reg; SIMO=null; } } var f={oggi:vOggi,riepilogo:vRiepilogo,strategia:vStrategia,istruzioni:vIstruzioni,compdiv:vCompDiv,pl:vPL,iva:vIva,imposte:vImposte,patrimonio:vPatrimonio,simulazione:vSimulazione,cassa:vCassa,flussi:vFlussi,utili:vUtili,commercialista:vReport,marini:vMarini,budget:vBudget,voci:vVoci,dashboard:vDash,param:vParam,controlli:vControlli,storico:vStorico}[S.tab]; document.getElementById('main').innerHTML='<div class="bar">'+provvHtml()+'<span id="pdfmsg" class="note"></span><button class="p" data-a="pdf" style="margin:0">⬇ Salva PDF</button></div><div class="pdfhead"'+(S.tab==='commercialista'?' style="display:none!important"':'')+'><b>Bilancio SRL — '+esc(TABS.filter(function(t){return t[0]===S.tab;})[0][1])+'</b><div class="note">Tullio Serci S.r.l. · generato il '+new Date().toLocaleDateString('it-IT')+' · importi in euro, IVA esclusa salvo dove indicato'+esc(provvNota())+'</div></div>'+f(r)+(SIMO?cashFlowHtml(SIMO):'');
+function render(){ nav(); var reg=calc(); S.__reg=reg; var r=reg, SIMO=null; if(S.tab==='pl'&&S.plPrev!==false){ try{ SIMO=simRun(); r=SIMO.res; }catch(e){ r=reg; SIMO=null; } } var f={oggi:vOggi,riepilogo:vRiepilogo,strategia:vStrategia,riserve:vRiserve,istruzioni:vIstruzioni,compdiv:vCompDiv,pl:vPL,iva:vIva,imposte:vImposte,patrimonio:vPatrimonio,simulazione:vSimulazione,cassa:vCassa,flussi:vFlussi,utili:vUtili,commercialista:vReport,marini:vMarini,budget:vBudget,voci:vVoci,dashboard:vDash,param:vParam,controlli:vControlli,storico:vStorico}[S.tab]; document.getElementById('main').innerHTML='<div class="bar">'+provvHtml()+'<span id="pdfmsg" class="note"></span><button class="p" data-a="pdf" style="margin:0">⬇ Salva PDF</button></div><div class="pdfhead"'+(S.tab==='commercialista'?' style="display:none!important"':'')+'><b>Bilancio SRL — '+esc(TABS.filter(function(t){return t[0]===S.tab;})[0][1])+'</b><div class="note">Tullio Serci S.r.l. · generato il '+new Date().toLocaleDateString('it-IT')+' · importi in euro, IVA esclusa salvo dove indicato'+esc(provvNota())+'</div></div>'+f(r)+(SIMO?cashFlowHtml(SIMO):'');
   if(S.tab==='riepilogo') grafico(r); if(S.tab==='voci') bulkInfo(); marcaTabelle(); }
 function marcaRisultati(){ [].forEach.call(document.querySelectorAll('#main .kpi'),function(k){ var b=k.querySelector('b'); k.classList.toggle('kpos',!!(b&&(b.classList.contains('pos')||b.classList.contains('ok')))); k.classList.toggle('kneg',!!(b&&(b.classList.contains('neg')||b.classList.contains('ko')))); });
   [].forEach.call(document.querySelectorAll('#main table tr.t td'),function(td){ if(td.classList.contains('pos')||td.classList.contains('neg')) return; var b=td.querySelector('b.pos,b.neg,b.ok,b.ko'); if(b&&td.children.length===1) td.classList.add(b.classList.contains('pos')||b.classList.contains('ok')?'pos':'neg'); }); }
@@ -1752,6 +1775,8 @@ async function azione(a,id){
       var vecchia=S.edit&&S.edit.id?S.edit:null, fv=vecchia?voceFonte(vecchia):null; v.src=!vecchia?'manuale':(fv&&fv.auto?'modificata':(vecchia.src||'manuale'));
       if(vecchia&&fv&&fv.auto&&!/modificata a mano/.test(v.note)) v.note=(v.note?v.note+' · ':'')+'modificata a mano il '+new Date().toLocaleDateString('it-IT')+' (era: '+fv.nome+')';
       await call('apiSalvaVoce',voceVersoServer(v)); S.edit=null; await ricarica(); }
+    else if(a==='rsadd'){ rsCfg().debiti.push({desc:'',rata:'',da:'',n:1,ogni:1,tipo:'rate'}); stSalva(); render(); }
+    else if(a==='rsdel'){ if(confirm('Togliere questo debito?')){ rsCfg().debiti.splice(+id,1); stSalva(); render(); } }
     else if(a==='vff'){ VF.fonte=id||''; render(); }
     else if(a==='vfreset'){ VF.fonte='';VF.testo='';VF.cat='';VF.da='';VF.a='';VF.elim=false; render(); }
     else if(a==='mod'){ S.edit=S.voci.filter(function(x){return x.id===id;})[0]; render(); window.scrollTo(0,0); }
@@ -1965,7 +1990,7 @@ function stIn(path,val,o){ o=o||{}; var v=val===''||val===null||val===undefined?
   return '<input type="'+(o.type||'text')+'"'+(o.type?'':' inputmode="decimal"')+' data-st="'+path+'" value="'+esc(v)+'"'+(o.ph!==undefined?' placeholder="'+esc(o.ph)+'"':'')+(o.style?' style="'+o.style+'"':'')+'>'; }
 function stCampo(l,inp,nota){ return '<div><label>'+l+'</label>'+inp+(nota?'<div class="note">'+nota+'</div>':'')+'</div>'; }
 function stGrafico(R,ctx){ var M=R.mesi, W=1200, H=320, pl=62, pr=14, pt=24, pb=30, n=M.length, bw=(W-pl-pr)/n, F=ctx.fido, so=R.sogliaEff;
-  var fis=M.map(function(m,i){ var r=R.righe; return r.ivaVers[i]+r.ivaArr[i]+r.avviso[i]+r.imposte[i]+r.f24Comp[i]+r.f24Div[i]; }), ch=R.righe.chiusura;
+  var fis=M.map(function(m,i){ var r=R.righe; return r.ivaVers[i]+r.ivaArr[i]+r.avviso[i]+r.imposte[i]+r.f24Comp[i]+r.f24Div[i]+(r.debiti?r.debiti[i]:0); }), ch=R.righe.chiusura;
   var vals=[0,-F,so].concat(ch,fis.map(function(x){ return -x; })), mx=Math.max.apply(null,vals), mn=Math.min.apply(null,vals); if(mx<=mn) mx=mn+1;
   var rg=mx-mn, st=Math.pow(10,Math.floor(Math.log10(rg/5))); [1,2,2.5,5,10].some(function(f){ if(rg/(st*f)<=6){ st=st*f; return true; } return false; });
   var lo=Math.floor(mn/st)*st, hi=Math.ceil(mx/st)*st, Y=function(v){ return pt+(hi-v)/(hi-lo)*(H-pt-pb); }, k=function(v){ return (Math.round(v/100)/10).toLocaleString('it-IT')+'k'; }, h='';
@@ -1997,7 +2022,7 @@ function vStrategia(){ var ctx=stCtx(), c=stCfg(), R=E.strategia(ctx,c), M=R.mes
   var rowIn=function(l,key,a,o){ o=o||{}; return '<tr><td style="text-align:left">'+l+'</td>'+a.map(function(v,i){ return '<td class="mod"><input type="text" inputmode="decimal" data-st="'+key+'|'+M[i]+'" value="'+eurIn(v)+'"></td>'; }).join('')+'<td>'+(o.neg&&sum(a)?'−'+eur(sum(a)):eur(sum(a)))+'</td></tr>'; };
   var fido=M.map(function(m,i){ return r.chiusura[i]+ctx.fido; });
   var tab=row('Cassa a inizio mese',r.apertura,{s:1,noTot:1})+rowIn('+ Incassi da clienti, escluso Adler (IVA inclusa)','incM',r.inc)+row('+ Incassi Adler (servizio di 2 mesi prima)',r.adler)+rowIn('± Movimenti straordinari (rate Paysolution, laser…)','straord',r.straord)+rowIn('− Spese correnti: fornitori, carte, studio, pubblicità, royalty (IVA inclusa)','spM',r.spese,{neg:1})
-    +rowIn('IVA del mese, si versa il 16 del mese dopo (debito − credito; negativa = credito)','ivaM',r.ivaInc)+row('− IVA corrente versata (16 del mese; a dicembre con l\'acconto)',r.ivaVers,{neg:1})+row(c.ivaModo==='ravv'?'− IVA arretrata: ravvedimento (imposta + sanzioni + interessi)':'− IVA arretrata: rate dell\'avviso bonario',c.ivaModo==='ravv'?r.ivaArr:r.avviso,{neg:1})+row('− IRES e IRAP',r.imposte,{neg:1})
+    +rowIn('IVA del mese, si versa il 16 del mese dopo (debito − credito; negativa = credito)','ivaM',r.ivaInc)+row('− IVA corrente versata (16 del mese; a dicembre con l\'acconto)',r.ivaVers,{neg:1})+row(c.ivaModo==='ravv'?'− IVA arretrata: ravvedimento (imposta + sanzioni + interessi)':'− IVA arretrata: rate dell\'avviso bonario',c.ivaModo==='ravv'?r.ivaArr:r.avviso,{neg:1})+row('− IRES e IRAP',r.imposte,{neg:1})+(r.debiti&&r.debiti.some(function(x){ return x>0.5; })?row('− Rate di debiti pregressi (dal commercialista)',r.debiti,{neg:1}):'')
     +rowIn('− Compenso netto '+esc(nm[0]),'nettiM.0',R.netti[0],{neg:1})+rowIn('− Compenso netto '+esc(nm[1]),'nettiM.1',R.netti[1],{neg:1})+row('− F24 compensi (ritenute + Gestione Separata, mese dopo)',r.f24Comp,{neg:1})
     +row('− Dividendi netti (a tutti i soci)',r.divNetti,{neg:1})+row('− F24 ritenuta 26% sui dividendi',r.f24Div,{neg:1})
     +row('= CASSA A FINE MESE',r.chiusura,{t:1,c:1,noTot:1})+row('Disponibile con il fido ('+eur(ctx.fido)+')',fido,{s:1,c:1,noTot:1})+row('Reddito netto famiglia ('+esc(nm[0])+' + '+esc(nm[1])+')',r.famiglia,{cmp:+c.fam});
@@ -2080,6 +2105,69 @@ function stAzione(a,id){ var c=stCfg(), ctx;
 document.addEventListener('change',function(e){ var k=e.target&&e.target.dataset&&e.target.dataset.st; if(!k) return; if(!stSet(k,e.target.value)) return; stSalva();
   setTimeout(function(){ var a=document.activeElement, kk=a&&a.dataset&&a.dataset.st; render(); if(kk){ var el=document.querySelector('[data-st="'+kk+'"]'); if(el){ el.focus(); if(el.select) el.select(); } } },0); });
 document.addEventListener('keydown',function(e){ if(e.key==='Enter'&&e.target.dataset&&e.target.dataset.st&&e.target.tagName==='INPUT') e.target.blur(); });
+/* ── Pagina DEBITI E RISERVE: debiti fiscali pregressi, riserve dell'anno in corso, liquidità libera, mese di equilibrio ── */
+function rsIn(k,v,o){ o=o||{}; if(o.sel) return '<select data-rs="'+k+'">'+o.sel.map(function(x){ return '<option value="'+x[0]+'"'+(String(v)===String(x[0])?' selected':'')+'>'+esc(x[1])+'</option>'; }).join('')+'</select>';
+  return '<input type="'+(o.tipo||'text')+'" data-rs="'+k+'" value="'+(v===''||v===undefined||v===null?'':(o.tipo?esc(v):eurIn(+v)))+'"'+(o.ph?' placeholder="'+esc(o.ph)+'"':'')+' style="'+(o.w?'width:'+o.w:'')+'">'; }
+function rsGrafico(Ris){ var W=1200,H=300,pl=62,pr=10,pt=18,pb=28,n=Ris.length,bw=(W-pl-pr)/n;
+  var vals=[0]; Ris.forEach(function(x){ vals.push(x.cassa,x.tot,x.libera); }); var mx=Math.max.apply(null,vals), mn=Math.min.apply(null,vals); if(mx<=mn) mx=mn+1; var pad=(mx-mn)*0.06; mx+=pad; mn-=pad;
+  var Y=function(v){ return pt+(mx-v)/(mx-mn)*(H-pt-pb); }, k=function(v){ return (Math.round(v/100)/10).toLocaleString('it-IT')+'k'; }, h='<rect x="0" y="0" width="'+W+'" height="'+H+'" fill="#fff"/>';
+  var rg=mx-mn, st=Math.pow(10,Math.floor(Math.log10(rg/5))); [1,2,2.5,5,10].some(function(f){ if(rg/(st*f)<=6){ st=st*f; return true; } return false; });
+  for(var t=Math.ceil(mn/st)*st;t<=mx;t+=st) h+='<line x1="'+pl+'" x2="'+(W-pr)+'" y1="'+Y(t)+'" y2="'+Y(t)+'" stroke="'+(Math.abs(t)<1e-6?'#888':'#e3e6ea')+'" stroke-width="'+(Math.abs(t)<1e-6?1:.7)+'"/><text x="'+(pl-6)+'" y="'+(Y(t)+4)+'" font-size="11" text-anchor="end" fill="#667">'+k(t)+'</text>';
+  var pc=[],pl2=[];
+  Ris.forEach(function(x,i){ var x0=pl+i*bw+bw*0.18, w=bw*0.64, y0=Y(0), seg=[[x.pregressi,'#8e24aa'],[x.correnti,'#ef6c00'],[x.scorta,'#9e9e9e']], acc=0;
+    seg.forEach(function(sg){ if(sg[0]<=0) return; var a=Y(acc), b=Y(acc+sg[0]); h+='<rect x="'+x0+'" y="'+b+'" width="'+w+'" height="'+Math.max(0.5,a-b)+'" fill="'+sg[1]+'" opacity=".75"><title>'+eur(sg[0])+' €</title></rect>'; acc+=sg[0]; });
+    var c=pl+i*bw+bw/2; pc.push(c+','+Y(x.cassa)); pl2.push(c+','+Y(x.libera));
+    h+='<text x="'+c+'" y="'+(H-10)+'" font-size="11" text-anchor="middle" fill="#445">'+etmC(x.m)+'</text>'; });
+  h+='<polyline points="'+pc.join(' ')+'" fill="none" stroke="#1565c0" stroke-width="2.6"/><polyline points="'+pl2.join(' ')+'" fill="none" stroke="#2e7d32" stroke-width="2.2" stroke-dasharray="6 4"/>';
+  Ris.forEach(function(x,i){ var c=pl+i*bw+bw/2; h+='<circle cx="'+c+'" cy="'+Y(x.libera)+'" r="3.5" fill="'+(x.libera>=0?'#2e7d32':'#c62828')+'"><title>'+etmC(x.m)+': liquidità libera '+eur(x.libera)+' €</title></circle>'; });
+  return '<svg viewBox="0 0 '+W+' '+H+'" width="100%" height="'+H+'" role="img" aria-label="Cassa, impegni e liquidità libera">'+h+'</svg>'; }
+function etmC(m){ return ['gen','feb','mar','apr','mag','giu','lug','ago','set','ott','nov','dic'][+String(m).slice(5,7)-1]+' '+String(m).slice(2,4); }
+function rsCfg(){ var c=stCfg(); if(!c.ivaArr||typeof c.ivaArr!=='object') c.ivaArr={}; if(!Array.isArray(c.debiti)) c.debiti=[]; if(c.scorta===undefined) c.scorta=''; if(c.imposte27===undefined) c.imposte27=''; return c; }
+function vRiserve(){ var ctx=stCtx(), c=rsCfg(), R=E.strategia(ctx,c), Q=R.riserve, Ris=Q.mesi, I=R.imposte, y1=R.anno, prev=String(+y1-1);
+  if(!Ris||!Ris.length) return '<div class="card">Nessun dato: apri prima la pagina Strategia.</div>';
+  var p0=Ris[0], fine=Ris[Ris.length-1], eq=Q.equilibrio, ultimo=R.mesi[R.mesi.length-1];
+  var kp=kpi('Debiti fiscali pregressi a fine '+etmC(p0.m),eur(p0.pregressi),p0.pregressi>0.5?'neg':'pos')
+    +kpi('Riserve per l\'anno in corso a fine '+etmC(p0.m),eur(p0.correnti))
+    +'<div class="kpi card '+(eq?'kpos':'kneg')+'"><span>Equilibrio finanziario</span><b class="'+(eq?'pos':'neg')+'">'+(eq?istMese(eq):'non raggiunto entro '+istMese(ultimo))+'</b></div>'
+    +kpi('Prelevabile ora senza scoprire i mesi successivi',eur(p0.prelevabile),p0.prelevabile>0.5?'pos':'neg')
+    +kpi('Liquidità libera a '+istMese(fine.m),eur(fine.libera),fine.libera>=0?'pos':'neg')
+    +(Q.pregressiChiusi?kpi('Debiti pregressi chiusi da',istMese(Q.pregressiChiusi).replace(/^./,function(x){return x.toUpperCase();})).replace(' €</b>','</b>'):'');
+  var spieg='<div class="card"><b>Come leggere questa pagina</b><div class="note" style="margin-top:4px;line-height:1.55">A fine di ogni mese la cassa (senza fido) viene <b>assegnata virtualmente</b>, in quest\'ordine: '
+    +'<b>1)</b> IVA '+prev+' residua (imposta + sanzioni e interessi a quella data) · <b>2)</b> imposte '+prev+' ancora da versare (IRES e IRAP: saldo, anche rateizzato) · <b>3)</b> rateizzazioni e altri debiti pregressi · '
+    +'<b>4)</b> IVA '+y1+' già maturata e non ancora versata (si paga il 16 del mese dopo) · <b>5)</b> imposte di competenza '+y1+' maturate mese per mese, al netto degli acconti già versati · <b>6)</b> scorta operativa minima. '
+    +'Solo quello che resta è <b>liquidità libera</b>, utilizzabile per compensi in più, dividendi o spese non indispensabili. Le spese correnti, i compensi già previsti dalla Strategia e le scadenze del mese sono già pagati nella cassa.<br>'
+    +'<b>Prelevabile ora</b> = la liquidità libera più bassa da questo mese in avanti: prelevando di più, un mese futuro resterebbe scoperto. <b>Equilibrio finanziario</b> = il primo mese da cui la liquidità libera non torna più sotto zero.</div></div>';
+  var th=function(t){ return '<th style="white-space:normal;line-height:1.2;vertical-align:bottom">'+t+'</th>'; };
+  var hd='<tr><th style="text-align:left;vertical-align:bottom">Mese</th>'+th('Cassa a<br>fine mese')+th('1) IVA '+prev+'<br>residua')+th('2) Imposte '+prev+'<br>da versare')+th('3) Rate e<br>altri debiti')+th('4) IVA '+y1+'<br>maturata')+th('5) Imposte '+y1+'<br>maturate')+th('6) Scorta')+th('Totale<br>impegni')+th('Liquidità<br>libera')+th('Prelevabile<br>ora')+'</tr>';
+  var rw=Ris.map(function(x){ var sc=function(v,k){ var cov=x.coperto[k], scop=v-cov; return eur(v)+(scop>0.5?'<div class="note" style="color:var(--kotx)">scoperti '+eur(scop)+'</div>':''); };
+    return '<tr class="t"><td style="text-align:left;text-transform:capitalize">'+istMese(x.m)+(x.m===eq?' <span class="pill ppos">equilibrio</span>':'')+'</td><td class="'+(x.cassa<0?'neg':'')+'">'+eur(x.cassa)+'</td><td>'+sc(x.ivaRes,'A')+'</td><td>'+sc(x.imp26,'B')+'</td><td>'+sc(x.debiti,'C')+'</td><td>'+sc(x.iva27,'D')+'</td><td>'+sc(x.imp27,'E')+'</td><td>'+sc(x.scorta,'S')+'</td><td><b>'+eur(x.tot)+'</b></td><td class="'+(x.libera>=0?'pos':'neg')+'">'+eur(x.libera)+'</td><td class="'+(x.prelevabile>0.5?'pos':'')+'">'+eur(x.prelevabile)+'</td></tr>'; }).join('');
+  var tab='<div class="card tw"><b>Mese per mese: cassa, impegni e liquidità libera</b><table style="table-layout:fixed;width:100%;min-width:1000px;margin-top:6px"><colgroup><col style="width:12%"><col span="10" style="width:8.8%"></colgroup>'+hd+rw+'</table>'
+    +'<div class="note" style="margin-top:4px">"Scoperti" = la parte di quell\'impegno che la cassa di fine mese non copre, rispettando l\'ordine di priorità. Le imposte '+y1+' sono una stima ('+eur(I.T27)+' €'+(c.imposte27!==''?', dato dello studio':', calcolata dalla consolle')+'); per l\'anno dopo uso lo stesso livello.</div></div>';
+  var gr='<div class="card"><b>Cassa e impegni</b>'+rsGrafico(Ris)+'<div class="note"><span style="display:inline-block;width:11px;height:11px;background:#8e24aa;opacity:.75;margin:0 4px -1px 0"></span>debiti pregressi <span style="display:inline-block;width:11px;height:11px;background:#ef6c00;opacity:.75;margin:0 4px -1px 10px"></span>riserve dell\'anno <span style="display:inline-block;width:11px;height:11px;background:#9e9e9e;margin:0 4px -1px 10px"></span>scorta <span style="display:inline-block;width:18px;height:3px;background:#1565c0;margin:0 4px 3px 10px"></span>cassa a fine mese <span style="display:inline-block;width:18px;border-top:3px dashed #2e7d32;margin:0 4px 3px 10px"></span>liquidità libera</div></div>';
+  // dati dal commercialista
+  var arrCalc={}; (ctx.arretrati||[]).forEach(function(x){ arrCalc[x.m]=x.imp; }); if(ctx.meseNov) arrCalc[ctx.meseNov]=ctx.ivaNov;
+  var arrRows=R.arretrati.filter(function(x){ return !x.acconto; }).map(function(x){ return '<tr><td style="text-align:left">IVA di '+istMese(x.m)+'</td><td>'+String(x.scad).split('-').reverse().join('/')+'</td><td>'+(arrCalc[x.m]!==undefined?eur(+arrCalc[x.m]):'—')+'</td><td class="mod">'+rsIn('ivaArr|'+x.m,c.ivaArr[x.m],{ph:'come calcolato'})+'</td></tr>'; }).join('');
+  var accRow=R.arretrati.filter(function(x){ return x.acconto; }).map(function(x){ return '<tr><td style="text-align:left">Acconto IVA '+prev+' (27/12)</td><td>'+String(x.scad).split('-').reverse().join('/')+'</td><td>'+eur(r2c(0.88*Math.max(0,+ctx.ivaDic||0)))+'</td><td class="mod">'+rsIn('acconto',c.acconto,{ph:'come calcolato'})+'</td></tr>'; }).join('');
+  var deb=(c.debiti||[]).map(function(d,i){ return '<tr><td class="mod">'+rsIn('deb|'+i+'|desc',d.desc,{tipo:'text',ph:'es. Avviso bonario 2024, rateizzazione ADER…'})+'</td><td class="mod">'+rsIn('deb|'+i+'|rata',d.rata)+'</td><td class="mod">'+rsIn('deb|'+i+'|da',d.da,{tipo:'date'})+'</td><td class="mod">'+rsIn('deb|'+i+'|n',d.n,{tipo:'number',w:'70px'})+'</td><td class="mod">'+rsIn('deb|'+i+'|ogni',d.ogni,{sel:[[1,'mensile'],[3,'trimestrale'],[6,'semestrale'],[12,'annuale']]})+'</td><td>'+eur((+d.rata||0)*(+d.n||0))+'</td><td><button class="l" data-a="rsdel" data-id="'+i+'">×</button></td></tr>'; }).join('');
+  var dati='<div class="card"><b>Dati dal commercialista</b> <span class="note">(se lasci vuoto vale il calcolo della consolle; quando lo studio ti dà la cifra ufficiale, scrivila qui e tutto si ricalcola: Strategia, Istruzioni, Oggi)</span>'
+    +'<div style="margin-top:8px"><b>IVA '+prev+' residua</b> (imposta; sanzioni e interessi li calcola la consolle in base alla data di pagamento)</div>'
+    +'<table style="table-layout:fixed;width:720px;margin-top:4px"><colgroup><col style="width:220px"><col style="width:110px"><col style="width:190px"><col style="width:200px"></colgroup><tr><th style="text-align:left">Periodo</th><th>Scadenza</th><th>Calcolata dalla consolle €</th><th>Importo dello studio €</th></tr>'+arrRows+accRow+'</table>'
+    +'<div class="g" style="margin-top:10px"><div><label>Imposte '+prev+' (IRES + IRAP, saldo) €</label>'+rsIn('imposte',c.imposte,{ph:eurIn(+ctx.imposte2026||0)+' (calcolo)'})+'</div>'
+    +'<div><label>Imposte '+y1+' stimate (IRES + IRAP) €</label>'+rsIn('imposte27',c.imposte27,{ph:eurIn(I.T27calc||0)+' (calcolo)'})+'</div>'
+    +'<div><label>Acconti '+y1+'</label>'+rsIn('acconti',c.acconti,{sel:[['storico','Storico (sulle imposte '+prev+')'],['previsionale','Previsionale (sulle imposte '+y1+')']]})+'</div>'
+    +'<div><label>Rate per il saldo di giugno</label>'+rsIn('rate',c.rate,{sel:[['','Le sceglie la consolle ('+R.rate+')'],[1,'1 (unica)'],[2,'2'],[3,'3'],[4,'4'],[5,'5'],[6,'6'],[7,'7']]})+'</div>'
+    +'<div><label>Scorta operativa minima €</label>'+rsIn('scorta',c.scorta,{ph:eurIn(Q.scorta)})+'</div></div>'
+    +'<div style="margin-top:10px"><b>Rateizzazioni e altri debiti pregressi</b> <span class="note">(avvisi bonari, cartelle, rateizzazioni INPS o Agenzia: rata, prima scadenza ancora da pagare, quante rate restano)</span></div>'
+    +'<table style="table-layout:fixed;width:1000px;margin-top:4px"><colgroup><col style="width:340px"><col style="width:120px"><col style="width:170px"><col style="width:100px"><col style="width:140px"><col style="width:100px"><col style="width:30px"></colgroup><tr><th style="text-align:left">Descrizione</th><th>Rata €</th><th style="white-space:normal">Prima scadenza da pagare</th><th>Rate rimaste</th><th>Ogni</th><th>Totale €</th><th></th></tr>'+(deb||'<tr><td colspan="7" class="note">Nessun debito inserito</td></tr>')+'</table>'
+    +'<button class="l" data-a="rsadd" style="margin-top:6px">+ aggiungi un debito</button> <span id="stmsg" class="note"></span></div>';
+  return '<div class="kpis">'+kp+'</div>'+spieg+gr+tab+dati; }
+function r2c(x){ return Math.round(x*100)/100; }
+document.addEventListener('change',function(e){ var k=e.target&&e.target.dataset&&e.target.dataset.rs; if(!k) return; var c=rsCfg(), t=String(e.target.value).trim(), q=k.split('|'), num=function(){ if(t==='') return ''; var n=plParse(t); return n===null?'':n; };
+  if(q[0]==='ivaArr'){ if(t==='') delete c.ivaArr[q[1]]; else c.ivaArr[q[1]]=num(); }
+  else if(q[0]==='deb'){ var d=c.debiti[+q[1]]; if(!d) return; if(q[2]==='rata') d.rata=num(); else if(q[2]==='n'||q[2]==='ogni') d[q[2]]=parseInt(t,10)||1; else d[q[2]]=t; }
+  else if(q[0]==='acconti') c.acconti=t; else if(q[0]==='rate') c.rate=t===''?'':parseInt(t,10); else c[q[0]]=num();
+  stSalva(); render(); });
+
 /* ── Pagina ISTRUZIONI: cosa fare mese per mese, ricavato dalla Strategia ── */
 var MESI_LUNGHI=['gennaio','febbraio','marzo','aprile','maggio','giugno','luglio','agosto','settembre','ottobre','novembre','dicembre'];
 function istMese(m){ return MESI_LUNGHI[+m.slice(5,7)-1]+' '+m.slice(0,4); }
@@ -2130,6 +2218,7 @@ function vIstruzioni(){ var ctx=stCtx(), c=stCfg(), R=E.strategia(ctx,c), M=R.me
       f.push('<b>ravvedimento IVA di '+istMese(x.m)+'</b>: imposta cod. '+x.cod+' anno '+x.m.slice(0,4)+' '+eur(p.imp)+' € + sanzione cod. 8904 '+eur(sa)+' € (1/'+Math.round(1/fr.frazione)+') + interessi cod. 1991 '+eur(it)+' €'); tot16+=p.imp+sa+it; }); });
     else if(r.avviso[i]>0.5){ f.push('rata dell\'avviso bonario IVA (codici e importo esatti sono nell\'avviso): circa '+eur(r.avviso[i])+' €'); tot16+=r.avviso[i]; }
     if(f.length) add(+g16(m),'<b>Paga l\'F24</b><ul style="margin:2px 0 0 16px;padding:0">'+f.map(function(x){ return '<li>'+x+'</li>'; }).join('')+'</ul>',tot16,'');
+    ((R.riserve&&R.riserve.debitiDet[i])||[]).forEach(function(d){ add(+d.g||16,'<b>Paga la rata '+d.k+'/'+d.n+'</b> – '+esc(d.desc||'debito pregresso'),d.v,'dati del commercialista (pagina Debiti e riserve)'); });
     // imposte
     (R.impDett[i]||[]).forEach(function(t){ var v=+String(t).split(': ').pop(), lbl=String(t).split(': ')[0], sec=/^2° acconto/.test(lbl);
       var giorno=sec?30:(m.slice(5)==='06'?30:+g16(m)), cod=sec?'IRES cod. 2002 '+eur(v*rI)+' € + IRAP cod. 3813 '+eur(v*(1-rI))+' €':'IRES (saldo cod. 2003, 1° acconto cod. 2001) '+eur(v*rI)+' € + IRAP (saldo cod. 3800, 1° acconto cod. 3812) '+eur(v*(1-rI))+' €'+(/rata [2-7]/.test(lbl)?'; interessi di rateazione cod. 1668 (IRES) e 3805 (IRAP)':'');
@@ -2580,7 +2669,8 @@ function vOggi(r){ vIstruzioni(); var I=IST, R=I.R, ctx=I.ctx, oggi=new Date().t
   var kp=kpi('Cassa oggi senza fido (stima)',eur(cassaOggi),cassaOggi<0?'neg':'pos')+kpi('Disponibile con il fido',eur(cassaOggi+ctx.fido),cassaOggi+ctx.fido<(+R.cfg.soglia||0)?'neg':'pos')
     +(f24?'<div class="kpi card"><span>Prossimo F24 ('+fmtD(f24.d)+')</span><b>'+eur(f24.a.imp)+' €</b></div>':'')
     +kpi('Ancora da incassare in '+MESI_LUNGHI[+mOggi.slice(5)-1],eur(inMese),'pos')+kpi('Ancora da pagare in '+MESI_LUNGHI[+mOggi.slice(5)-1],eur(outMese))
-    +(fineMese!==null?kpi('Cassa prevista a fine mese',eur(fineMese),fineMese<R.sogliaEff?'neg':'pos'):'');
+    +(fineMese!==null?kpi('Cassa prevista a fine mese',eur(fineMese),fineMese<R.sogliaEff?'neg':'pos'):'')
+    +(R.riserve?'<div class="kpi card '+(R.riserve.equilibrio?'kpos':'kneg')+'"><span>Equilibrio finanziario (pagina Debiti e riserve)</span><b class="'+(R.riserve.equilibrio?'pos':'neg')+'">'+(R.riserve.equilibrio?istMese(R.riserve.equilibrio):'non raggiunto')+'</b></div>':'');
   var riga=function(t){ var e=entrata(t.a); return '<tr><td style="text-align:left">'+fmtD(t.d)+'</td><td style="text-align:left;white-space:normal">'+(t===f24?'<b>Paga l\'F24</b> – righe nel riquadro "Prossimo F24" qui sopra':t.a.cosa)+'</td><td class="'+(t.a.imp?(e?'pos':''):'')+'">'+(t.a.imp?(e?'+':'−')+eur(t.a.imp):'')+'</td><td style="text-align:left" class="note">'+(e?'incasso atteso':esc(t.a.nota||''))+'</td></tr>'; };
   var tabMesi='<table class="fit cdt" style="min-width:600px"><thead><tr><th style="text-align:left">Mese</th><th>Cassa a inizio mese</th><th>Spese del mese</th><th>Cassa a fine mese</th></tr></thead><tbody>'+mesi.map(function(x){ return '<tr class="t"><td style="text-align:left;text-transform:capitalize">'+istMese(x.m)+'</td><td>'+(x.ini===null?'—':eur(x.ini))+'</td><td>'+eur(x.usc)+'</td><td class="'+(x.fin===null?'':(x.fin<R.sogliaEff?'neg':'pos'))+'">'+(x.fin===null?'—':eur(x.fin))+'</td></tr>'; }).join('')+'</tbody></table>';
   /* da cosa sono fatti "ancora da incassare" e "ancora da pagare": i movimenti uno per uno, con la pagina dove si correggono */
