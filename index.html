@@ -847,7 +847,7 @@ table.fit{min-width:0!important;width:100%!important;font-size:9.4px}table.fit.w
     M.forEach(function (m, i) { var Q = B.piano.quote[i] || {}; Object.keys(Q).forEach(function (a) { cum[a] = (cum[a] || 0) + Q[a]; });
       var dataR = mesePiu(m) + '-16', A = 0;
       if (c.ivaModo === 'ravv') Rv.items.forEach(function (x) { var pag = x.pagato.filter(function (p) { return p.m <= m; }).reduce(function (t, p) { return t + p.imp; }, 0), resto = Math.max(0, x.imp - pag); if (resto < 0.005) return; var f = stFattoreRavv(x.scad, dataR, c.legale); A += resto * ((x.soloSanz ? 0 : 1) + f.sanz + f.int); });
-      else for (var j = i + 1; j < N; j++) A += B.avviso[j];
+      else { var pagAvv = 0; for (var j = 0; j <= i; j++) pagAvv += B.avviso[j]; A = Math.max(0, num(B.avvisoTot) - pagAvv); }
       var Bimp = Math.max(0, T26 - (cum[String(+y1 - 1)] || 0)), Cd = debScad.filter(function (d) { return d.m > m; }).reduce(function (t, d) { return t + d.v; }, 0);
       var D = i + 1 < N ? Math.max(0, B.ivaVers[i + 1] - (B.accIva[i + 1] || 0)) : Math.max(0, B.ivaInc[i]), y = m.slice(0, 4), E = 0;
       [y1, y2].forEach(function (a) { var fr = a < y ? 1 : a === y ? +m.slice(5, 7) / 12 : 0; E += Math.max(0, annoImp[a] * fr - (cum[a] || 0)); });
@@ -2160,12 +2160,23 @@ function vRiserve(){ var ctx=stCtx(), c=rsCfg(), R=E.strategia(ctx,c), Q=R.riser
     +'<div style="margin-top:10px"><b>Rateizzazioni e altri debiti pregressi</b> <span class="note">(avvisi bonari, cartelle, rateizzazioni INPS o Agenzia: rata, prima scadenza ancora da pagare, quante rate restano)</span></div>'
     +'<table style="table-layout:fixed;width:1000px;margin-top:4px"><colgroup><col style="width:340px"><col style="width:120px"><col style="width:170px"><col style="width:100px"><col style="width:140px"><col style="width:100px"><col style="width:30px"></colgroup><tr><th style="text-align:left">Descrizione</th><th>Rata €</th><th style="white-space:normal">Prima scadenza da pagare</th><th>Rate rimaste</th><th>Ogni</th><th>Totale €</th><th></th></tr>'+(deb||'<tr><td colspan="7" class="note">Nessun debito inserito</td></tr>')+'</table>'
     +'<button class="l" data-a="rsadd" style="margin-top:6px">+ aggiungi un debito</button> <span id="stmsg" class="note"></span></div>';
-  return '<div class="kpis">'+kp+'</div>'+spieg+gr+tab+dati; }
+  /* conto dell'anno: dove va la cassa */
+  var r=R.righe, idx=R.mesi.map(function(m,i){ return m.slice(0,4)===y1?i:-1; }).filter(function(i){ return i>=0; }), S_=function(a){ return idx.reduce(function(t,i){ return t+(+(a&&a[i])||0); },0); };
+  var ent=S_(r.inc)+S_(r.adler)+S_(r.straord), sp=S_(r.spese), cn=S_(r.compNetti), cf=S_(r.f24Comp), ivaC=S_(r.ivaVers), ivaA=S_(r.ivaArr)+S_(r.avviso), imp=S_(r.imposte), deb=S_(r.debiti), dv=S_(r.divNetti)+S_(r.f24Div), dc=r.chiusura[idx[idx.length-1]]-(idx[0]?r.chiusura[idx[0]-1]:R.cassa0);
+  var imp26=Math.min(imp,I.T26), impAcc=imp-imp26, pr=function(v){ return ent>0?(Math.round(v/ent*1000)/10).toLocaleString('it-IT')+'%':''; };
+  var rr=[['Entrate (Adler, clienti, Paysolution, altri; IVA compresa)',ent,1],['Spese correnti (fornitori, pubblicità, trasferte, abbonamenti, studio, royalty; IVA compresa)',-sp],['Compensi: netti a '+esc(ctx.nomi[0])+' e '+esc(ctx.nomi[1]),-cn],['Compensi: F24 di ritenute e gestione separata',-cf],['Fisco corrente '+y1+': IVA del mese',-ivaC],['Fisco corrente '+y1+': acconti IRES e IRAP '+y1,-impAcc],['Debito '+prev+': IVA arretrata (ravvedimento o avviso)',-ivaA],['Debito '+prev+': saldo IRES e IRAP '+prev,-imp26],['Rate di altri debiti pregressi',-deb],['Dividendi (netti + ritenuta)',-dv],['= Variazione della cassa nell\'anno',dc,1]];
+  var conto='<div class="card"><b>Dove va la cassa nel '+y1+'</b> <span class="note">(somma dei mesi della Strategia; le percentuali sono sulle entrate)</span><table style="table-layout:fixed;width:900px;margin-top:6px"><colgroup><col style="width:640px"><col style="width:140px"><col style="width:120px"></colgroup>'
+    +rr.filter(function(x){ return Math.abs(x[1])>0.5||x[2]; }).map(function(x){ return '<tr'+(x[2]?' class="t"':'')+'><td style="text-align:left">'+x[0]+'</td><td class="'+(x[2]?cls(x[1]):'')+'">'+eur(x[1])+'</td><td class="note">'+pr(Math.abs(x[1]))+'</td></tr>'; }).join('')+'</table>'
+    +'<div class="note" style="margin-top:4px">Fisco del '+y1+' (IVA del mese e acconti) '+eur(ivaC+impAcc)+' € = '+pr(ivaC+impAcc)+' delle entrate; debito del '+prev+' pagato nel '+y1+' '+eur(ivaA+imp26+deb)+' € = '+pr(ivaA+imp26+deb)+'. È il '+prev+' non versato a pesare sul '+y1+': quando è chiuso, la stessa attività genera liquidità libera.</div></div>';
+  var leve='<div class="card"><b>IVA '+prev+' residua: come pagarla</b><div class="g" style="margin-top:6px"><div><label>Modo</label>'+rsIn('ivaModo',c.ivaModo,{sel:[['ravv','Ravvedimento a rate (pago io, sanzione ridotta)'],['avviso','Avviso bonario (20 rate trimestrali)']]})+'</div>'
+    +'<div><label>Rate mensili del ravvedimento</label>'+rsIn('ivaRateN',c.ivaRateN,{sel:[[3,'3'],[4,'4'],[6,'6'],[8,'8'],[10,'10'],[12,'12'],[15,'15'],[18,'18']]})+'</div><div><label>Dal mese</label>'+rsIn('ivaRateDa',c.ivaRateDa||R.mesi[0],{tipo:'month'})+'</div></div>'
+    +'<div class="note" style="margin-top:4px">Costo di sanzioni e interessi con queste scelte: <b>'+eur(c.ivaModo==='avviso'?Math.max(0,R.avvisoTot-R.arrTot):R.extraArr)+' €</b>'+(R.chiusoIn?' · IVA arretrata chiusa a '+istMese(R.chiusoIn):'')+' · cassa minima '+eur(R.minimo)+' € a '+istMese(R.meseMin)+'. Il ravvedimento si può pagare a rate (versamenti parziali con sanzione e interessi in proporzione); la sanzione ridotta è 1/8 fino al 30/04/'+y1+', poi 1/7. Rateizzare allarga la cassa ma non riduce il debito: la liquidità libera e il mese di equilibrio cambiano poco.</div></div>';
+  return '<div class="kpis">'+kp+'</div>'+spieg+conto+leve+gr+tab+dati; }
 function r2c(x){ return Math.round(x*100)/100; }
 document.addEventListener('change',function(e){ var k=e.target&&e.target.dataset&&e.target.dataset.rs; if(!k) return; var c=rsCfg(), t=String(e.target.value).trim(), q=k.split('|'), num=function(){ if(t==='') return ''; var n=plParse(t); return n===null?'':n; };
   if(q[0]==='ivaArr'){ if(t==='') delete c.ivaArr[q[1]]; else c.ivaArr[q[1]]=num(); }
   else if(q[0]==='deb'){ var d=c.debiti[+q[1]]; if(!d) return; if(q[2]==='rata') d.rata=num(); else if(q[2]==='n'||q[2]==='ogni') d[q[2]]=parseInt(t,10)||1; else d[q[2]]=t; }
-  else if(q[0]==='acconti') c.acconti=t; else if(q[0]==='rate') c.rate=t===''?'':parseInt(t,10); else c[q[0]]=num();
+  else if(q[0]==='acconti'||q[0]==='ivaModo'||q[0]==='ivaRateDa') c[q[0]]=t; else if(q[0]==='ivaRateN') c.ivaRateN=parseInt(t,10)||4; else if(q[0]==='rate') c.rate=t===''?'':parseInt(t,10); else c[q[0]]=num();
   stSalva(); render(); });
 
 /* ── Pagina ISTRUZIONI: cosa fare mese per mese, ricavato dalla Strategia ── */
