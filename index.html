@@ -520,6 +520,7 @@ table.fit{min-width:0!important;width:100%!important;font-size:9.4px}table.fit.w
   }
 
   var SIM_DEFAULT = {
+    be: { alloc: {} },
     mesi: ['2026-11', '2026-12'],
     /* Scenario concordato il 07/11/2026 (importi IVA esclusa; compensi LORDI = netti / 0,61, rapporto netto/lordo osservato nel 2026):
        nov: Rosanna 6.000 netti + Tullio 200 netti = 6.200 netti; dic: Rosanna 500 netti + Tullio 200 netti = 700 netti.
@@ -1112,9 +1113,9 @@ function calc(){ return E.calcola({voci:vociCalc(),dash:S.dash||{},params:params
 function cls(x){ return x<-0.004?'neg':(x>0.004?'pos':''); }
 
 /* ── Viste ── */
-var TABS=[['oggi','Oggi'],['riepilogo','Riepilogo'],['strategia','Strategia'],['riserve','Debiti e riserve'],['istruzioni','Istruzioni'],['compdiv','Compenso o dividendo'],['pl','P&L mensile'],['cassa','Cassa'],['flussi','Cash flow'],['iva','IVA'],['imposte','Imposte (stima)'],['patrimonio','Stato patrimoniale'],['simulazione','Previsione nov-dic'],['utili','Prelievo utili'],['budget','Budget'],['commercialista','Per il commercialista'],['marini','Marini'],['voci','Voci manuali'],['dashboard','Da Dashboard V6'],['param','Parametri'],['controlli','Controlli'],['storico','Storico']];
+var TABS=[['oggi','Oggi'],['riepilogo','Riepilogo'],['strategia','Strategia'],['riserve','Debiti e riserve'],['istruzioni','Istruzioni'],['compdiv','Compenso o dividendo'],['pl','P&L mensile'],['be','Break even'],['cassa','Cassa'],['flussi','Cash flow'],['iva','IVA'],['imposte','Imposte (stima)'],['patrimonio','Stato patrimoniale'],['simulazione','Previsione nov-dic'],['utili','Prelievo utili'],['budget','Budget'],['commercialista','Per il commercialista'],['marini','Marini'],['voci','Voci manuali'],['dashboard','Da Dashboard V6'],['param','Parametri'],['controlli','Controlli'],['storico','Storico']];
 function nav(){ document.getElementById('nav').innerHTML=TABS.map(function(t){return '<button class="'+(S.tab===t[0]?'on':'')+'" data-t="'+t[0]+'">'+t[1]+'</button>';}).join(''); }
-function render(){ nav(); var reg=calc(); S.__reg=reg; var r=reg, SIMO=null; if(S.tab==='pl'&&S.plPrev!==false){ try{ SIMO=simRun(); r=SIMO.res; }catch(e){ r=reg; SIMO=null; } } var f={oggi:vOggi,riepilogo:vRiepilogo,strategia:vStrategia,riserve:vRiserve,istruzioni:vIstruzioni,compdiv:vCompDiv,pl:vPL,iva:vIva,imposte:vImposte,patrimonio:vPatrimonio,simulazione:vSimulazione,cassa:vCassa,flussi:vFlussi,utili:vUtili,commercialista:vReport,marini:vMarini,budget:vBudget,voci:vVoci,dashboard:vDash,param:vParam,controlli:vControlli,storico:vStorico}[S.tab]; document.getElementById('main').innerHTML='<div class="bar">'+provvHtml()+'<span id="pdfmsg" class="note"></span><button class="p" data-a="pdf" style="margin:0">⬇ Salva PDF</button></div><div class="pdfhead"'+(S.tab==='commercialista'?' style="display:none!important"':'')+'><b>Bilancio SRL — '+esc(TABS.filter(function(t){return t[0]===S.tab;})[0][1])+'</b><div class="note">Tullio Serci S.r.l. · generato il '+new Date().toLocaleDateString('it-IT')+' · importi in euro, IVA esclusa salvo dove indicato'+esc(provvNota())+'</div></div>'+f(r)+(SIMO?cashFlowHtml(SIMO):'');
+function render(){ nav(); var reg=calc(); S.__reg=reg; var r=reg, SIMO=null; if((S.tab==='pl'||S.tab==='be')&&S.plPrev!==false){ try{ SIMO=simRun(); r=SIMO.res; }catch(e){ r=reg; SIMO=null; } } var f={oggi:vOggi,riepilogo:vRiepilogo,strategia:vStrategia,riserve:vRiserve,istruzioni:vIstruzioni,compdiv:vCompDiv,pl:vPL,be:vBE,iva:vIva,imposte:vImposte,patrimonio:vPatrimonio,simulazione:vSimulazione,cassa:vCassa,flussi:vFlussi,utili:vUtili,commercialista:vReport,marini:vMarini,budget:vBudget,voci:vVoci,dashboard:vDash,param:vParam,controlli:vControlli,storico:vStorico}[S.tab]; document.getElementById('main').innerHTML='<div class="bar">'+provvHtml()+'<span id="pdfmsg" class="note"></span><button class="p" data-a="pdf" style="margin:0">⬇ Salva PDF</button></div><div class="pdfhead"'+(S.tab==='commercialista'?' style="display:none!important"':'')+'><b>Bilancio SRL — '+esc(TABS.filter(function(t){return t[0]===S.tab;})[0][1])+'</b><div class="note">Tullio Serci S.r.l. · generato il '+new Date().toLocaleDateString('it-IT')+' · importi in euro, IVA esclusa salvo dove indicato'+esc(provvNota())+'</div></div>'+f(r)+(SIMO?cashFlowHtml(SIMO):'');
   if(S.tab==='riepilogo') grafico(r); if(S.tab==='voci') bulkInfo(); marcaTabelle(); }
 function marcaRisultati(){ [].forEach.call(document.querySelectorAll('#main .kpi'),function(k){ var b=k.querySelector('b'); k.classList.toggle('kpos',!!(b&&(b.classList.contains('pos')||b.classList.contains('ok')))); k.classList.toggle('kneg',!!(b&&(b.classList.contains('neg')||b.classList.contains('ko')))); });
   [].forEach.call(document.querySelectorAll('#main table tr.t td'),function(td){ if(td.classList.contains('pos')||td.classList.contains('neg')) return; var b=td.querySelector('b.pos,b.neg,b.ok,b.ko'); if(b&&td.children.length===1) td.classList.add(b.classList.contains('pos')||b.classList.contains('ok')?'pos':'neg'); }); }
@@ -1257,6 +1258,95 @@ function plGest(r){
    +'<div class="note"><b>Come leggerlo.</b> Costi variabili = quelli che crescono con le vendite (acquisti merci, intercompany Paysolution, trasporti, pubblicità, commissioni bancarie, royalty) più la variazione delle rimanenze. Costi fissi = struttura (consulenti, abbonamenti, trasferte, altri). Personale e amministratori sono mostrati a parte e l\'EBITDA è dopo di essi. La colonna % ricavi è sul totale del periodo, le righe in corsivo sono % del singolo mese. Le imposte sono la stima IRES/IRAP della pagina Imposte, non il bilancio ufficiale. Classificazione fisso/variabile gestionale, da condividere con il commercialista.</div>'
    +(diff>0.01?'<div class="wa note">Attenzione: il risultato ante imposte di questa tabella differisce di '+eur(diff)+' € dall\'utile del motore. Controllare le categorie.</div>':'')
    +'<div class="note">'+(sum(r,function(m){return m.costiDash;})?'':'')+'IVA esclusa; fa eccezione l\'IVA indetraibile, che è un costo. Le righe "da Dashboard V6" non hanno dettaglio per categoria.</div>'; }
+
+/* ── Pagina Break even: costi collegati alla fonte di ricavo ── */
+var BE_FONTI=[['a','Adler (consulenza)'],['p','Paysolution'],['v','Vendite (Amazon, Shopify, estero)']];
+var BE_COSTI=[
+  {id:'acquisti_materiali',nome:'Acquisti materiali e merci',f:function(m){return plVal(m,'acquisti_materiali');},def:{mode:'man',a:0,p:0,v:100}},
+  {id:'intercompany_costo',nome:'Fatture da Paysolution (intercompany)',f:function(m){return plVal(m,'intercompany_costo');},def:{mode:'man',a:0,p:100,v:0}},
+  {id:'costiDash',nome:'Costi Paysolution da Dashboard V6',f:function(m){return m.costiDash||0;},def:{mode:'man',a:0,p:100,v:0}},
+  {id:'consumo',nome:'Consumo di magazzino (diminuzione rimanenze)',f:function(m){return -(m.varRim||0);},def:{mode:'man',a:0,p:100,v:0}},
+  {id:'trasporti',nome:'Trasporti e spedizioni',f:function(m){return plVal(m,'trasporti');},def:{mode:'man',a:0,p:0,v:100}},
+  {id:'pubblicita',nome:'Pubblicità',f:function(m){return plVal(m,'pubblicita');},def:{mode:'man',a:0,p:0,v:100}},
+  {id:'oneri_bancari',nome:'Commissioni e oneri bancari',f:function(m){return plVal(m,'oneri_bancari');},def:{mode:'man',a:0,p:0,v:100}},
+  {id:'royalties',nome:'Royalties (a Tullio Serci)',f:function(m){return plVal(m,'royalties');},def:{mode:'rev2',a:0,p:50,v:50}},
+  {id:'trasferte_welfare',nome:'Trasferte, welfare e rappresentanza',f:function(m){return plVal(m,'trasferte_welfare');},def:{mode:'man',a:100,p:0,v:0}}];
+function beCfg(){ var s=simS(); if(!s.be||typeof s.be!=='object') s.be={}; if(!s.be.alloc) s.be.alloc={}; return s.be; }
+function beAl(id){ var c=BE_COSTI.filter(function(x){return x.id===id;})[0], st=beCfg().alloc[id]||{}; return {mode:st.mode||c.def.mode, a:st.a!==undefined?+st.a:c.def.a, p:st.p!==undefined?+st.p:c.def.p, v:st.v!==undefined?+st.v:c.def.v}; }
+function beRic(r){ var o={a:0,p:0,v:0};
+  r.mesi.forEach(function(m){ var a=plVal(m,'servizi'), p=plVal(m,'intercompany_ricavo')+(m.ricaviDash||0), v=plVal(m,'vendite')+plVal(m,'vendite_amazon')+plVal(m,'corrispettivi');
+    v+=m.ricavi-(a+p+v); o.a+=a; o.p+=p; o.v+=v; }); return o; }
+function beQuote(id,ric){ var al=beAl(id), q;
+  if(al.mode==='rev2'){ var t=ric.p+ric.v; q=t>0.004?{a:0,p:ric.p/t,v:ric.v/t}:{a:0,p:.5,v:.5}; }
+  else if(al.mode==='rev3'){ var t3=ric.a+ric.p+ric.v; q=t3>0.004?{a:ric.a/t3,p:ric.p/t3,v:ric.v/t3}:{a:1/3,p:1/3,v:1/3}; }
+  else q={a:al.a/100,p:al.p/100,v:al.v/100};
+  q.fisso=Math.max(0,1-q.a-q.p-q.v); return q; }
+var beTimer;
+function beSalva(){ clearTimeout(beTimer); beTimer=setTimeout(async function(){ var m=document.getElementById('bemsg'); try{ S.config=await call('apiSalvaConfig',{sim:JSON.stringify(simS())}); m=document.getElementById('bemsg'); if(m){ m.textContent='Ripartizione salvata'; m.className='ok'; } }catch(e){ m=document.getElementById('bemsg'); if(m){ m.textContent='Salvataggio non riuscito: '+e.message; m.className='ko'; } } },700); }
+function beSet(el){ var k=el.dataset.be.split('|'), id=k[0], f=k[1], st=beCfg().alloc, cur=beAl(id); st[id]={mode:cur.mode,a:cur.a,p:cur.p,v:cur.v};
+  if(f==='mode') st[id].mode=el.value; else { var n=plParse(el.value); if(n===null) n=0; st[id][f]=Math.max(0,Math.min(100,n)); }
+  render(); beSalva(); }
+function beCalc(r){
+  var ric=beRic(r), n=r.mesi.length||1, T=function(f){ return r.mesi.reduce(function(a,m){return a+f(m);},0); };
+  var righe=BE_COSTI.map(function(c){ var tot=T(c.f), q=beQuote(c.id,ric); return {id:c.id,nome:c.nome,tot:tot,q:q,a:tot*q.a,p:tot*q.p,v:tot*q.v,fisso:tot*q.fisso}; });
+  var cv={a:0,p:0,v:0}, nonAtt=0; righe.forEach(function(x){ cv.a+=x.a; cv.p+=x.p; cv.v+=x.v; nonAtt+=x.fisso; });
+  var mdc={a:ric.a-cv.a,p:ric.p-cv.p,v:ric.v-cv.v}; var R=ric.a+ric.p+ric.v, MDC=mdc.a+mdc.p+mdc.v, CV=cv.a+cv.p+cv.v;
+  var c=r.mesi.map(plCalc), S=function(f){ return c.reduce(function(a,x){return a+f(x);},0); };
+  var fissiStr=S(function(x){return x.fis;})-righe.filter(function(x){return x.id==='trasferte_welfare';}).reduce(function(a,x){return a+x.tot;},0);
+  var pers=S(function(x){return x.pers;}), amm=S(function(x){return x.amm;}), fin=-S(function(x){return x.fin;});
+  if(Math.abs(fin)<0.005) fin=0; var fissi=[{n:'Costi fissi di struttura (consulenti, abbonamenti, altri)',v:fissiStr},{n:'Quote di costi collegati non attribuite alle fonti',v:nonAtt},{n:'Personale e amministratori',v:pers},{n:'Ammortamenti',v:amm}];
+  var F=fissi.reduce(function(a,x){return a+x.v;},0), Ffin=F+fin;
+  return {ric:ric,R:R,n:n,righe:righe,cv:cv,CV:CV,mdc:mdc,MDC:MDC,fissi:fissi,F:F,fin:fin,Ffin:Ffin,
+    mdcP:R>0.004?MDC/R:0, mdcPf:{a:ric.a>0.004?mdc.a/ric.a:0,p:ric.p>0.004?mdc.p/ric.p:0,v:ric.v>0.004?mdc.v/ric.v:0}}; }
+function vBE(r){ var B=beCalc(r), on=S.plPrev!==false, n=B.n, R=B.R;
+  var e=function(x){ return eur(x); }, mens=function(x){ return eur(x/n); };
+  var bar='<div class="card"><div class="bar" style="margin:0"><span class="note">'+(on?'Calcolo su ricavi e costi dell\'anno <b>compresa la previsione nov-dic</b> (la stessa del P&L, modificabile da lì).':'Calcolo solo sui dati <b>già registrati</b>.')+' <span id="bemsg"></span></span><button class="l" data-a="plprev">'+(on?'Mostra solo il registrato':'Includi la previsione nov-dic')+'</button></div></div>';
+  var head='<tr><th style="text-align:left">€ · IVA ESCLUSA · periodo '+etm(r.mesi[0].m)+' – '+etm(r.mesi[n-1].m)+'</th>'+BE_FONTI.map(function(f){return '<th>'+f[1]+'</th>';}).join('')+'<th>Totale</th></tr>';
+  var riga=function(l,fa,o){ o=o||{}; var v=['a','p','v'].map(function(k){return fa(k);}), t=o.tot!==undefined?o.tot:v.reduce(function(a,x){return a+x;},0);
+    return '<tr class="'+(o.t?'t':(o.s?'s':''))+'"><td'+(o.ind?' style="padding-left:14px"':'')+'>'+l+'</td>'+v.map(function(x){return '<td class="'+(o.c?cls(x):'')+'">'+(o.p?pct(x,o.base?o.base[0]:1):e(x))+'</td>';}).join('')+'<td class="'+(o.c?cls(t):'')+'">'+(o.p?'':e(t))+'</td></tr>'; };
+  var rp=function(l,fa,den,o){ o=o||{}; var vals=['a','p','v'].map(function(k){ var d=den(k); return d>0.004?fa(k)/d:null; }), td=den('t'), tv=td>0.004?fa('t')/td:null; var f=function(x){ return x===null?'–':IT.format(Math.round(x*1000)/10)+' %'; };
+    return '<tr class="s"><td style="padding-left:14px;font-style:italic">'+l+'</td>'+vals.map(function(x){return '<td style="font-style:italic" class="'+(x===null?'':cls(x))+'">'+f(x)+'</td>';}).join('')+'<td style="font-style:italic" class="'+(tv===null?'':cls(tv))+'">'+f(tv)+'</td></tr>'; };
+  var rows=[];
+  rows.push(riga('RICAVI',function(k){return B.ric[k];},{t:1}));
+  B.righe.forEach(function(x){ if(Math.abs(x.tot)<0.005) return; rows.push(riga(esc(x.nome),function(k){return x[k];},{ind:1})); });
+  rows.push(riga('COSTI VARIABILI COLLEGATI',function(k){return B.cv[k];},{t:1}));
+  rows.push(riga('MARGINE DI CONTRIBUZIONE',function(k){return B.mdc[k];},{t:1,c:1}));
+  rows.push(rp('% margine di contribuzione sui ricavi',function(k){return k==='t'?B.MDC:B.mdc[k];},function(k){return k==='t'?B.R:B.ric[k];}));
+  rows.push(rp('Quota di ciascuna fonte sul margine di contribuzione totale',function(k){return k==='t'?B.MDC:B.mdc[k];},function(k){return B.MDC>0.004?B.MDC:0;}));
+  rows.push(rp('Quota di ciascuna fonte sui ricavi totali',function(k){return k==='t'?B.R:B.ric[k];},function(k){return B.R>0.004?B.R:0;}));
+  var t1='<div class="card tw"><table class="fit"><thead>'+head+'</thead><tbody>'+rows.join('')+'</tbody></table></div>';
+  /* ripartizione modificabile */
+  var al=BE_COSTI.map(function(c){ var a=beAl(c.id), man=a.mode==='man', tot=B.righe.filter(function(x){return x.id===c.id;})[0].tot;
+    var inp=function(f){ return '<td class="mod"><input type="text" inputmode="decimal" data-be="'+c.id+'|'+f+'" value="'+eurIn(a[f])+'" '+(man?'':'disabled style="opacity:.45"')+'></td>'; };
+    var q=beQuote(c.id,B.ric);
+    return '<tr><td style="text-align:left">'+esc(c.nome)+'</td><td>'+e(tot)+'</td><td><select data-be="'+c.id+'|mode"><option value="man"'+(man?' selected':'')+'>Percentuali a mano</option><option value="rev2"'+(a.mode==='rev2'?' selected':'')+'>In proporzione ai ricavi Paysolution + Vendite</option><option value="rev3"'+(a.mode==='rev3'?' selected':'')+'>In proporzione a tutti i ricavi</option></select></td>'
+      +inp('a')+inp('p')+inp('v')+'<td class="'+(q.fisso>0.0005?'neg':'')+'">'+IT.format(Math.round(q.fisso*1000)/10)+' %</td></tr>'; });
+  var t2='<div class="card tw"><b>A quale fonte di ricavo appartiene ogni costo (modificabile)</b><div class="note">Scrivi la percentuale del costo che dipende da ciascuna fonte. Quello che resta fuori dal 100% diventa costo fisso comune. Le royalty sono ripartite in proporzione ai ricavi di Paysolution e Vendite perché la loro base di calcolo (Fatturato Marchio) non comprende Adler. Le impostazioni sono salvate nel Foglio con la previsione.</div><table class="fit"><thead><tr><th style="text-align:left">Costo</th><th>Importo periodo</th><th>Come si ripartisce</th><th>% Adler</th><th>% Paysolution</th><th>% Vendite</th><th>Resta fisso</th></tr></thead><tbody>'+al.join('')+'</tbody></table></div>';
+  /* costi fissi */
+  var fr=B.fissi.filter(function(x){return Math.abs(x.v)>0.005;}).map(function(x){ return '<tr><td style="text-align:left">'+esc(x.n)+'</td><td>'+e(x.v)+'</td><td>'+mens(x.v)+'</td><td>'+pct(x.v,R)+'</td></tr>'; }).join('');
+  var t3='<div class="card tw"><b>Costi fissi comuni da coprire</b><table class="fit"><thead><tr><th style="text-align:left">Voce</th><th>Periodo</th><th>Al mese</th><th>% ricavi</th></tr></thead><tbody>'+fr
+    +'<tr class="t"><td style="text-align:left">TOTALE COSTI FISSI (pareggio operativo, EBIT = 0)</td><td>'+e(B.F)+'</td><td>'+mens(B.F)+'</td><td>'+pct(B.F,R)+'</td></tr>'
+    +'<tr><td style="text-align:left">Oneri finanziari al netto degli interessi attivi</td><td>'+e(B.fin)+'</td><td>'+mens(B.fin)+'</td><td>'+pct(B.fin,R)+'</td></tr>'
+    +'<tr class="t"><td style="text-align:left">TOTALE con gestione finanziaria (pareggio ante imposte, EBT = 0)</td><td>'+e(B.Ffin)+'</td><td>'+mens(B.Ffin)+'</td><td>'+pct(B.Ffin,R)+'</td></tr></tbody></table></div>';
+  /* break even */
+  var okm=B.mdcP>0.0001, bepO=okm?B.F/B.mdcP:0, bepF=okm?B.Ffin/B.mdcP:0, sic=function(b){ return R>0.004&&okm?(R-b)/R:null; };
+  var fm=function(x){ return x===null?'–':IT.format(Math.round(x*1000)/10)+' %'; };
+  var kp=function(l,v,p,c2){ return '<div class="kpi card"><span>'+l+'</span><b class="'+(c2||'')+'">'+v+'</b><span>'+p+'</span></div>'; };
+  var kpis='<div class="kpis">'+kp('Ricavi del periodo',e(R)+' €','media '+mens(R)+' € al mese')
+    +kp('Margine di contribuzione',e(B.MDC)+' €','% '+fm(R>0.004?B.MDC/R:null),cls(B.MDC))
+    +kp('Costi fissi da coprire',e(B.F)+' €','al mese '+mens(B.F)+' €')
+    +kp('Pareggio operativo (EBIT = 0)',okm?e(bepO)+' €':'non raggiungibile',okm?'ricavi al mese '+mens(bepO)+' €':'il margine di contribuzione non è positivo')
+    +kp('Margine di sicurezza',fm(sic(bepO)),'quanto i ricavi possono scendere prima di andare in perdita',cls(sic(bepO)===null?0:sic(bepO)))
+    +kp('Pareggio ante imposte (EBT = 0)',okm?e(bepF)+' €':'non raggiungibile',okm?'ricavi al mese '+mens(bepF)+' €':'')+'</div>';
+  /* copertura per fonte */
+  var cop=['a','p','v'].map(function(k,i){ var m=B.mdc[k], cov=B.F>0.004?m/B.F:null, mp=B.mdcPf[k], alone=mp>0.0001?B.F/mp:null;
+    return '<tr><td style="text-align:left">'+BE_FONTI[i][1]+'</td><td>'+e(B.ric[k])+'</td><td>'+e(m)+'</td><td>'+(mp>0?fm(mp):'–')+'</td><td class="'+cls(m)+'">'+fm(cov)+'</td><td>'+(alone===null?'–':e(alone)+' € ('+mens(alone)+' al mese)')+'</td></tr>'; }).join('');
+  var rest=Math.max(0,B.F-B.mdc.a), mixPV=(B.ric.p+B.ric.v)>0.004?(B.mdc.p+B.mdc.v)/(B.ric.p+B.ric.v):0, serv=mixPV>0.0001?rest/mixPV:null;
+  var t4='<div class="card tw"><b>Quanto copre ogni fonte dei costi fissi</b><table class="fit"><thead><tr><th style="text-align:left">Fonte</th><th>Ricavi</th><th>Margine di contribuzione</th><th>% margine sui ricavi</th><th>Quota dei costi fissi coperta</th><th>Ricavi per coprire da sola tutti i costi fissi</th></tr></thead><tbody>'+cop
+    +'<tr class="t"><td style="text-align:left">Totale</td><td>'+e(R)+'</td><td>'+e(B.MDC)+'</td><td>'+(okm?fm(B.mdcP):'–')+'</td><td class="'+cls(B.MDC-B.F)+'">'+fm(B.F>0.004?B.MDC/B.F:null)+'</td><td>'+(okm?e(bepO)+' €':'–')+'</td></tr></tbody></table></div>'
+    +'<div class="card"><b>Con il margine di Adler già in cassa</b><div class="note">Adler copre '+e(Math.min(B.mdc.a,B.F))+' € dei costi fissi; restano da coprire <b>'+e(rest)+' €</b> ('+mens(rest)+' al mese). '+(serv===null?'Paysolution e Vendite non hanno un margine di contribuzione positivo: il pareggio non è raggiungibile con il mix attuale.':'Con il mix attuale tra Paysolution e Vendite (margine '+fm(mixPV)+' sui loro ricavi) servono ricavi da queste due fonti per <b>'+e(serv)+' €</b> nel periodo, cioè <b>'+mens(serv)+' € al mese</b>; oggi sono '+e(B.ric.p+B.ric.v)+' € ('+mens(B.ric.p+B.ric.v)+' al mese).')+'</div></div>';
+  var note='<div class="note"><b>Come leggerlo.</b> Break even = ricavi per cui il risultato è zero = costi fissi ÷ % di margine di contribuzione. Il margine di contribuzione è calcolato per fonte: ricavi meno i soli costi che dipendono da quella fonte (tabella di ripartizione). Gli altri costi sono fissi e comuni: struttura, personale e amministratori, ammortamenti. Il calcolo assume il mix di ricavi del periodo; se cambia il peso delle fonti cambia anche il pareggio. Imposte escluse. La ripartizione dei costi è una scelta gestionale da condividere con il commercialista.</div>';
+  return bar+kpis+t1+t2+t3+t4+note; }
 function vPL(r,ro){ PLRO=!!ro; var h=r.mesi.map(function(m){return etm(m.m)+(plEdit(m.m)?' ✎':'');}).concat(['Totale']);
   var ricRows=E.CATEGORIE.filter(function(c){return c.tipo==='ricavo'&&!c.finanziario;}).map(function(c){
     return rowE(esc(c.nome)+' — IVA esclusa',r,c.id); });
@@ -1798,7 +1888,7 @@ async function pdfCommercialista(){ var sc0=[0,0], pm=document.getElementById('p
     await w.save();
     fissaSvg(false); window.scrollTo(sc0[0],sc0[1]); document.body.classList.remove('pdfmode'); if(pm){ pm.textContent='PDF scaricato: '+nome; pm.className='note ok'; }
   }catch(e){ fissaSvg(false); window.scrollTo(sc0[0],sc0[1]); document.body.classList.remove('pdfmode'); if(pm){ pm.textContent='Download diretto non riuscito ('+e.message+'): apro la stampa, scegli "Salva come PDF".'; pm.className='note ko'; } setTimeout(function(){ window.print(); },400); } }
-document.addEventListener('change',function(e){ if(!e.target||e.target.id!=='provv') return; simS().includiProvvisorie=e.target.checked; render(); (async function(){ var m=document.getElementById('pdfmsg'); try{ S.config=await call('apiSalvaConfig',{sim:JSON.stringify(simS())}); m=document.getElementById('pdfmsg'); if(m){ m.textContent=e.target.checked?'Voci provvisorie incluse':'Voci provvisorie escluse'; m.className='note ok'; } }catch(x){ m=document.getElementById('pdfmsg'); if(m){ m.textContent='Salvataggio non riuscito: '+x.message; m.className='note ko'; } } })(); });
+document.addEventListener('change',function(e){ if(e.target&&e.target.dataset&&e.target.dataset.be){ beSet(e.target); return; } if(!e.target||e.target.id!=='provv') return; simS().includiProvvisorie=e.target.checked; render(); (async function(){ var m=document.getElementById('pdfmsg'); try{ S.config=await call('apiSalvaConfig',{sim:JSON.stringify(simS())}); m=document.getElementById('pdfmsg'); if(m){ m.textContent=e.target.checked?'Voci provvisorie incluse':'Voci provvisorie escluse'; m.className='note ok'; } }catch(x){ m=document.getElementById('pdfmsg'); if(m){ m.textContent='Salvataggio non riuscito: '+x.message; m.className='note ko'; } } })(); });
 document.addEventListener('change',function(e){ if(e.target&&e.target.id==='repmese'){ S.repMese=e.target.value; render(); } if(e.target&&e.target.id==='marinidata'){ S.mariniData=e.target.value; render(); } if(e.target&&e.target.id==='marinidett'){ S.mariniDett=e.target.checked; render(); } if(e.target&&e.target.id==='marininote'){ simS().mariniNote=e.target.value; var dn=e.target.parentNode.querySelector('.onlyrep'); if(dn) dn.textContent=e.target.value; (async function(){ var m=document.getElementById('marinimsg'); try{ S.config=await call('apiSalvaConfig',{sim:JSON.stringify(simS())}); if(m){ m.textContent='Note salvate'; m.className='note ok norep'; } }catch(x){ if(m){ m.textContent='Salvataggio non riuscito: '+x.message; m.className='note neg norep'; } } })(); } });
 function vDash(r){ var d=S.dash||{}, ch=Object.keys(d.chiusure||{}).sort();
   return '<div class="card"><b>Dati letti dalla Dashboard V6 (sola lettura)</b><div class="note">Letti il '+esc(d.letto_il||'—')+'. Mese con chiusura = valori della chiusura (immutabili); mesi senza chiusura = fatture intercompany approvate.</div></div>'
