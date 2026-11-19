@@ -1161,7 +1161,7 @@ var plTimer,plRT;
 function plSalva(){ clearTimeout(plTimer); plTimer=setTimeout(async function(){ var m=document.getElementById('plmsg'); try{ S.config=await call('apiSalvaConfig',{sim:JSON.stringify(simS())}); m=document.getElementById('plmsg'); if(m){ m.textContent='Previsione salvata'; m.className='ok'; } }catch(e){ m=document.getElementById('plmsg'); if(m){ m.textContent='Salvataggio non riuscito: '+e.message; m.className='ko'; } } },700); }
 function plRender(){ var a=document.activeElement, k=a&&a.dataset&&a.dataset.pl; render(); if(k){ var el=document.querySelector('[data-pl="'+k+'"]'); if(el){ el.focus(); if(el.select) el.select(); } } }
 function plBanner(r){ var b=S.__reg.totali, t=r.totali, on=S.plPrev!==false;
-  return '<div class="card"><div class="bar" style="margin:0"><span class="note">'+(on?'<b>Novembre e dicembre sono modificabili</b>: nelle celle tratteggiate scrivi l\'importo atteso del mese (IVA esclusa): i ricavi in questa tabella, i costi nella tabella "Dettaglio per categoria" qui sotto. La differenza rispetto a quanto è già registrato diventa la previsione. Compensi: inserisci il lordo; i contributi della società si aggiungono in automatico. Previsione inclusa: ricavi '+eur(t.ricavi-b.ricavi)+' € · costi '+eur(t.costi-b.costi)+' €. ':'Stai vedendo solo i dati registrati. ')+'<span id="plmsg"></span></span><button class="l" data-a="plprev">'+(on?'Mostra solo il registrato':'Includi la previsione nov-dic')+'</button></div></div>'; }
+  return '<div class="card"><div class="bar" style="margin:0"><span class="note">'+(on?'<b>Novembre e dicembre sono modificabili</b>: nelle celle tratteggiate scrivi l\'importo atteso del mese (IVA esclusa): i ricavi in questa tabella, i costi nelle righe dello stesso schema. La differenza rispetto a quanto è già registrato diventa la previsione. Compensi: inserisci il lordo; i contributi della società si aggiungono in automatico. Previsione inclusa: ricavi '+eur(t.ricavi-b.ricavi)+' € · costi '+eur(t.costi-b.costi)+' €. ':'Stai vedendo solo i dati registrati. ')+'<span id="plmsg"></span></span><button class="l" data-a="plprev">'+(on?'Mostra solo il registrato':'Includi la previsione nov-dic')+'</button></div></div>'; }
 function tab(head,rows,lab){ return '<div class="card tw"><table class="fit"><thead><tr><th style="text-align:left">'+(lab||'€ · IVA ESCLUSA')+'</th>'+head.map(function(h){return '<th>'+h+'</th>';}).join('')+'</tr></thead><tbody>'+rows.join('')+'</tbody></table></div>'; }
 function rowM(l,r,f,o){ o=o||{}; return '<tr class="'+(o.t?'t':'')+(o.s?' s':'')+'"><td>'+l+'</td>'+r.mesi.map(function(m){var x=f(m);return '<td class="'+(o.c?cls(x):'')+'">'+eur(x)+'</td>';}).join('')+'<td class="'+(o.c?cls(o.tot):'')+'">'+eur(o.tot)+'</td></tr>'; }
 var pct=function(x,tot){ return tot>0.004 ? IT.format(Math.round(x/tot*1000)/10)+' %' : '–'; };
@@ -1195,6 +1195,68 @@ function tabF24(r){ var cs=E.CATEGORIE.filter(function(c){return c.f24;}), gen=s
     +'<tr class="t"><td colspan="3" style="text-align:left">Totale da pagare</td><td>'+eur(ft)+'</td></tr></table></div>':'';
   return '<div class="card pbk"><b>Pagamenti F24 per tipo (cassa, per mese di versamento)</b><div class="note">Non sono costi: sono i versamenti di debiti verso Erario e INPS. I costi veri (quota INPS società, sanzioni, INAIL) sono già nelle righe dei costi. Il mese corrente e i successivi contengono gli F24 ancora da pagare (scadenza il 16). IRPEF compensi = codice 1001 (compensi amministratori e redditi assimilati); IRPEF stipendi = TFR, conguagli, addizionali e crediti. Il codice 1001 non distingue stipendi da compensi: per spostare un importo cambia la categoria della voce.</div></div>'+tab(h,rows,'€ · VERSAMENTI F24')+daPagare; }
 function sum(r,f){ return r.mesi.reduce(function(s,m){return s+f(m);},0); }
+
+/* ── P&L gestionale: ricavi → costi variabili → margine di contribuzione → costi fissi e personale → EBITDA → EBIT (RO) → gestione finanziaria → ante imposte → imposte → utile netto ── */
+var PL_VAR=['acquisti_materiali','intercompany_costo','trasporti','pubblicita','oneri_bancari','royalties'],
+    PL_FIS=['servizi_prof','abbonamenti_utenze','trasferte_welfare','altri'],
+    PL_PERS=['compensi_amm','stipendi','contributi','accantonamenti'], PL_AMM=['ammortamenti'], PL_FIN=['oneri_finanziari'];
+function plSc(ids){ return function(m){ return ids.reduce(function(a,k){ return a+plVal(m,k); },0); }; }
+function plCalc(m){ var o={};
+  o.ric=m.ricavi; o.varCat=plSc(PL_VAR)(m); o.varDash=m.costiDash||0; o.varRim=m.varRim||0;
+  o.varT=o.varCat+o.varDash; o.mdc=o.ric-o.varT+o.varRim;
+  o.fisCat=plSc(PL_FIS)(m); o.pers=plSc(PL_PERS)(m); o.amm=plSc(PL_AMM)(m); o.oneri=plSc(PL_FIN)(m);
+  o.altriNC=m.costi-(o.varT+o.fisCat+o.pers+o.amm+o.oneri); if(Math.abs(o.altriNC)<0.005) o.altriNC=0;
+  o.fis=o.fisCat+o.altriNC; o.ebitda=o.mdc-o.fis-o.pers; o.ebit=o.ebitda-o.amm;
+  o.fin=(m.interessi||0)-o.oneri; o.ebt=o.ebit+o.fin; o.imp=(m.ires||0)+(m.irap||0); o.net=o.ebt-o.imp; o.utileMotore=m.utile; return o; }
+function plGest(r){
+  var c=r.mesi.map(plCalc), R=r.totali.ricavi, H=r.mesi.map(function(m){return etm(m.m)+(plEdit(m.m)?' ✎':'');}).concat(['Totale','% ricavi']), nc=H.length;
+  var T=function(f){ return c.reduce(function(a,x){ return a+f(x); },0); };
+  var rows=[];
+  var sez=function(t){ rows.push('<tr class="s"><td colspan="'+(nc+1)+'" style="background:#eef2f7;text-align:left"><b>'+t+'</b></td></tr>'); };
+  var cat=function(id,force){ var tot=sum(r,function(m){return plVal(m,id);}); if(Math.abs(tot)<0.005 && !plRiga(id) && !force) return;
+    rows.push('<tr><td style="padding-left:14px">'+esc(catNome(id))+'</td>'+r.mesi.map(function(m){return plCell(m,id);}).join('')+'<td>'+eur(tot)+'</td><td>'+pct(tot,R)+'</td></tr>'); };
+  var ln=function(l,f,o){ o=o||{}; var t=T(f); rows.push('<tr class="'+(o.t?'t':'s')+'"><td'+(o.ind?' style="padding-left:14px"':'')+'>'+l+'</td>'+c.map(function(x){var v=f(x);return '<td class="'+(o.c?cls(v):'')+'">'+eur(v)+'</td>';}).join('')+'<td class="'+(o.c?cls(t):'')+'">'+eur(t)+'</td><td>'+(o.nopct?'':'<b>'+pct(t,R)+'</b>')+'</td></tr>'); };
+  var pr=function(l,f){ var t=T(f); rows.push('<tr class="s"><td style="padding-left:14px;font-style:italic">'+l+'</td>'+c.map(function(x){var v=f(x);return '<td style="font-style:italic" class="'+cls(v)+'">'+pct(v,x.ric)+'</td>';}).join('')+'<td style="font-style:italic" class="'+cls(t)+'">'+pct(t,R)+'</td><td></td></tr>'); };
+  sez('1 · RICAVI (IVA esclusa)');
+  E.CATEGORIE.filter(function(x){return x.tipo==='ricavo'&&!x.finanziario;}).forEach(function(x){ cat(x.id); });
+  if(sum(r,function(m){return m.ricaviDash;})) ln('Ricavi da Dashboard V6',function(x){return 0;},{ind:1,nopct:1}), rows.pop(), rows.push('<tr><td style="padding-left:14px">Ricavi da Dashboard V6</td>'+r.mesi.map(function(m){return '<td>'+eur(m.ricaviDash)+'</td>';}).join('')+'<td>'+eur(sum(r,function(m){return m.ricaviDash;}))+'</td><td>'+pct(sum(r,function(m){return m.ricaviDash;}),R)+'</td></tr>');
+  ln('TOTALE RICAVI',function(x){return x.ric;},{t:1});
+  sez('2 · COSTI VARIABILI (crescono con le vendite)');
+  PL_VAR.forEach(function(id){ cat(id); });
+  if(sum(r,function(m){return m.costiDash;})) rows.push('<tr><td style="padding-left:14px">Costi Paysolution da Dashboard V6</td>'+r.mesi.map(function(m){return '<td>'+eur(m.costiDash)+'</td>';}).join('')+'<td>'+eur(sum(r,function(m){return m.costiDash;}))+'</td><td>'+pct(sum(r,function(m){return m.costiDash;}),R)+'</td></tr>');
+  ln('Consumo di magazzino (diminuzione delle rimanenze; negativo = magazzino aumentato)',function(x){return -x.varRim;},{ind:1});
+  ln('TOTALE COSTI VARIABILI (incluso il consumo di magazzino)',function(x){return x.varT-x.varRim;},{t:1});
+  ln('MARGINE DI CONTRIBUZIONE',function(x){return x.mdc;},{t:1,c:1}); pr('% margine di contribuzione',function(x){return x.mdc;});
+  sez('3 · COSTI FISSI DI STRUTTURA');
+  PL_FIS.forEach(function(id){ cat(id); });
+  if(Math.abs(T(function(x){return x.altriNC;}))>0.005) ln('Altri costi non classificati',function(x){return x.altriNC;},{ind:1});
+  ln('TOTALE COSTI FISSI',function(x){return x.fis;},{t:1});
+  sez('4 · PERSONALE E AMMINISTRATORI');
+  PL_PERS.forEach(function(id){ cat(id); });
+  ln('TOTALE PERSONALE E AMMINISTRATORI',function(x){return x.pers;},{t:1});
+  ln('EBITDA (margine operativo lordo, MOL)',function(x){return x.ebitda;},{t:1,c:1}); pr('% EBITDA',function(x){return x.ebitda;});
+  sez('5 · AMMORTAMENTI');
+  PL_AMM.forEach(function(id){ cat(id,true); });
+  ln('EBIT = RISULTATO OPERATIVO (RO)',function(x){return x.ebit;},{t:1,c:1}); pr('% EBIT / RO',function(x){return x.ebit;});
+  sez('6 · GESTIONE FINANZIARIA');
+  rows.push('<tr><td style="padding-left:14px">Interessi attivi (mutuo a socio)</td>'+r.mesi.map(function(m){return '<td>'+eur(m.interessi||0)+'</td>';}).join('')+'<td>'+eur(r.totali.interessi||0)+'</td><td>'+pct(r.totali.interessi||0,R)+'</td></tr>');
+  PL_FIN.forEach(function(id){ cat(id,true); });
+  ln('SALDO GESTIONE FINANZIARIA (interessi attivi − oneri)',function(x){return x.fin;},{c:1});
+  ln('RISULTATO ANTE IMPOSTE (EBT)',function(x){return x.ebt;},{t:1,c:1}); pr('% ante imposte',function(x){return x.ebt;});
+  sez('7 · IMPOSTE E RISULTATO NETTO');
+  ln('Imposte stimate (IRES + IRAP, stima cumulativa)',function(x){return x.imp;},{ind:1});
+  ln('UTILE / PERDITA NETTO',function(x){return x.net;},{t:1,c:1}); pr('% utile netto',function(x){return x.net;});
+  var diff=Math.abs(T(function(x){return x.ebt;})-T(function(x){return x.utileMotore;}));
+  var cf=T(function(x){return x.fis+x.pers+x.amm;}), mdcP=R>0.004?T(function(x){return x.mdc;})/R:0, pareggio=mdcP>0.0001?cf/mdcP:0;
+  var kp=function(l,v,p,cl){ return '<div class="kpi card"><span>'+l+'</span><b class="'+(cl||'')+'">'+v+' €</b><span>'+p+'</span></div>'; };
+  var kpis='<div class="kpis">'+kp('Ricavi',eur(R),'100 %')+kp('Margine di contribuzione',eur(T(function(x){return x.mdc;})),pct(T(function(x){return x.mdc;}),R),cls(T(function(x){return x.mdc;})))
+    +kp('EBITDA',eur(T(function(x){return x.ebitda;})),pct(T(function(x){return x.ebitda;}),R),cls(T(function(x){return x.ebitda;})))+kp('EBIT / RO',eur(T(function(x){return x.ebit;})),pct(T(function(x){return x.ebit;}),R),cls(T(function(x){return x.ebit;})))
+    +kp('Ante imposte',eur(T(function(x){return x.ebt;})),pct(T(function(x){return x.ebt;}),R),cls(T(function(x){return x.ebt;})))+kp('Utile netto stimato',eur(T(function(x){return x.net;})),pct(T(function(x){return x.net;}),R),cls(T(function(x){return x.net;})))
+    +kp('Ricavi di pareggio operativo (EBIT = 0)',eur(pareggio),mdcP>0.0001?'costi fissi, personale e ammortamenti / % margine di contribuzione':'margine di contribuzione non positivo','')+'</div>';
+  return kpis+tab(H,rows,'€ · IVA ESCLUSA')
+   +'<div class="note"><b>Come leggerlo.</b> Costi variabili = quelli che crescono con le vendite (acquisti merci, intercompany Paysolution, trasporti, pubblicità, commissioni bancarie, royalty) più la variazione delle rimanenze. Costi fissi = struttura (consulenti, abbonamenti, trasferte, altri). Personale e amministratori sono mostrati a parte e l\'EBITDA è dopo di essi. La colonna % ricavi è sul totale del periodo, le righe in corsivo sono % del singolo mese. Le imposte sono la stima IRES/IRAP della pagina Imposte, non il bilancio ufficiale. Classificazione fisso/variabile gestionale, da condividere con il commercialista.</div>'
+   +(diff>0.01?'<div class="wa note">Attenzione: il risultato ante imposte di questa tabella differisce di '+eur(diff)+' € dall\'utile del motore. Controllare le categorie.</div>':'')
+   +'<div class="note">'+(sum(r,function(m){return m.costiDash;})?'':'')+'IVA esclusa; fa eccezione l\'IVA indetraibile, che è un costo. Le righe "da Dashboard V6" non hanno dettaglio per categoria.</div>'; }
 function vPL(r,ro){ PLRO=!!ro; var h=r.mesi.map(function(m){return etm(m.m)+(plEdit(m.m)?' ✎':'');}).concat(['Totale']);
   var ricRows=E.CATEGORIE.filter(function(c){return c.tipo==='ricavo'&&!c.finanziario;}).map(function(c){
     return rowE(esc(c.nome)+' — IVA esclusa',r,c.id); });
@@ -1210,7 +1272,7 @@ function vPL(r,ro){ PLRO=!!ro; var h=r.mesi.map(function(m){return etm(m.m)+(plE
    rowM('UTILE / PERDITA (al netto IVA)',r,function(m){return m.utile;},{t:1,c:1,tot:r.totali.utile}),
    rowP('% utile sul fatturato',r,function(m){return m.utile;},{c:1,tot:r.totali.utile}),
    rowM('Utile cumulato',r,function(m){return m.utileCum;},{c:1,tot:r.totali.utile})]));
-  var out=(ro?'':plBanner(r))+tab(h,rows)+(function(){ var e=r.mesi.filter(function(m){return m.dashEscluso;}).map(function(m){return etm(m.m);}); return e.length?'<div class="note">Dashboard V6 non conteggiata in '+e.join(', ')+': le fatture Paysolution sono già nelle voci manuali (nessun doppio conteggio).</div>':''; })()+dettaglioCat(r)+tabF24(r)+'<div class="note">F24 ritenute e simili versamenti non sono costi: '+eur(r.totali.uscitaNonCosto)+' € registrati fuori dal P&L.</div>'; PLRO=false; return out; }
+  var out=(ro?'':plBanner(r))+plGest(r)+(function(){ var e=r.mesi.filter(function(m){return m.dashEscluso;}).map(function(m){return etm(m.m);}); return e.length?'<div class="note">Dashboard V6 non conteggiata in '+e.join(', ')+': le fatture Paysolution sono già nelle voci manuali (nessun doppio conteggio).</div>':''; })()+tabF24(r)+'<div class="note">F24 ritenute e simili versamenti non sono costi: '+eur(r.totali.uscitaNonCosto)+' € registrati fuori dal P&L.</div>'; PLRO=false; return out; }
 function vIva(r){ var h=r.mesi.map(function(m){return etm(m.m);}).concat(['Totale']);
   return '<div class="note">Questa pagina mostra l\'IVA (l\'imposta), non gli imponibili.</div>'+tab(h,[rowM('IVA a debito (vendite)',r,function(m){return m.ivaDeb;},{tot:r.totali.ivaDeb}),
    rowM('IVA a credito (acquisti detraibili)',r,function(m){return m.ivaCred;},{tot:r.totali.ivaCred}),
