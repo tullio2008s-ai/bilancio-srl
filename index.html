@@ -1401,6 +1401,7 @@ function voceFonte(v){ var n=String(v.note||''), r=String(v.riferimento||''), d=
   if(src==='manuale') return F('mano','Scritta a mano','#1565c0',false);
   if(/^PREVISIONE|da emettere|^PROVVISORI/i.test(d)) return F('stima','Stima / previsione','#ef6c00',false);
   if(src==='sibill-doc'||/fonte: (Sibill )?documenti/i.test(n)) return F('file','Fattura Sibill','#2e7d32',true);
+  if(src==='corrispettivi'||/fonte: corrispettivi/i.test(n)) return F('file','Corrispettivi (Agenzia Entrate)','#2e7d32',true);
   if(src==='primanota'||/^(PN|SPA|IMP)-/.test(r)||/fonte: prima nota/i.test(n)) return F('file','Prima nota Sibill','#2e7d32',true);
   if(src==='paghe'||/^D\d+-(AMM|DIP|INPS|TFR)/.test(r)||/^F24P-/.test(r)||/prospetto contabile|Contabile \(commercialista\)/i.test(n)) return F('file','Paghe dello studio','#2e7d32',true);
   if(/^F24/i.test(d)||/Paga F24/i.test(n)) return F('file','F24 dello studio','#2e7d32',true);
@@ -2545,7 +2546,7 @@ function agSaldoForm(){ setTimeout(agSaldoTot,0); var C=simS().cassa; if(!AG.con
    +conti.map(function(c,i){ return '<tr><td class="mod" style="text-align:left"><input type="text" data-ag="conto|'+i+'|nome" value="'+esc(c.nome)+'" style="text-align:left"></td><td class="mod"><input type="text" inputmode="decimal" data-ag="conto|'+i+'|saldo" value="'+(String(c.saldo)===''?'':eurIn(agNum(c.saldo)))+'"></td></tr>'; }).join('')
    +'<tr><td style="text-align:left">Totale scritto</td><td id="agscr"></td></tr><tr><td style="text-align:left">Fido</td><td id="agfidor"></td></tr>'
    +'<tr class="t"><td style="text-align:left"><b>Cassa senza fido</b> (quella che uso in tutta la consolle)</td><td id="agtot"></td></tr><tr><td style="text-align:left">Disponibile con il fido</td><td id="agdisp"></td></tr></tbody></table>'
-   +'<div style="margin-top:6px;display:flex;gap:14px;flex-wrap:wrap;align-items:center"><label>Data del saldo <input type="date" id="agdata" data-ag="data" value="'+agOggi()+'"></label><label>Fido Sella € <input type="text" inputmode="decimal" id="agfido" data-ag="fidoimp" value="'+eurIn(+C.fido||0)+'" style="width:90px"></label>'
+   +'<div style="margin-top:6px;display:flex;gap:14px;flex-wrap:wrap;align-items:center"><label>Data del saldo <input type="date" id="agdata" data-ag="data" value="'+(AG.dataEc||agOggi())+'"></label><label>Fido Sella € <input type="text" inputmode="decimal" id="agfido" data-ag="fidoimp" value="'+eurIn(+C.fido||0)+'" style="width:90px"></label>'
    +'<button class="l" data-a="agconto">+ conto</button><button class="p" data-a="agsaldo">Salva il saldo</button></div>'
    +'<div class="note" style="margin-top:4px">Saldo attuale nella consolle: '+eur(+C.saldo||0)+' € senza fido ('+eur((+C.saldo||0)+(+C.fido||0))+' € con il fido) al '+agFmt(C.data)+'.</div><div id="agchk"></div>'; }
 /* totale senza fido + controllo di plausibilità contro la cassa prevista per quella data */
@@ -2562,8 +2563,47 @@ async function agSaldoSalva(){ var C=simS().cassa, d=(document.getElementById('a
     +(saltati.length?'\n\nQuesti movimenti erano previsti tra il '+agFmt(vecchia)+' e il '+agFmt(d)+'. Se sono già avvenuti sono dentro il nuovo saldo; se NON sono ancora avvenuti, dopo il salvataggio spostali più avanti nella pagina Cassa, altrimenti escono dalla previsione:\n'+saltati.slice(0,15).map(function(x){ return '• '+agFmt(x.data)+' '+String(x.desc).slice(0,60)+' '+eur(x.importo); }).join('\n'):'')+'\n\nConfermi?';
   if(!confirm(txt)) return;
   C.saldo=tot; C.data=d; C.fido=fido; C.saldiConFido=!!AG.conFido; C.conti=AG.conti.map(function(c){ return {nome:String(c.nome||'').trim(),saldo:String(c.saldo).trim()===''?'':Math.round(agNum(c.saldo)*100)/100}; });
-  agStato().saldo={il:agOggi(),fino:d}; S.config=await call('apiSalvaConfig',{sim:JSON.stringify(simS())});
+  agStato().saldo={il:agOggi(),fino:d}; if(AG.ecPending){ agStato().ec=AG.ecPending; AG.ecPending=null; } S.config=await call('apiSalvaConfig',{sim:JSON.stringify(simS())});
   AG.p=''; AG.msg='Saldo salvato: cassa '+eur(tot)+' € senza fido ('+eur(tot+fido)+' € con il fido) al '+agFmt(d)+(saltati.length?'. Controlla nella pagina Cassa i '+saltati.length+' movimenti previsti prima di questa data.':''); AG.ko=false; render(); }
+
+
+/* ── Corrispettivi (export Agenzia delle Entrate: "Corrispettivi" o "Corrispettivi dettaglio") ── */
+function agCorr(t){ var I=agIndice(), righe=[], gia=0, ult='', vecchie=0, anno0=new Date().getFullYear()-1;
+  var vend=(S.voci||[]).filter(function(v){ return !v.eliminata&&v.categoria==='vendite'; });
+  var blob=vend.map(function(v){ return {v:v,s:(String(v.descrizione||'')+' '+String(v.riferimento||'')+' '+String(v.note||'')).toUpperCase()}; });
+  t.r.forEach(function(r){ var d=agData(agCol(t,r,'DATA')), nota=String(agCol(t,r,'NOTA')).trim(); if(!d||!nota) return;
+    if(+d.slice(0,4)<anno0){ vecchie++; return; }
+    var imp=agNum(agCol(t,r,'NETTO')), iva=agNum(agCol(t,r,'IVA')), lordo=agNum(agCol(t,r,'LORDO')); if(!imp&&!lordo) return;
+    var mn=/^\s*(\d+)\s*-/.exec(nota), n=mn?mn[1]:'', rimb=/rimborso/i.test(nota), sg=rimb?-1:1; imp=sg*Math.abs(imp); iva=sg*Math.abs(iva);
+    var ric=(/\bIT6[0-9A-Z]{6,}\b/.exec(nota.toUpperCase())||[''])[0], ord=(/\b\d{3}-\d{6,7}-\d{6,7}\b/.exec(nota)||[''])[0];
+    var comp=d.slice(0,7), cliente=(/cliente ([^-–]+?)(?: - |$| – )/i.exec(nota)||[])[1]||'', canale=/amazon/i.test(nota)?'Amazon':(/shopify/i.test(nota)?'Shopify':(/subscription|abbonament/i.test(nota)?'Abbonamento cloud':'Vendita'));
+    var esito='nuova', ex=null, nt='';
+    if(ric||ord){ var tr=blob.filter(function(b){ return (ric&&b.s.indexOf(ric)>=0)||(ord&&b.s.indexOf(ord)>=0); })[0];
+      if(tr){ ex=tr.v; esito=Math.abs((+ex.imponibile||0)-imp)<0.06?'uguale':'diverso'; if(esito==='uguale') gia++; else nt='Già presente con importo diverso: ora '+eur(+ex.imponibile||0)+' €, nel file '+eur(imp)+' €. Controlla prima di aggiungere.'; } }
+    if(esito==='nuova'){ var dp=blob.filter(function(b){ return String(b.v.competenza).slice(0,7)===comp&&Math.abs((+b.v.imponibile||0)-imp)<0.06; })[0];
+      if(dp){ esito='doppione'; ex=dp.v; nt='Stesso mese e stesso importo di una vendita già registrata: se è la stessa, lascia la spunta tolta.'; } }
+    if(rimb) nt=(nt?nt+' ':'')+'Rimborso: importo messo in negativo.';
+    if(d>ult) ult=d;
+    var desc=(rimb?'Rimborso corrispettivo ':'Corrispettivo ')+(canale!=='Vendita'?canale+' ':'')+(ric||('n. '+n))+(cliente?' - '+cliente.trim():'');
+    righe.push({sel:esito==='nuova',esito:esito,ex:ex,nota:nt,v:{categoria:'vendite',data:d,competenza:comp,descrizione:desc,imponibile:Math.round(imp*100)/100,iva:Math.round(iva*100)/100,detraibile:true,riferimento:'CORRAdE-'+(n||d)+'-'+d.slice(0,4),note:'fonte: corrispettivi (export Agenzia Entrate), caricati il '+agFmt(agOggi())+(ric?', ricevuta '+ric:'')+(ord?', ordine '+ord:'')}}); });
+  righe=righe.filter(function(x){ return x.esito!=='uguale'; });
+  return {tipo:'corr',righe:righe,gia:gia,fino:ult,vecchie:vecchie}; }
+
+/* ── Estratti conto banche (PDF): leggo il saldo finale e la data ── */
+function agEstratto(testo,nome){ var T=String(testo||'').replace(/[\u0000-\u0009\u000b-\u001f]/g,''), num=function(s){ return agNum(String(s).replace(/\s+/g,'')); };
+  var m=/Saldo finale al\s+(\d{2})\.(\d{2})\.(\d{4})\s*([+-])\s*([\d\s.]+,\s*\d{2})/.exec(T);
+  if(m&&/INTESA|BCITITMM|Conto Business Insieme/i.test(T)) return {file:nome,conto:'Intesa Sanpaolo',data:m[3]+'-'+m[2]+'-'+m[1],saldo:(m[4]==='-'?-1:1)*num(m[5])};
+  var p=/Da\s+(?:\d{2}\/\d{2}\/\d{4}\s+a\s+)(\d{2}\/\d{2}\/\d{4})/.exec(T)||/Da\s+a\s+\d{2}\/\d{2}\/\d{4}\s+(\d{2}\/\d{2}\/\d{4})/.exec(T), s=/Saldo finale\s+(-?[\d,]+\.\d{2})/.exec(T);
+  if(s&&p&&/SWAN|swan\.io/i.test(T)) return {file:nome,conto:'Conto Sibill',data:agData(p[1]),saldo:+String(s[1]).replace(/,/g,'')};
+  var g=/Saldo finale(?: al)?\s*(\d{2}[.\/]\d{2}[.\/]\d{4})?\s*([+-]?)\s*([\d.\s]+,\s*\d{2})/i.exec(T);
+  if(g) return {file:nome,conto:'Conto da '+nome.replace(/\.pdf$/i,''),data:g[1]?agData(g[1].replace(/\./g,'/')):'',saldo:(g[2]==='-'?-1:1)*num(g[3]),generico:true};
+  return null; }
+function agEcPanel(){ var E_=AG.ec; if(!E_) return '';
+  return '<div style="margin-top:8px"><b>Saldi letti dagli estratti</b></div><table class="fit" style="max-width:760px;margin-top:4px"><thead><tr><th style="text-align:left">File</th><th style="text-align:left">Conto</th><th>Saldo finale al</th><th>Saldo €</th></tr></thead><tbody>'
+    +E_.saldi.map(function(x){ return '<tr><td style="text-align:left;white-space:normal">'+esc(x.file)+'</td><td style="text-align:left">'+esc(x.conto)+(x.generico?' <span class="pill pneg">banca non riconosciuta: rinomina il conto</span>':'')+'</td><td>'+agFmt(x.data)+'</td><td>'+eur(x.saldo)+'</td></tr>'; }).join('')+'</tbody></table>'
+    +(E_.altri.length?'<div class="wa" style="margin-top:4px">Non riconosciuti: '+E_.altri.map(esc).join(', ')+'</div>':'')
+    +'<div class="note" style="margin-top:4px">Gli estratti non creano voci: porto questi saldi nel modulo "Saldo banche", dove li controlli (puoi aggiungere gli altri conti) e li salvi. Il saldo vale alla data dell\'estratto: se la data è passata, la cassa riparte da quel giorno e i movimenti successivi vanno ricontrollati nella pagina Cassa.</div>'
+    +'<div style="margin-top:8px"><button class="p" data-a="agecusa">Porta i saldi nel modulo saldo</button> <button class="l" data-a="agannulla">Annulla</button></div>'; }
 
 /* ── 2. Fatture Sibill (export "Documenti": emessi e ricevuti) ── */
 function agIndice(){ var vv=S.voci||[], ref={}, tok={}; vv.forEach(function(v){ var k=agNorm(v.riferimento); if(k) (ref[k]=ref[k]||[]).push(v);
@@ -2688,6 +2728,9 @@ async function agLeggi(files){ AG.msg=''; AG.ko=false; var p=AG.p; try{
   if(p==='fatture'||p==='pn'){ var wb=await agXlsx(files[0]);
     if(p==='fatture'){ var t=agTab(wb,'Numero documento'); if(!t) throw new Error('Questo file non sembra l\'export "Documenti" di Sibill (manca la colonna "Numero documento").'); AG.prev=agFatture(t); }
     else { var t2=agTab(wb,'Data Contabile'); if(!t2) throw new Error('Questo file non sembra la prima nota di Sibill (manca la colonna "Data Contabile").'); AG.prev=agPrimaNota(t2); } }
+  else if(p==='corr'){ var wbc=await agXlsx(files[0]), tc=agTab(wbc,'NETTO'); if(!tc||tc.h['NOTA']===undefined||tc.h['DATA']===undefined) throw new Error('Questo file non sembra l\'export "Corrispettivi" (servono le colonne DATA, NOTA, NETTO, IVA, LORDO).'); AG.prev=agCorr(tc); }
+  else if(p==='ec'){ var sal=[], alt=[]; for(var ie=0;ie<files.length;ie++){ var pge=await agPdf(files[ie]), r_=agEstratto(pge.map(function(x){ return x.testo; }).join('\n'),files[ie].name); if(r_) sal.push(r_); else alt.push(files[ie].name); }
+    if(!sal.length) throw new Error('Non riconosco questi PDF come estratti conto (Intesa Sanpaolo o conto Sibill/Swan). Per gli altri conti usa "Saldo banche al giorno".'); AG.ec={saldi:sal,altri:alt}; AG.prev=null; render(); return; }
   else if(p==='paghe'){ var cont=[], lul=[], altri=[]; for(var i=0;i<files.length;i++){ var pg=await agPdf(files[i]), c=agContabile(pg), l=agLul(pg); if(c&&c.length) cont=cont.concat(c); if(l.length) lul=lul.concat(l); if(!(c&&c.length)&&!l.length) altri.push(files[i].name); }
     if(!cont.length&&!lul.length) throw new Error('Non riconosco questi PDF: servono il prospetto contabile delle paghe e/o il libro unico (cedolini) dello studio.');
     AG.prev=agPaghe(cont,lul); if(altri.length) AG.msg='Non riconosciuti: '+altri.join(', '); }
@@ -2703,7 +2746,7 @@ async function agApplica(){ var P=AG.prev; if(!P) return; var sel=P.righe.filter
   if(ps.length) extra.push('Cassa: le fatture Paysolution ('+ps.join(', ')+') restano fuori dalla cassa: conta il netto mensile che inserisci tu');
   if(!nuove.length&&!mod.length&&!extra.length&&P.tipo!=='paghe'){ AG.msg='Niente da aggiornare: è tutto già nella consolle.'; AG.ko=false; AG.prev=null; AG.p=''; render(); return; }
   if(!confirm('Aggiungo '+nuove.length+' voci e ne aggiorno '+mod.length+'.'+(P.tipo==='paghe'&&P.lul.length?' Salvo i dati di '+P.lul.length+' cedolini (netto, IRPEF, imponibile da inizio anno).':'')+(extra.length?'\n\n'+extra.join('\n'):'')+'\n\nConfermi?')) return;
-  var srcT={fatture:'sibill-doc',pn:'primanota',paghe:'paghe'}[P.tipo]; nuove.forEach(function(v){ v.src=srcT; });
+  var srcT={fatture:'sibill-doc',pn:'primanota',paghe:'paghe',corr:'corrispettivi'}[P.tipo]; nuove.forEach(function(v){ v.src=srcT; });
   if(nuove.length) await call('apiImportaVoci',nuove.map(voceVersoServer));
   for(var i=0;i<mod.length;i++){ var r=mod[i], v=r.ex, nv={id:v.id,categoria:v.categoria,data:v.data,competenza:v.competenza,imponibile:+v.imponibile,iva:+v.iva||0,detraibile:!!v.detraibile,descrizione:v.descrizione||'',riferimento:v.riferimento||'',note:v.note||''};
     ['categoria','data','competenza','imponibile','iva','detraibile','riferimento','note'].forEach(function(k){ nv[k]=r.v[k]; }); if(r.v.descrizione) nv.descrizione=r.v.descrizione; nv.src=r.esito==='riclassifica'?(v.src||srcT):srcT; await call('apiSalvaVoce',voceVersoServer(nv)); }
@@ -2712,46 +2755,48 @@ async function agApplica(){ var P=AG.prev; if(!P) return; var sel=P.righe.filter
     var ms=P.cont.map(function(x){ return x.mese; }).concat(P.lul.map(function(x){ return x.mese; })).sort(); st.paghe={il:agOggi(),fino:ms[ms.length-1]||''}; }
   if(P.tipo==='fatture'){ ps.forEach(function(k){ sm.cassa.esclusi.push(k); }); st.fatture={il:agOggi(),fino:P.fino}; }
   if(P.tipo==='pn'){ st.pn={il:agOggi(),fino:P.fino}; }
+  if(P.tipo==='corr'){ st.corr={il:agOggi(),fino:P.fino}; }
   S.config=await call('apiSalvaConfig',{sim:JSON.stringify(sm)});
   await ricarica(); var nc=await agNettaApplica(true);
   AG.prev=null; AG.p=''; AG.msg='Aggiornamento fatto: '+nuove.length+' voci aggiunte, '+mod.length+' aggiornate'+(nc>0?', previsione del mese ridotta su '+nc+' righe':'')+(P.tipo==='paghe'&&P.lul.length?', '+P.lul.length+' cedolini salvati':'')+'. I numeri di tutte le pagine sono ricalcolati.'; AG.ko=false; await ricarica(); }
 
 /* ── pannello nella pagina Oggi ── */
 var AG_FONTI=[
-  {id:'saldo',t:'Saldo banche ad oggi',q:'Ogni giorno, o almeno il lunedì',giorni:7,cosa:'I saldi dei conti (Sella, Intesa, Sibill, PayPal, Stripe). È il punto di partenza di tutta la cassa.'},
-  {id:'fatture',t:'Fatture Sibill (emesse e ricevute)',q:'Ogni settimana e a fine mese',giorni:10,cosa:'Sibill → Documenti → Esporta (Excel). Diventano ricavi, costi e IVA.'},
-  {id:'pn',t:'Prima nota Sibill',q:'A fine mese, dopo aver sistemato categorie e riconciliazioni in Sibill',giorni:35,cosa:'Sibill → Prima nota → Esporta (Excel). Ne prendo commissioni bancarie e spese senza fattura.'},
-  {id:'paghe',t:'Paghe del mese (PDF dello studio)',q:'Appena lo studio manda le paghe (inizio mese)',giorni:40,cosa:'Prospetto contabile e cedolini (libro unico). Diventano compensi, contributi e l\'F24 del 16.'},
-  {id:'ec',t:'Estratti conto banche',q:'—',giorni:0,cosa:'Non servono alla consolle: i movimenti di tutte le banche e carte sono già nella prima nota Sibill.'}];
+  {id:'saldo',b:'Carica saldo banche al giorno…',t:'Saldo banche al giorno X',q:'Ogni giorno, o almeno il lunedì',giorni:7,cosa:'I saldi dei conti (Sella, Intesa, Sibill, PayPal, Stripe) alla data che scegli. È il punto di partenza di tutta la cassa.'},
+  {id:'fatture',b:'Carica fatture Sibill',t:'Fatture Sibill (emesse e ricevute)',q:'Ogni settimana e a fine mese',giorni:10,cosa:'Sibill → Documenti → Esporta (Excel). Diventano ricavi, costi e IVA.'},
+  {id:'corr',b:'Carica corrispettivi',t:'Corrispettivi (vendite a privati)',q:'Ogni settimana e a fine mese',giorni:10,cosa:'Portale Agenzia delle Entrate / gestionale corrispettivi → esporta "Corrispettivi" o "Corrispettivi dettaglio" (file .xls). Diventano ricavi (vendite a privati: Amazon, Shopify, abbonamenti).'},
+  {id:'pn',b:'Carica prima nota',t:'Prima nota Sibill',q:'A fine mese, dopo aver sistemato categorie e riconciliazioni in Sibill',giorni:35,cosa:'Sibill → Prima nota → Esporta (Excel). Ne prendo commissioni bancarie e spese senza fattura.'},
+  {id:'ec',b:'Carica estratti banche',t:'Estratti conto banche',q:'A fine mese, quando la banca li pubblica',giorni:0,cosa:'PDF mensili di Intesa Sanpaolo e del conto Sibill/Swan. Non creano voci: leggo il saldo finale di ogni estratto e lo porto nel modulo "saldo banche" per controllarlo e salvarlo. Il saldo è corretto alla data dell\'estratto (fine mese).'},
+  {id:'paghe',b:'Carica paghe del mese',t:'Paghe del mese (PDF dello studio)',q:'Appena lo studio manda le paghe (inizio mese)',giorni:40,cosa:'Prospetto contabile e cedolini (libro unico). Diventano compensi, contributi e l\'F24 del 16.'}];
 function agUltimo(id){ var st=agStato(), x=st[id]; if(id==='saldo'){ var C=simS().cassa; return {il:C.data,fino:C.data}; } return x||null; }
 function agAllerte(){ var al=[], oggi=agOggi(); AG_FONTI.forEach(function(f){ if(!f.giorni||f.id==='saldo') return; var u=agUltimo(f.id); if(!u){ al.push(f.t+': mai caricate dalla consolle (pagina Oggi → Aggiorna i dati).'); return; }
   var gg=Math.round((Date.parse(oggi)-Date.parse(u.il))/864e5); if(gg>f.giorni) al.push(f.t+': ultimo caricamento il '+agFmt(u.il)+' ('+gg+' giorni fa).'); });
   var sm=simS(), pm=sm.paghe||{}, ult=Object.keys(pm).sort().pop(); if(ult){ var nm=Object.keys(pm[ult]); nm.forEach(function(n){ var x=pm[ult][n], mesiRim=12-(+ult.slice(5,7)), proj=(+x.impAnno||0)+mesiRim*(+x.impMese||0); if(proj>50000) al.push('IRPEF '+agTitolo(n)+': imponibile da inizio anno '+eur(+x.impAnno||0)+' € a '+agEtm(ult)+'; a questo ritmo a dicembre '+eur(proj)+' €, oltre 50.000 (aliquota 43%).'); }); }
   return al; }
 function agCard(){ var st=agStato(), oggi=agOggi();
-  var stato=function(f){ if(f.id==='ec') return '<span class="note">non serve</span>'; var u=agUltimo(f.id); if(!u||!u.il) return '<span class="pill pneg">mai caricato</span>'; var gg=Math.round((Date.parse(oggi)-Date.parse(u.il))/864e5), ok=gg<=f.giorni; return '<span class="pill '+(ok?'ppos':'pneg')+'">'+(f.id==='saldo'?'saldo al ':'caricato il ')+agFmt(u.il)+'</span>'+(u.fino&&f.id!=='saldo'?' <span class="note">dati fino al '+(f.id==='paghe'?agEtm(u.fino):agFmt(u.fino))+'</span>':''); };
+  var stato=function(f){ var u=agUltimo(f.id); if(!u||!u.il) return '<span class="pill pneg">mai caricato</span>'; var gg=Math.round((Date.parse(oggi)-Date.parse(u.il))/864e5), ok=!f.giorni||gg<=f.giorni; return '<span class="pill '+(ok?'ppos':'pneg')+'">'+(f.id==='saldo'?'saldo al ':'caricato il ')+agFmt(f.id==='saldo'?u.fino:u.il)+'</span>'+(u.fino&&f.id!=='saldo'?' <span class="note">dati fino al '+(f.id==='paghe'?agEtm(u.fino):agFmt(u.fino))+'</span>':''); };
   var vecchio=function(f){ if(!f.giorni) return false; var u=agUltimo(f.id); return !u||!u.il||Math.round((Date.parse(oggi)-Date.parse(u.il))/864e5)>f.giorni; }, anyOld=AG_FONTI.some(vecchio);
-  var sotto=function(f){ if(f.id==='ec') return 'non servono'; var u=agUltimo(f.id); if(!u||!u.il) return 'mai caricato'; return (f.id==='saldo'?'saldo al ':'caricato il ')+agFmt(u.il); };
-  var bott='<div class="agb">'+AG_FONTI.map(function(f){ return '<button class="'+(AG.p===f.id?'on':(vecchio(f)?'old':''))+'" data-a="agp" data-id="'+f.id+'">'+f.t+'<small>'+sotto(f)+'</small></button>'; }).join('')+'</div>';
+  var sotto=function(f){ var u=agUltimo(f.id); if(!u||!u.il) return 'mai caricato'; return f.id==='saldo'?'saldo al '+agFmt(u.fino||u.il):'caricato il '+agFmt(u.il); };
+  var bott='<div class="agb">'+AG_FONTI.map(function(f){ return '<button class="'+(AG.p===f.id?'on':(vecchio(f)?'old':''))+'" data-a="agp" data-id="'+f.id+'">'+f.b+'<small>'+sotto(f)+'</small></button>'; }).join('')+'</div>';
   var tab='<table class="fit cdt ag" style="min-width:600px;margin-top:8px"><thead><tr><th style="text-align:left">Cosa carichi</th><th style="text-align:left">Da dove</th><th style="text-align:left">Quando</th><th style="text-align:left">Stato</th></tr></thead><tbody>'
     +AG_FONTI.map(function(f){ return '<tr><td style="text-align:left"><b>'+f.t+'</b></td><td style="text-align:left;white-space:normal">'+f.cosa+'</td><td style="text-align:left;white-space:normal">'+f.q+'</td><td style="text-align:left;white-space:normal">'+stato(f)+'</td></tr>'; }).join('')
     +'<tr><td style="text-align:left"><b>Previsioni di incasso</b></td><td style="text-align:left;white-space:normal">Paysolution (30% del MOL e rate materiali), Adler, vendite: pagina <b>Strategia</b>, righe del mese.</td><td style="text-align:left;white-space:normal">Ogni mese, o quando cambia una stima</td><td></td></tr>'
     +'<tr><td style="text-align:left"><b>Export dati</b></td><td style="text-align:left;white-space:normal">Voci manuali → Esporta dati: il file da mandarmi per il controllo al centesimo.</td><td style="text-align:left;white-space:normal">A fine mese</td><td></td></tr></tbody></table>';
   var pan=''; if(AG.p){ var f=AG_FONTI.filter(function(x){ return x.id===AG.p; })[0];
     if(AG.p==='saldo') pan=agSaldoForm();
-    else if(AG.p==='ec') pan='<div class="note" style="font-size:13px">La consolle non ha bisogno degli estratti conto: <b>Sibill li legge già</b> (Sella, Intesa, Sibill, PayPal, Stripe e la carta Amex sono tutti nella prima nota). Usa:<br>• <b>Saldo banche ad oggi</b> per il saldo;<br>• <b>Prima nota Sibill</b> per commissioni e spese senza fattura.<br>Gli estratti conto in PDF restano per lo studio (Raffaela) e per l\'archivio in Dropbox.</div>';
-    else { var acc=AG.p==='paghe'?'.pdf':'.xlsx,.xls,.csv', mult=AG.p==='paghe'?' multiple':'';
-      pan='<div class="note">'+f.cosa+(AG.p==='paghe'?' Puoi scegliere più PDF insieme (prospetto contabile e cedolini).':'')+(AG.p==='pn'?' Considero solo i movimenti dopo il <b>'+agFmt(st.pnRegistrataFino||'2026-10-31')+'</b> (prima nota già verificata e registrata fino a quella data).':'')+' Il file si legge qui nel browser e non viene inviato a nessuno. Prima di scrivere ti mostro l\'anteprima.</div>'
-        +'<div style="margin-top:6px"><input type="file" id="agfile" accept="'+acc+'"'+mult+' class="hid"><button class="p" data-a="agscegli">Scegli il file…</button></div>'+(AG.prev?agAnteprima(AG.prev):''); } }
-  return '<div class="card norep"><b>Aggiorna i dati</b><div class="note" style="margin-top:2px">Cosa devi dare alla consolle e quando. Scegli cosa caricare:</div>'+bott
+    else { var pdf=AG.p==='paghe'||AG.p==='ec', acc=pdf?'.pdf':'.xlsx,.xls,.csv', mult=pdf?' multiple':'';
+      pan='<div class="note">'+f.cosa+(pdf?' Puoi scegliere più PDF insieme.':'')+(AG.p==='pn'?' Considero solo i movimenti dopo il <b>'+agFmt(st.pnRegistrataFino||'2026-10-31')+'</b> (prima nota già verificata e registrata fino a quella data).':'')+' Il file si legge qui nel browser e non viene inviato a nessuno. Prima di scrivere ti mostro l\'anteprima.</div>'
+        +'<div style="margin-top:6px"><input type="file" id="agfile" accept="'+acc+'"'+mult+' class="hid"><button class="p" data-a="agscegli">Scegli il file…</button></div>'+(AG.p==='ec'?agEcPanel():(AG.prev?agAnteprima(AG.prev):'')); } }
+  return '<div class="card norep"><b>Caricamento dati</b><div class="note" style="margin-top:2px">Qui, e solo qui, si caricano tutti i dati. Scegli cosa caricare (in rosso: da aggiornare). Ogni file mostra prima un\'anteprima e non scrive niente senza il tuo "Conferma".</div>'+bott
     +(AG.msg?'<div class="'+(AG.ko?'wa':'okbox')+'" style="margin-top:6px">'+esc(AG.msg)+'</div>':'')
-    +(pan?'<div class="agpan">'+pan+'</div>':'')+'<details style="margin-top:6px"'+(!AG.p&&anyOld?' open':'')+'><summary class="note" style="cursor:pointer">Cosa caricare e quando</summary>'+tab+'</details></div>'; }
+    +(pan?'<div class="agpan">'+pan+'</div>':'')+'<details style="margin-top:6px"'+(!AG.p&&anyOld?' open':'')+'><summary class="note" style="cursor:pointer">Cosa caricare, da dove e quando</summary>'+tab+'</details></div>'; }
 function agEsito(r){ var m={riclassifica:['ppos','riclassifica'],nuova:['ppos','nuova'],sostituisce:['ppos','sostituisce la previsione'],aggiorna:['ppos','aggiorna'],uguale:['','già uguale'],doppione:['pneg','forse già presente'],capex:['pneg','bene strumentale?'],diverso:['pneg','da controllare']}[r.esito]||['',r.esito];
   return '<span class="pill '+m[0]+'">'+m[1]+'</span>'+(r.ex&&r.esito!=='uguale'&&r.esito!=='aggiorna'?'<div class="note">'+esc(String(r.ex.descrizione||'').slice(0,70))+' · '+eur(+r.ex.imponibile||0)+'</div>':'')+(r.esito==='aggiorna'&&r.ex?'<div class="note">ora '+eur(+r.ex.imponibile||0)+'</div>':'')+(r.nota?'<div class="note">'+esc(r.nota)+'</div>':''); }
 function agAnteprima(P){ var catOpt=function(i,c){ return '<select data-ag="r|'+i+'|categoria">'+E.CATEGORIE.filter(function(x){ return x.tipo==='ricavo'||x.tipo==='costo'; }).map(function(x){ return '<option value="'+x.id+'"'+(x.id===c?' selected':'')+'>'+esc(x.nome)+'</option>'; }).join('')+'</select>'; };
   var nSel=P.righe.filter(function(r){ return r.sel&&r.esito!=='uguale'; }).length, h='<div style="margin-top:8px"><b>Anteprima</b> <span class="note">('+esc(P.file||'')+')</span></div>';
   if(P.tipo==='fatture') h+='<div class="note">Documenti nel file: '+P.tot+' (fino al '+agFmt(P.fino)+'); già nella consolle: <b>'+P.gia+'</b>; da aggiungere o abbinare: <b>'+P.righe.length+'</b>'+(P.vecchie?'; anni precedenti ignorati: '+P.vecchie:'')+'. Togli la spunta a quello che non vuoi; categoria e competenza si possono cambiare.</div>'
     +(P.prevAperte&&P.prevAperte.length?'<div class="wa" style="margin-top:4px">Restano le previsioni dei costi del mese: '+P.prevAperte.map(function(v){ return esc(String(v.descrizione).slice(0,60))+' ('+eur(+v.imponibile||0)+')'; }).join('; ')+'. Quando il mese è chiuso e hai caricato tutte le fatture, eliminale in <b>Voci manuali</b>, altrimenti i costi contano due volte.</div>':'');
+  if(P.tipo==='corr') h+='<div class="note">Corrispettivi nel file (anno in corso e precedente); già nella consolle: <b>'+P.gia+'</b>; da controllare o aggiungere: <b>'+P.righe.length+'</b>'+(P.vecchie?'; anni precedenti ignorati: '+P.vecchie:'')+'. Ultima data nel file: '+agFmt(P.fino)+'. Le vendite già registrate le riconosco dal numero di ricevuta Amazon o dall\'ordine; quelle senza ricevuta, dal mese e dall\'importo (segnate "forse già presente", senza spunta).</div>';
   if(P.tipo==='pn') h+='<div class="note">Movimenti dopo il '+agFmt(P.da)+' al '+agFmt(P.fino)+'. Con fattura o riconciliati in Sibill: '+P.fatt+' (entrano con le fatture); spese abbinate a fatture già registrate: '+P.abb+'. Esclusi perché non sono costi o arrivano da altre fonti: '+Object.keys(P.scart).map(function(k){ return k.toLowerCase()+' '+P.scart[k]; }).join(', ')+'.</div>'
     +(P.ignote.length?'<div class="wa" style="margin-top:4px">Movimenti senza categoria (o con una categoria che non conosco): '+P.ignote.length+'. Dagli una categoria in Sibill e ricarica:<br>'+P.ignote.slice(0,12).map(function(m){ return agFmt(m.d)+' '+esc(m.desc)+' '+eur(m.imp)+(m.cat?' ['+esc(m.cat.toLowerCase())+']':''); }).join('<br>')+(P.ignote.length>12?'<br>…':'')+'</div>':'');
   if(P.tipo==='paghe'){ h+=P.cont.map(function(x){ return '<div class="note">Prospetto contabile '+agEtm(x.mese)+' – '+esc(x.raggr.toLowerCase())+': lordo '+eur(x.lordo)+', ritenute IRPEF '+eur(x.irpef)+', addizionali '+eur(x.addReg+x.addCom)+', INPS a carico collaboratori '+eur(x.inpsColl)+', contributi a carico ditta '+eur(x.contrDitta)+', netti '+eur(x.netti)+' '+(x.quadra?'<span class="pill ppos">quadra</span>':'<span class="pill pneg">non quadra: controlla</span>')+'</div>'; }).join('');
@@ -2765,7 +2810,10 @@ function agAnteprima(P){ var catOpt=function(i,c){ return '<select data-ag="r|'+
   else h+='<div class="okbox" style="margin-top:6px">Nessuna voce nuova: la consolle è già aggiornata con questo file.</div>';
   return h+'<div style="margin-top:8px;display:flex;gap:10px;align-items:center"><button class="p" data-a="agok">Conferma e aggiorna la consolle ('+nSel+')</button><button class="l" data-a="agannulla">Annulla</button></div>'; }
 async function agAzione(a,id){ try{
-  if(a==='agp'){ AG.p=AG.p===id?'':id; AG.prev=null; AG.msg=''; AG.conti=null; AG.conFido=undefined; render(); if(AG.p==='saldo') agSaldoTot(); }
+  if(a==='agp'){ AG.p=AG.p===id?'':id; AG.prev=null; AG.msg=''; AG.conti=null; AG.conFido=undefined; AG.ec=null; AG.dataEc=''; render(); if(AG.p==='saldo') agSaldoTot(); }
+  else if(a==='agecusa'){ var Ce=simS().cassa, base=(Array.isArray(Ce.conti)&&Ce.conti.length)?Ce.conti:AG_CONTI.map(function(n){ return {nome:n,saldo:''}; }), cc=JSON.parse(JSON.stringify(base)), dmax='';
+    AG.ec.saldi.forEach(function(x){ var k=String(x.conto).toLowerCase().split(' ')[0], tr=cc.filter(function(c){ return String(c.nome).toLowerCase().indexOf(k)>=0; })[0]; if(tr) tr.saldo=x.saldo; else cc.push({nome:x.conto,saldo:x.saldo}); if(x.data>dmax) dmax=x.data; });
+    AG.conti=cc; AG.dataEc=dmax; AG.ecPending={il:agOggi(),fino:dmax}; AG.ec=null; AG.p='saldo'; AG.conFido=undefined; AG.msg='Saldi degli estratti portati nel modulo (data '+agFmt(dmax)+'). Controlla gli altri conti (Sella, PayPal, Stripe…) e salva.'; AG.ko=false; render(); agSaldoTot(); }
   else if(a==='agscegli'){ var f=document.getElementById('agfile'); if(f){ f.value=''; f.click(); } }
   else if(a==='agannulla'){ AG.prev=null; AG.msg=''; render(); }
   else if(a==='agok'){ await agApplica(); }
@@ -2799,6 +2847,39 @@ function agComeSiLavora(){ var ok='<td style="text-align:center;color:var(--ok);
    +'<li><b>Riepilogo</b> mostra <b>solo il registrato</b>, senza stime: lo cambiano le voci e la casella "Includi voci provvisorie". Per questo una stima compare in Oggi e nel P&amp;L ma non nel Riepilogo.</li></ul>'
    +'<b>Due trappole</b><ul style="margin:2px 0 0 18px;padding:0"><li>La pagina <b>Cash flow</b> non alimenta niente: è un foglio a parte. Le stime di incasso che contano vanno in <b>Cassa</b>, tra i movimenti a mano.</li><li>La pagina <b>Budget</b> (esercizio 2027) non cambia Oggi.</li></ul>'
    +'<b>Regola pratica</b><ul style="margin:2px 0 0 18px;padding:0"><li>Pagamento o incasso <b>già avvenuto o certo</b> → <b>Voci manuali</b> o <b>Aggiorna i dati</b>.</li><li><b>Incasso futuro stimato</b> (Paysolution, clienti) → <b>Cassa</b>.</li><li><b>Spesa futura stimata</b> del mese → <b>Previsione nov-dic</b>; dal 2027 → <b>Strategia</b>.</li></ul></div></details></div>'; }
+
+/* ── Note: come leggere, usare e attualizzare la consolle ── */
+function agNote(guida){ var h3=function(t){ return '<div style="margin-top:10px"><b>'+t+'</b></div>'; }, ul=function(L){ return '<ul style="margin:3px 0 0 18px;padding:0;line-height:1.5">'+L.map(function(x){ return '<li>'+x+'</li>'; }).join('')+'</ul>'; };
+  return '<div class="card"><details open><summary style="cursor:pointer"><b>Note: come leggere, usare e attualizzare la consolle</b></summary>'
+   +h3('1. Come leggere i numeri')
+   +ul(['<b>Oggi, Cassa, Cash flow</b> sono <b>cassa</b>: soldi che entrano ed escono alla data del pagamento, IVA compresa.',
+        '<b>P&amp;L mensile e Break even</b> sono <b>competenza</b>: ricavi e costi del mese di riferimento, IVA esclusa. Il P&amp;L va da ricavi a margine di contribuzione, EBITDA, EBIT e utile netto, con le percentuali sui ricavi.',
+        '<b>Riepilogo</b> mostra solo il <b>registrato</b> (niente stime). Per questo una stima compare in Oggi e nel P&amp;L ma non nel Riepilogo.',
+        'In <b>Voci manuali</b> ogni voce indica la sua fonte: verde = arrivata da un file, arancione = stima o previsione, blu = scritta a mano. Le stime vanno sostituite con i dati reali appena arrivano.',
+        '<b>Controlli</b> deve essere tutta verde: se una riga è rossa, i numeri non tornano e non vanno usati per decidere finché non capisci perché.',
+        'Fisso/variabile nel P&amp;L e assegnazione dei costi alle fonti di ricavo nel Break even sono <b>ipotesi mie</b>, da rivedere con il commercialista.'])
+   +h3('2. Come usarla per decidere')
+   +ul(['<b>Posso pagare?</b> → <b>Oggi</b> (cassa e scadenze a 30 giorni), <b>Cassa</b> e <b>Cash flow</b> (il minimo dei prossimi mesi).',
+        '<b>Guadagno?</b> → <b>P&amp;L mensile</b> (utile e margini) e <b>Break even</b> (quanto fatturare per pareggiare e quanto costi fissi copre ogni fonte).',
+        '<b>Quanto tenere da parte?</b> → <b>Imposte (stima)</b> e <b>IVA</b>.',
+        '<b>Come far uscire i soldi?</b> → <b>Compenso o dividendo</b>, <b>Prelievo utili</b>, <b>Debiti e riserve</b>.',
+        '<b>Dove arriva l\'anno?</b> → <b>Previsione nov-dic</b> e <b>Budget</b>. Gli scenari più ampi: <b>Strategia</b>.',
+        'Le pagine <b>Per il commercialista</b> e <b>Marini</b> servono a preparare i colloqui con lo studio.'])
+   +h3('3. Come attualizzarla (routine)')
+   +ul(['<b>Ogni giorno o il lunedì</b>: <b>Carica saldo banche al giorno…</b> (data di oggi). Poi guarda questa pagina.',
+        '<b>Ogni settimana</b>: <b>Carica fatture Sibill</b> e <b>Carica corrispettivi</b>.',
+        '<b>A fine mese</b>, in quest\'ordine: fatture Sibill → corrispettivi → <b>prima nota</b> (dopo aver sistemato categorie e riconciliazioni in Sibill) → <b>estratti banche</b> (per il saldo di fine mese) → <b>paghe</b> appena le manda lo studio → pagina <b>Controlli</b> → <b>P&amp;L</b>.',
+        'Dopo i caricamenti: se compare l\'allerta "La Previsione conta ancora per intero spese che hai già caricato", premi <b>Allinea la previsione</b>; poi rivedi le righe di previsione nel mese (Previsione nov-dic, dal 2027 Strategia).',
+        'Le <b>stime di incasso</b> (Paysolution, Adler, clienti) non arrivano da file: si aggiornano a mano in <b>Cassa</b> e <b>Strategia</b>.',
+        'A fine mese esporta i dati da <b>Voci manuali → Esporta dati</b> per il controllo al centesimo.'])
+   +h3('4. Come funzionano i caricamenti')
+   +ul(['Il file si legge nel browser e non va a nessun altro; prima di scrivere vedi un\'anteprima riga per riga, con la possibilità di togliere la spunta.',
+        'Le voci già presenti vengono riconosciute (numero fattura, ricevuta, ordine) e non duplicate; quelle dubbie sono segnate "forse già presente" e restano senza spunta.',
+        '<b>Corrispettivi</b>: accetto sia il file "Corrispettivi" sia "Corrispettivi dettaglio". I rimborsi diventano ricavi negativi.',
+        '<b>Estratti banche</b>: leggo Intesa Sanpaolo e il conto Sibill/Swan. Non creano voci: portano i saldi finali nel modulo saldo. Per Sella, PayPal e Stripe scrivi il saldo a mano nello stesso modulo.',
+        'Per annullare una voce caricata per errore: <b>Voci manuali</b> → elimina (resta nello storico e si può ripristinare).'])
+   +'</details></div>'+'<div class="card"><b>Promemoria settimanale</b>'+guida+'</div>'; }
+
 /* ── Pagina OGGI: la fotografia al giorno di consultazione (stessi calcoli di Istruzioni e Strategia) ── */
 function vOggi(r){ vIstruzioni(); var I=IST, R=I.R, ctx=I.ctx, oggi=new Date().toISOString().slice(0,10), mOggi=oggi.slice(0,7), entro=new Date(Date.now()+30*864e5).toISOString().slice(0,10);
   var dataAz=function(mm,a){ return mm+'-'+String(a.g).padStart(2,'0'); }, fmtD=function(d){ return d.split('-').reverse().join('/'); };
@@ -2854,7 +2935,7 @@ function vOggi(r){ vIstruzioni(); var I=IST, R=I.R, ctx=I.ctx, oggi=new Date().t
    +(f24?'<div class="card"><b>Prossimo F24: '+fmtD(f24.d)+' – '+eur(f24.a.imp)+' €</b><div style="margin-top:4px">'+f24.a.cosa.replace(/<b>Paga l.F24<\/b>/,'')+'</div></div>':'')
    +'<div class="card tw"><b>Scadenze dei prossimi 30 giorni</b><table class="fit sc" style="min-width:600px;margin-top:6px"><thead><tr><th style="text-align:left">Data</th><th style="text-align:left">Cosa fare</th><th>Importo €</th><th style="text-align:left">Note</th></tr></thead><tbody>'+(prossime.map(riga).join('')||'<tr><td colspan="4">Nessuna scadenza</td></tr>')+'</tbody></table></div>'
    +'<div class="card tw"><b>Cassa nei prossimi mesi</b>'+tabMesi+(minM?'<div class="note" style="margin-top:4px">Minimo: '+eur(minM.fin)+' € a '+istMese(minM.m)+' (minimo consentito: '+eur(R.sogliaEff)+' €'+(R.cfg.usaFido?', cioè disponibile con il fido '+eur(+R.cfg.soglia)+' €':'')+').</div>':'')+'</div>'
-   +'<div class="card"><b>Cosa guardare e quando</b>'+guida+'</div>'+agComeSiLavora(); }
+   +agNote(guida)+agComeSiLavora(); }
 document.addEventListener('input',simAgg); document.addEventListener('change',simAgg);
 document.addEventListener('change',function(e){ var k=e.target.dataset&&e.target.dataset.pl; if(!k) return; var q=k.split('|'); plSet(q[0],q[1],e.target.value); plSalva(); clearTimeout(plRT); plRT=setTimeout(plRender,350); });
 document.addEventListener('change',function(e){ var k=e.target.dataset&&e.target.dataset.bud; if(!k) return; budSet(k,e.target.value); budSalva(); setTimeout(function(){ var a=document.activeElement, kk=a&&a.dataset&&a.dataset.bud; render(); if(kk){ var el=document.querySelector('[data-bud="'+kk+'"]'); if(el){ el.focus(); if(el.select) el.select(); } } },0); });
