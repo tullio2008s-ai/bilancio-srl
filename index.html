@@ -82,7 +82,7 @@ table.fit{min-width:0!important;width:100%!important;font-size:9.4px}table.fit.w
 .pbk{break-before:page;page-break-before:always}}
 .note{font-size:12px;color:var(--mu)}.hid{display:none}
 </style></head><body>
-<header><h1>Bilancio SRL <small>Tullio Serci S.r.l. · gestionale riservato</small></h1><small id="versione" title="Versione della consolle: se non vedi la data dell'ultimo aggiornamento, ricarica" style="opacity:.85;margin-right:10px">versione 21/11/2026 · affitti 3</small><small id="utente"></small><button class="l" id="exit" data-a="logout" style="color:#fff;border-color:#fff8">Esci</button></header>
+<header><h1>Bilancio SRL <small>Tullio Serci S.r.l. · gestionale riservato</small></h1><small id="versione" title="Versione della consolle: se non vedi la data dell'ultimo aggiornamento, ricarica" style="opacity:.85;margin-right:10px">versione 21/11/2026 · consulenze</small><small id="utente"></small><button class="l" id="exit" data-a="logout" style="color:#fff;border-color:#fff8">Esci</button></header>
 <div id="demo" class="demo hid">MODALITÀ DEMO: dati sintetici salvati solo in questo browser. Nessun dato reale.</div>
 <nav id="nav"></nav>
 <main id="main"></main>
@@ -101,7 +101,8 @@ table.fit{min-width:0!important;width:100%!important;font-size:9.4px}table.fit.w
     { id: 'intercompany_costo', nome: 'Fatture da Paysolution (intercompany)', tipo: 'costo' },
     { id: 'trasporti', nome: 'Trasporti e spedizioni', tipo: 'costo' },
     { id: 'pubblicita', nome: 'Pubblicita', tipo: 'costo' },
-    { id: 'servizi_prof', nome: 'Commercialista, consulenti e servizi', tipo: 'costo' },
+    { id: 'servizi_prof', nome: 'Commercialista e paghe', tipo: 'costo' },
+    { id: 'consulenze', nome: 'Consulenze e servizi esterni', tipo: 'costo' },
     { id: 'affitti', nome: 'Affitti e locazioni', tipo: 'costo' },
     { id: 'abbonamenti_utenze', nome: 'Abbonamenti, utenze, sicurezza, assicurazioni', tipo: 'costo' },
     { id: 'trasferte_welfare', nome: 'Trasferte, welfare e rappresentanza', tipo: 'costo' },
@@ -379,7 +380,7 @@ table.fit{min-width:0!important;width:100%!important;font-size:9.4px}table.fit.w
     { id: 'stipendi', gruppo: 'COSTI', nome: 'Stipendi', cat: 'stipendi', noIva: true },
     { id: 'royalties', gruppo: 'COSTI', nome: 'Royalties (a Tullio Serci)', cat: 'royalties', noIva: true },
     { id: 'paysCosto', gruppo: 'COSTI', nome: 'Fatture da Paysolution', cat: 'intercompany_costo' },
-    { id: 'acqServizi', gruppo: 'COSTI', nome: 'Commercialista, consulenti e servizi', cat: 'servizi_prof' },
+    { id: 'acqServizi', gruppo: 'COSTI', nome: 'Commercialista e paghe (stime per consulenze comprese)', cat: 'servizi_prof' },
     { id: 'collab', gruppo: 'COSTI', nome: 'Collaboratori a fattura (es. Matteo), senza IVA', cat: 'servizi_prof', noIva: true },
     { id: 'acqMateriali', gruppo: 'COSTI', nome: 'Acquisti materiali e merci', cat: 'acquisti_materiali' },
     { id: 'pubblicita', gruppo: 'COSTI', nome: 'Pubblicita', cat: 'pubblicita' },
@@ -1072,7 +1073,7 @@ var API = window.BILANCIO_API || '', DEMO = !API, TOKEN = '';
 try { TOKEN = sessionStorage.getItem('bsrl_t') || ''; } catch (e) {}
 /* Il server (Apps Script) accetta solo le categorie originali. Le categorie nuove viaggiano con una categoria di base valida
    e un'etichetta [[cat:...]] nelle note; la pagina le ricompone quando legge le voci. */
-var CAT_BASE={affitti:'altri',vendite_amazon:'vendite',corrispettivi:'vendite',interessi_attivi:'vendite',f24_iva2025:'f24_ritenute',f24_acconto_iva:'f24_ritenute',f24_saldo_iva:'f24_ritenute',f24_irpef_stipendi:'f24_ritenute',f24_irpef_compensi:'f24_ritenute',f24_inps:'f24_ritenute',f24_gs_inps:'f24_ritenute',f24_altre:'f24_ritenute'};
+var CAT_BASE={affitti:'altri',consulenze:'servizi_prof',vendite_amazon:'vendite',corrispettivi:'vendite',interessi_attivi:'vendite',f24_iva2025:'f24_ritenute',f24_acconto_iva:'f24_ritenute',f24_saldo_iva:'f24_ritenute',f24_irpef_stipendi:'f24_ritenute',f24_irpef_compensi:'f24_ritenute',f24_inps:'f24_ritenute',f24_gs_inps:'f24_ritenute',f24_altre:'f24_ritenute'};
 var TOKCAT=/\s*\[\[cat:([a-z0-9_]+)\]\]/;
 /* [[src:...]] nelle note = fonte della voce (file Sibill, prima nota, paghe, pacchetto, manuale, modificata a mano) */
 var TOKSRC=/\s*\[\[src:([a-z0-9_-]+)\]\]/, TOKMOV=/\s*\[\[mov:([^\]]*)\]\]/;   /* mov = movimenti della prima nota dentro una voce raggruppata: data|importo;... */
@@ -1254,7 +1255,7 @@ function sum(r,f){ return r.mesi.reduce(function(s,m){return s+f(m);},0); }
 
 /* ── P&L gestionale: ricavi → costi variabili → margine di contribuzione → costi fissi e personale → EBITDA → EBIT (RO) → gestione finanziaria → ante imposte → imposte → utile netto ── */
 var PL_VAR=['acquisti_materiali','intercompany_costo','trasporti','pubblicita','oneri_bancari','royalties'],
-    PL_FIS=['servizi_prof','affitti','abbonamenti_utenze','trasferte_welfare','altri'],
+    PL_FIS=['servizi_prof','consulenze','affitti','abbonamenti_utenze','trasferte_welfare','altri'],
     PL_PERS=['compensi_amm','stipendi','contributi','accantonamenti'], PL_AMM=['ammortamenti'], PL_FIN=['oneri_finanziari'];
 function plSc(ids){ return function(m){ return ids.reduce(function(a,k){ return a+plVal(m,k); },0); }; }
 function plCalc(m){ var o={};
@@ -1664,7 +1665,7 @@ function budSalva(){ clearTimeout(budTimer); budTimer=setTimeout(async function(
 function bRowIn(l,path,arr,ref){ return '<tr><td>'+l+'</td>'+arr.map(function(v,i){return budCell(path+'.'+i,v);}).join('')+'<td class="note">'+(ref==null?'':eur(ref))+'</td><td>'+eur(bsum(arr))+'</td></tr>'; }
 function bRowC(l,arr,o){ o=o||{}; var t=o.tot!==undefined?o.tot:bsum(arr); return '<tr class="'+(o.t?'t':'')+(o.s?' s':'')+'"><td>'+l+'</td>'+arr.map(function(v){return '<td class="'+(o.c?cls(v):'')+'">'+(o.dash&&!v?'–':eur(v))+'</td>';}).join('')+'<td class="note">'+(o.ref==null?'':eur(o.ref))+'</td><td class="'+(o.c?cls(t):'')+'">'+(o.noTot?'':eur(t))+'</td></tr>'; }
 function vBudget(){ var B=budS(), ctx=budCtx(), C=E.budgetCalc(B,ctx), o2=ctx.o, refc={};
-  o2.res.mesi.forEach(function(m){ Object.keys(m.cat||{}).forEach(function(k){ refc[k]=(refc[k]||0)+m.cat[k]; }); });
+  o2.res.mesi.forEach(function(m){ Object.keys(m.cat||{}).forEach(function(k){ refc[k]=(refc[k]||0)+m.cat[k]; }); }); if(refc.consulenze) refc.servizi_prof=(refc.servizi_prof||0)+refc.consulenze;   /* nel budget una sola riga per commercialista e consulenze; l'affitto 2026 non c'è più */
   var head=MESI3.concat(['Rif. 2026','Totale']), P=B.par;
   var neg=function(a){ return a.map(function(x){return -x;}); };
   /* testata e parametri */
@@ -1933,6 +1934,7 @@ function mcConto(v){ var d=String(v.descrizione||'').toUpperCase(), c=v.categori
    case 'pubblicita': return t(/AMAZON EU|COMMISSION/)?'402.03070':'402.01016';
    case 'trasferte_welfare': return t(/DAY S\.?P|WELFARE|BUONI PASTO/)?'402.03041':(t(/RAPPRESENTANZA|RISTOR/)?'402.02010':'402.02009');
    case 'abbonamenti_utenze': return t(/FASTWEB|VODAFONE|TELECOM|TELEFON|HOLAFLY|\bTIM\b/)?'402.03002':(t(/GENERALI|ASSICUR|POLIZZA/)?'402.03007':(t(/VERISURE|SICUREZZA/)?'402.02013':'402.03008'));
+   case 'consulenze': return t(/RIFIUT|PILE|BATTERIE/)?'402.03020':(t(/PULIZI/)?'402.03019':'402.02013');
    case 'affitti': return t(/NOLEGG|LEASING/)?'402.02014':'403.01001';
    case 'servizi_prof': return t(/ELETTROMECCANIC|AFFITT/)?'403.01001':(t(/COMMERCIALIST|FISCAL|PARCELLA/)?'402.03010':(t(/PULIZI/)?'402.03019':(t(/RIFIUT|PILE|BATTERIE/)?'402.03020':'402.02013')));
    case 'intercompany_costo': return '402.03029';
@@ -2138,7 +2140,7 @@ async function azione(a,id){
     else if(a==='plmodo'){ var q=String(id).split('|'), sm=simS(); if(!sm.plModo||typeof sm.plModo!=='object') sm.plModo={}; sm.plModo[q[0]]=q[1]; render(); S.config=await call('apiSalvaConfig',{sim:JSON.stringify(sm)}); }
     else if(a==='plprev'){ S.plPrev=(S.plPrev===false); render(); }
     else if(a==='simzero'){ var z=simS(); Object.keys(z.righe).forEach(function(k){ z.righe[k]=z.righe[k].map(function(){return 0;}); }); render(); msg('Previsione azzerata: premi "Salva previsione" per conservarla'); }
-    else if(a==='budprefill'){ var bb=budS(), cc=budCtx(), rf={}; cc.o.res.mesi.forEach(function(m){ Object.keys(m.cat||{}).forEach(function(k){ rf[k]=(rf[k]||0)+m.cat[k]; }); }); E.BUD_RIC.concat(E.BUD_COS).forEach(function(r){ if(r.cat&&rf[r.cat]!==undefined){ var v=Math.round(rf[r.cat]/12*100)/100; bb.righe[r.id]=bb.righe[r.id].map(function(){return v;}); } }); budSalva(); render(); msg('Precompilato con la media mensile 2026: modifica le celle che vuoi'); }
+    else if(a==='budprefill'){ var bb=budS(), cc=budCtx(), rf={}; cc.o.res.mesi.forEach(function(m){ Object.keys(m.cat||{}).forEach(function(k){ rf[k]=(rf[k]||0)+m.cat[k]; }); }); if(rf.consulenze) rf.servizi_prof=(rf.servizi_prof||0)+rf.consulenze; E.BUD_RIC.concat(E.BUD_COS).forEach(function(r){ if(r.cat&&rf[r.cat]!==undefined){ var v=Math.round(rf[r.cat]/12*100)/100; bb.righe[r.id]=bb.righe[r.id].map(function(){return v;}); } }); budSalva(); render(); msg('Precompilato con la media mensile 2026: modifica le celle che vuoi'); }
     else if(a==='budzero'){ if(confirm('Azzerare tutto il budget?')){ simS().budget=E.budgetNorm({}); budSalva(); render(); } }
     else if(a==='addprel'){ var sp=simS(); sp.prelievi.push({data:sp.mesi[sp.mesi.length-1]+'-18',lordo:0}); render(); }
     else if(a==='delprel'){ simS().prelievi.splice(+id,1); render(); }
@@ -2731,8 +2733,8 @@ var AG_LIB={xlsx:['https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.
 var AG_CAT={'ABBONAMENTI':'abbonamenti_utenze','SICUREZZA':'abbonamenti_utenze','TELEFONIE A INTERNET':'abbonamenti_utenze','ASSICURAZIONI':'abbonamenti_utenze',
   'MATERIALI X GETT.':'acquisti_materiali','MATERIALI INDIRETTI':'acquisti_materiali','MATERIALI DA RIVENDERE':'acquisti_materiali','MATERIALI IMPO PER GETTONIERE':'acquisti_materiali','GETTONIERE':'acquisti_materiali',
   'TRASPORTI':'trasporti','IMBALLAGGI':'trasporti',"PUBBLICITA'":'pubblicita','PUBBLICITA':'pubblicita','SPESE TRASFERTA':'trasferte_welfare','WELFARE':'trasferte_welfare','RAPPRESENTANZA':'trasferte_welfare','RIMBORSO TRASFERTA':'trasferte_welfare',
-  'SERVIZI AUSILIARI':'servizi_prof','COMMERCIALISTA':'servizi_prof','SERVIZI':'servizi_prof','SERVIZI DI TERZI':'servizi_prof','CONSULENTI ESTERNI':'servizi_prof','FORMAZIONE':'servizi_prof','COMMISSIONI SIBILL':'oneri_bancari',
-  'PULIZIE':'altri','BONUS':'altri','LOCAZIONI':'affitti','AFFITTO':'affitti','AFFITTI':'affitti','COMMISSIONI A RIVENDITORE':'altri','ATTREZZATURE DA LAVORO':'altri','RIFIUTI INDUSTRIALI':'altri','MANUTENZIONE':'altri','SPESE LOCALE':'altri','CAPEX':'altri'};
+  'SERVIZI AUSILIARI':'consulenze','COMMERCIALISTA':'servizi_prof','PAGHE':'servizi_prof','SERVIZI':'consulenze','SERVIZI DI TERZI':'consulenze','CONSULENTI ESTERNI':'consulenze','FORMAZIONE':'consulenze','COMMISSIONI SIBILL':'oneri_bancari',
+  'PULIZIE':'altri','BONUS':'altri','LOCAZIONI':'altri','AFFITTO':'affitti','AFFITTI':'affitti','COMMISSIONI A RIVENDITORE':'altri','ATTREZZATURE DA LAVORO':'altri','RIFIUTI INDUSTRIALI':'altri','MANUTENZIONE':'altri','SPESE LOCALE':'altri','CAPEX':'altri'};
 /* prima nota: categorie che non sono costi (o che entrano da altre fonti: fatture, paghe, F24, royalty, dividendi, giroconti, incassi) */
 var AG_PN_ESCL=/^(GIROCONT|IMPOSTE E TASSE|IVA E DAZI|PERSONALE|STIPENDI|DIVIDENDI|FINANZIAMENTI|AMERICAN EXPRESS|FONDO STRIPE|ACCREDITO|GETTONIERE|ROYALTIES|ADLER|STORNO|BONIFICO \/ CANCELLATO|RIMBORSO|NOTA DI CREDITO|FRODE|RICARICA CONTO|PRELIEVO BANCOMAT|CAPEX|ABBONAMENTI CLIENTI|ADDEBITO STRIPE|COMMISSIONI SIBILL)/;
 var AG_MESI=['GENNAIO','FEBBRAIO','MARZO','APRILE','MAGGIO','GIUGNO','LUGLIO','AGOSTO','SETTEMBRE','OTTOBRE','NOVEMBRE','DICEMBRE'];
@@ -2763,7 +2765,9 @@ function agTab(wb,chiave){ var t=null; wb.SheetNames.some(function(n){ var rows=
 function agCol(t,r,n){ return t.h[n]===undefined?'':r[t.h[n]]; }
 /* Riclassifica: se in Sibill hai cambiato la categoria di una spesa già registrata, propone lo stesso cambio nella consolle (solo tra le categorie di costo "normali") */
 var AG_RICL={}; Object.keys(AG_CAT).forEach(function(k){ AG_RICL[AG_CAT[k]]=1; });
-function agRiclassifica(v,catS,fonte,fino){ if(!v||v.eliminata||agTipo(v)!=='costo'||/riclassificata/.test(String(v.note||''))) return null;   /* già riclassificata: vale l'ultima scelta confermata */ var nc=AG_CAT[catS]; if(!nc||nc===v.categoria||!AG_RICL[v.categoria]) return null;
+/* categoria di costo da Sibill + controparte: gli studi (commercialista, paghe, consulente del lavoro) vanno in 'Commercialista e paghe' anche se Sibill li chiama servizi */
+function agCatCosto(catS,cp){ var c=AG_CAT[catS]; if(c==='consulenze'&&/\bSTUDIO\b|PAGHE|CONSULENT[EI] DEL LAVORO|COMMERCIALIST|ELABORAZIONE DATI/i.test(String(cp||''))) return 'servizi_prof'; return c; }
+function agRiclassifica(v,catS,fonte,fino){ if(!v||v.eliminata||agTipo(v)!=='costo'||/riclassificata/.test(String(v.note||''))) return null;   /* già riclassificata: vale l'ultima scelta confermata */ var nc=agCatCosto(catS,v.descrizione); if(!nc||nc===v.categoria||!AG_RICL[v.categoria]) return null;
   var nv=Object.assign({},v,{categoria:nc,note:(String(v.note||'').replace(/\s*· riclassificata.*$/,'')+' · riclassificata da '+catNome(v.categoria)+' a '+catNome(nc)+' come in Sibill ('+fonte+', '+agFmt(agOggi())+')').trim()});
   return {sel:!fino||String(v.data).slice(0,10)>fino,esito:'riclassifica',ex:v,v:nv,nota:catNome(v.categoria)+' → '+catNome(nc)+' (in Sibill: '+catS.toLowerCase()+')'}; }
 
@@ -2857,7 +2861,7 @@ function agFatture(t){ var I=agIndice(), usate={}, da=new Date(Date.now()-75*864
   docs.forEach(function(x){ if(x.gia){ gia++; if(!x.em&&!vist[x.gia.id]&&!/PAYSOLUTION/i.test(String(agCol(t,x.r,'Nome controparte')))){ var rc=agRiclassifica(x.gia,String(agCol(t,x.r,'Categoria')).trim().toUpperCase(),'documenti',agStato().pnRegistrataFino||'2026-10-31'); if(rc){ vist[x.gia.id]=1; ricl.push(rc); } } return; }
     var r=x.r, cp=String(agCol(t,r,'Nome controparte')).trim(), catS=String(agCol(t,r,'Categoria')).trim().toUpperCase(), auto=/AUTOFATT/i.test(x.td), nc=/NOTA DI CREDITO/i.test(x.td);
     var i0=agNum(agCol(t,r,'Imponibile')), v0=agNum(agCol(t,r,'IVA')), imp=Math.round((x.em?i0:-i0)*100)/100, iva=auto?0:Math.round((x.em?v0:-v0)*100)/100, causale=String(agCol(t,r,'Causale e annotazioni')||'').trim();
-    var cat=x.em?(/PAYSOLUTION/i.test(cp)?'intercompany_ricavo':/ADLER/i.test(cp)?'servizi':(/RAJ15/i.test(x.num)||catS==='GETTONIERE AMAZON')?'vendite_amazon':'vendite'):(/PAYSOLUTION/i.test(cp)?'intercompany_costo':(AG_CAT[catS]||'altri'));
+    var cat=x.em?(/PAYSOLUTION/i.test(cp)?'intercompany_ricavo':/ADLER/i.test(cp)?'servizi':(/RAJ15/i.test(x.num)||catS==='GETTONIERE AMAZON')?'vendite_amazon':'vendite'):(/PAYSOLUTION/i.test(cp)?'intercompany_costo':(agCatCosto(catS,cp)||'altri'));
     var comp=x.d.slice(0,7), sost=null, esito='nuova', sel=true, nota='';
     /* 1) stessa cifra già registrata a mano (es. laser, Adler da emettere): abbinata, non duplicata
        2) altrimenti sostituisce la previsione solo per Adler e Paysolution (una fattura al mese); le previsioni generiche restano e vanno tolte a mese chiuso */
