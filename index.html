@@ -32,6 +32,7 @@ div.okbox{background:var(--okbg);border:1px solid rgba(46,158,91,.45);border-rad
 .vv td{white-space:normal;word-break:break-word;vertical-align:top}.vv td:last-child{white-space:nowrap;text-align:left;padding-left:14px}.vv td:last-child button{padding:2px 6px;font-size:12px}
 .agpan{margin-top:8px;padding:8px 10px;border:1px dashed #b39ddb;border-radius:10px;background:#faf7ff}.ag2 select{max-width:200px;font:inherit;font-size:12px}.ag2 td,.ag2 th{vertical-align:top}
 @media(max-width:900px){.agb{grid-template-columns:repeat(2,minmax(0,1fr))}}
+td.arn,.karn{background:rgba(234,120,20,.30)!important;color:#7a3d00;font-weight:600}@media(prefers-color-scheme:dark){td.arn,.karn{color:#ffc58a}}
 div.wa{background:var(--kobg);border:1px solid rgba(234,120,20,.5);border-radius:8px;padding:6px 10px;color:var(--kotx)!important}
 .fit.cdt th,.fit.cdt td{width:auto!important}.fit.cdt th:first-child,.fit.cdt td:first-child{width:34%!important}
 .card>b:first-child,.card>.bar>b:first-child{color:#8e24aa}
@@ -142,7 +143,7 @@ table.fit{min-width:0!important;width:100%!important;font-size:9.4px}table.fit.w
     { id: 'sp_utile_prec', nome: 'Utile esercizio precedente (da destinare)', tipo: 'sp', sezione: 'pn', riporta: true }
   ];
   var PARAMS_DEFAULT = {
-    inizio: '2026-01', mesi: 12, ires: 24, irap: 3.9,
+    inizio: '2026-01', mesi: 12, ires: 24, irap: 2.93,
     ivaPeriodo: 'mensile', includeAcquistiSrl: false, includeDashboard: true, includeRimanenze: true, rimanenzeConf: { '2026-01': 45289.74, '2026-02': 40983.61, '2026-03': 43042.62, '2026-04': 30686.09, '2026-05': 28811.92,
       '2026-06': 23406.30, '2026-07': 23406.30, '2026-08': 22465.24, '2026-09': 22465.24, '2026-10': 0 }
   };
@@ -154,6 +155,8 @@ table.fit{min-width:0!important;width:100%!important;font-size:9.4px}table.fit.w
     for (var i = 0; i < n; i++) { out.push(y + '-' + (m < 10 ? '0' : '') + m); m++; if (m > 12) { m = 1; y++; } }
     return out;
   }
+  /* Deduzioni IRAP annue 2025 (Redditi 2026): contributi assicurativi 8.495 + personale a tempo indeterminato 36.000 + ulteriore deduzione 8.000 */
+  var IRAP_DED_ANNO = 52495;
   function vuoto() { return { ricavi: 0, costi: 0, ivaDeb: 0, ivaCred: 0, irapInded: 0, nonCosto: 0 }; }
 
   /* Dati comuni dalla Dashboard V6: mese chiuso -> chiusura; altrimenti fatture intercompany approvate. */
@@ -262,7 +265,7 @@ table.fit{min-width:0!important;width:100%!important;font-size:9.4px}table.fit.w
         r.ivaCreditoRiportato = riporto < 0 ? -riporto : 0; accP = 0;
       }
       var iresCum = Math.max(0, cum.utile) * P.ires / 100;
-      var irapBase = cum.utile + cum.inded - (cum.interessi || 0), irapCum = Math.max(0, irapBase) * P.irap / 100;
+      var irapDedCum = (P.irapDed == null ? IRAP_DED_ANNO : num(P.irapDed)) * (i + 1) / 12, irapBase = cum.utile + cum.inded - (cum.interessi || 0) - irapDedCum, irapCum = Math.max(0, irapBase) * P.irap / 100;
       r.irapBaseCum = irapBase; r.iresCum = iresCum; r.irapCum = irapCum;
       r.ires = iresCum - prevIres; r.irap = irapCum - prevIrap; prevIres = iresCum; prevIrap = irapCum;
       r.imposteCum = iresCum + irapCum;
@@ -408,7 +411,7 @@ table.fit{min-width:0!important;width:100%!important;font-size:9.4px}table.fit.w
   function bz() { var a = []; for (var i = 0; i < 12; i++) a.push(0); return a; }
   function budgetDefault() {
     var b = { anno: 2027, cassaIniziale: '', righe: { psFatt: bz(), coa: bz(), impostePag: bz(), altroCassa: bz() }, iva: {},
-      par: { royPs: 3, quotaMol: 30, cm: 40.46, contributoPs: 1975, ivaPs: 22, ritardoPs: 1, royTullio: 2, ritRoy: 20, contribPerc: 17, nettoPerc: 61, ires: 24, irap: 3.9, tfmAnno: 5000, ritDiv: 26 },
+      par: { royPs: 3, quotaMol: 30, cm: 40.46, contributoPs: 1975, ivaPs: 22, ritardoPs: 1, royTullio: 2, ritRoy: 20, contribPerc: 17, nettoPerc: 61, ires: 24, irap: 2.93, irapDed: 52495, tfmAnno: 5000, ritDiv: 26 },
       comp: { tullio: { netto: 4000, ultimo: 12, delibera: 36000 }, rosanna: { netto: 2000, ultimo: 12, delibera: 36000 } },
       div: { totale: 40000, primo: 7, ultimo: 12 }, riserveInizio: '' };
     BUD_RIC.concat(BUD_COS).forEach(function (r) { b.righe[r.id] = bz(); b.iva[r.id] = r.iva; });
@@ -422,6 +425,7 @@ table.fit{min-width:0!important;width:100%!important;font-size:9.4px}table.fit.w
     Object.keys(b.righe).forEach(function (k) { if (x.righe && Array.isArray(x.righe[k]) && x.righe[k].length === 12) b.righe[k] = x.righe[k].slice(); });
     Object.keys(b.iva).forEach(function (k) { if (x.iva && x.iva[k] !== undefined && x.iva[k] !== '') b.iva[k] = x.iva[k]; });
     Object.keys(b.par).forEach(function (k) { if (x.par && x.par[k] !== undefined && x.par[k] !== '') b.par[k] = x.par[k]; });
+    if (x.par && num(x.par.irap) === 3.9) b.par.irap = 2.93;   // vecchio default (senza deduzioni): passa all'aliquota reale
     ['tullio', 'rosanna'].forEach(function (a) { Object.keys(b.comp[a]).forEach(function (k) { if (x.comp && x.comp[a] && x.comp[a][k] !== undefined && x.comp[a][k] !== '') b.comp[a][k] = x.comp[a][k]; }); });
     Object.keys(b.div).forEach(function (k) { if (x.div && x.div[k] !== undefined && x.div[k] !== '') b.div[k] = x.div[k]; });
     return b;
@@ -463,7 +467,7 @@ table.fit{min-width:0!important;width:100%!important;font-size:9.4px}table.fit.w
     for (i = 0; i < N; i++) {
       var inds = o.comp.tullio[i] + o.comp.rosanna[i] + o.contributi[i] + o.tfm[i] + R.stipendi[i] + R.oneriFin[i];
       cu += o.U[i]; ci += inds; o.Ucum[i] = r2(cu);
-      o.imposteCum[i] = r2(num(P.ires) / 100 * Math.max(0, cu) + num(P.irap) / 100 * Math.max(0, cu + ci));
+      o.imposteCum[i] = r2(num(P.ires) / 100 * Math.max(0, cu) + num(P.irap) / 100 * Math.max(0, cu + ci - (P.irapDed == null ? IRAP_DED_ANNO : num(P.irapDed)) * (i + 1) / 12));
       o.utileNettoCum[i] = r2(cu - o.imposteCum[i]);
     }
     // prelievo utili (anticipo): importo totale ripartito sui mesi scelti
@@ -698,16 +702,16 @@ table.fit{min-width:0!important;width:100%!important;font-size:9.4px}table.fit.w
      compenso: IRES su utile dopo compensi, contributi e consulente; IRAP sul risultato (compensi indeducibili, consulente deducibile); INPS e INAIL 2/3 + 1/3; IRPEF.
      dividendo: IRES e IRAP sul risultato pieno, ritenuta 26%. In piu' del foglio: addizionali, netto alle persone e quanto resta in societa'. */
   function confrontoAz(x) {
-    var nz = function (v, d) { return v === undefined || v === '' || v === null ? d : num(v); }, ires = nz(x.ires, 24) / 100, irap = nz(x.irap, 3.9) / 100, rit = nz(x.rit, 26) / 100, inP = nz(x.inail, 0.505) / 100;
+    var nz = function (v, d) { return v === undefined || v === '' || v === null ? d : num(v); }, ires = nz(x.ires, 24) / 100, irap = nz(x.irap, 2.93) / 100, irapDed = nz(x.irapDed, 52495), rit = nz(x.rit, 26) / 100, inP = nz(x.inail, 0.505) / 100;
     var P = (x.pers || []).filter(function (p) { return num(p.lordo) > 0; }), ris = num(x.risultato), cons = num(x.consulente);
     var pc = P.map(function (p) { var L = num(p.lordo), g = nz(p.gs, 35.03) / 100, inl = p.inail ? inP : 0, cA = L * g / 3, iA = L * inl / 3, base = L - cA - iA, Rc = base + num(p.altri), adz = x.addizionali ? (num(x.addReg) + num(x.addCom)) / 100 : 0;
       var tax = function (Rc_, lav) { var Ri = Math.max(0, Rc_ - num(p.deduz)); return Math.max(0, stIrpefLorda(Ri) - (lav ? stDetrLavoro(Rc_) : 0) - num(p.detr)) + Ri * adz; };
       var irpef = tax(Rc, true) - tax(num(p.altri), false);
       return { nome: p.nome || '', lordo: L, cSoc: L * g * 2 / 3, iSoc: L * inl * 2 / 3, cAmm: cA, iAmm: iA, base: base, irpef: irpef, netto: L - cA - iA - irpef, marg: stMarg(Math.max(0, Rc - num(p.deduz))) }; });
     var sum = function (k) { return pc.reduce(function (t, z) { return t + z[k]; }, 0); }, L = sum('lordo');
-    var utileC = ris - cons - L - sum('cSoc') - sum('iSoc'), iresC = ires * Math.max(0, utileC + num(x.aumIres) - num(x.dimIres)), irapC = irap * Math.max(0, ris - cons + num(x.aumIrap) - num(x.dimIrap));
+    var utileC = ris - cons - L - sum('cSoc') - sum('iSoc'), iresC = ires * Math.max(0, utileC + num(x.aumIres) - num(x.dimIres)), irapC = irap * Math.max(0, ris - cons + num(x.aumIrap) - num(x.dimIrap) - irapDed);
     var socC = iresC + irapC + sum('cSoc') + sum('iSoc'), ammC = sum('irpef') + sum('cAmm') + sum('iAmm'), totC = socC + ammC, nettoC = sum('netto'), restaC = utileC - iresC - irapC;
-    var iresD = ires * Math.max(0, ris + num(x.aumIres) - num(x.dimIres)), irapD = irap * Math.max(0, ris + num(x.aumIrap) - num(x.dimIrap)), ritD = rit * L, socD = iresD + irapD, totD = socD + ritD, nettoD = L - ritD, restaD = ris - iresD - irapD - L;
+    var iresD = ires * Math.max(0, ris + num(x.aumIres) - num(x.dimIres)), irapD = irap * Math.max(0, ris + num(x.aumIrap) - num(x.dimIrap) - irapDed), ritD = rit * L, socD = iresD + irapD, totD = socD + ritD, nettoD = L - ritD, restaD = ris - iresD - irapD - L;
     return { pers: pc.map(function (z) { Object.keys(z).forEach(function (k) { if (typeof z[k] === 'number') z[k] = r2(z[k]); }); return z; }), lordo: r2(L),
       comp: { utile: r2(utileC), ires: r2(iresC), irap: r2(irapC), contrSoc: r2(sum('cSoc') + sum('iSoc')), consulente: r2(cons), societa: r2(socC), irpef: r2(sum('irpef')), contrAmm: r2(sum('cAmm') + sum('iAmm')), amministratori: r2(ammC), totale: r2(totC), netto: r2(nettoC), resta: r2(restaC), insieme: r2(nettoC + restaC) },
       div: { utile: r2(ris), ires: r2(iresD), irap: r2(irapD), societa: r2(socD), ritenuta: r2(ritD), totale: r2(totD), netto: r2(nettoD), resta: r2(restaD), insieme: r2(nettoD + restaD) },
@@ -775,7 +779,7 @@ table.fit{min-width:0!important;width:100%!important;font-size:9.4px}table.fit.w
     var y1 = String(+ctx.inizio.slice(0, 4)), y2 = String(+y1 + 1), mesi27 = anni[y1] || [];
     var eco27 = { ricavi: 0, compensi: 0, gs: 0 }; mesi27.forEach(function (i) { var m = M[i]; eco27.ricavi += marg(m) + adlerEco(m); eco27.compensi += lordi[0][i] + lordi[1][i]; eco27.gs += gsSoc[0][i] + gsSoc[1][i]; });
     var u27 = (eco27.ricavi - eco27.compensi - eco27.gs) * 12 / Math.max(1, mesi27.length), base27 = (eco27.compensi + eco27.gs) * 12 / Math.max(1, mesi27.length);
-    var T27 = c.imposte27 !== '' && c.imposte27 !== undefined && c.imposte27 !== null ? r2(num(c.imposte27)) : r2(0.24 * Math.max(0, u27) + num(ctx.irapPerc || 3.9) / 100 * Math.max(0, u27 + base27)), T27calc = r2(0.24 * Math.max(0, u27) + num(ctx.irapPerc || 3.9) / 100 * Math.max(0, u27 + base27)), Tacc = c.acconti === 'previsionale' ? T27 : T26, acc27 = r2(Tacc * (p1 + p2)), saldo27 = r2(T27 - acc27);
+    var T27 = c.imposte27 !== '' && c.imposte27 !== undefined && c.imposte27 !== null ? r2(num(c.imposte27)) : r2(0.24 * Math.max(0, u27) + num(ctx.irapPerc || 2.93) / 100 * Math.max(0, u27 + base27 - IRAP_DED_ANNO)), T27calc = r2(0.24 * Math.max(0, u27) + num(ctx.irapPerc || 2.93) / 100 * Math.max(0, u27 + base27 - IRAP_DED_ANNO)), Tacc = c.acconti === 'previsionale' ? T27 : T26, acc27 = r2(Tacc * (p1 + p2)), saldo27 = r2(T27 - acc27);
     function piano(n) {
       var tx = M.map(function () { return 0; }), det = M.map(function () { return []; }), quote = M.map(function () { return {}; });   /* quote: parte del versamento (senza interessi) per anno d'imposta */
       function giugno(y, parti, lbl) { var totale = parti.reduce(function (t, x) { return t + x.v; }, 0), i0 = M.indexOf(y + '-06'); if (i0 < 0 || totale <= 0) return 0; var q = totale / n, int = 0;
@@ -1101,7 +1105,7 @@ var SINT = (function(){
 })();
 
 /* ── Stato e calcolo ── */
-function params(){ var c=S.config||{}; return {inizio:c.inizio||'2026-01',mesi:+c.mesi||12,ires:c.ires!=null&&c.ires!==''?+c.ires:24,irap:c.irap!=null&&c.irap!==''?+c.irap:3.9,
+function params(){ var c=S.config||{}; return {inizio:c.inizio||'2026-01',mesi:+c.mesi||12,ires:c.ires!=null&&c.ires!==''?+c.ires:24,irap:c.irap!=null&&c.irap!==''?+c.irap:2.93,
   ivaPeriodo:c.ivaPeriodo||'mensile',includeAcquistiSrl:String(c.includeAcquistiSrl)==='true',includeDashboard:String(c.includeDashboard)!=='false',includeRimanenze:String(c.includeRimanenze)!=='false'}; }
 /* Voci "PROVVISORIA" (es. fattura di competenza dell'anno precedente registrata dallo studio nell'anno): si includono o escludono da tutti i calcoli con un solo interruttore */
 function provvisorie(){ return (S.voci||[]).filter(function(v){ return !v.eliminata&&/^\s*PROVVISORI/i.test(String(v.descrizione||'')); }); }
@@ -1113,9 +1117,9 @@ function calc(){ return E.calcola({voci:vociCalc(),dash:S.dash||{},params:params
 function cls(x){ return x<-0.004?'neg':(x>0.004?'pos':''); }
 
 /* ── Viste ── */
-var TABS=[['oggi','Oggi'],['riepilogo','Riepilogo'],['strategia','Strategia'],['riserve','Debiti e riserve'],['istruzioni','Istruzioni'],['compdiv','Compenso o dividendo'],['pl','P&L mensile'],['be','Break even'],['cassa','Cassa'],['flussi','Cash flow'],['iva','IVA'],['imposte','Imposte (stima)'],['patrimonio','Stato patrimoniale'],['simulazione','Previsione nov-dic'],['utili','Prelievo utili'],['budget','Budget'],['commercialista','Per il commercialista'],['marini','Marini'],['voci','Voci manuali'],['dashboard','Da Dashboard V6'],['param','Parametri'],['controlli','Controlli'],['storico','Storico']];
+var TABS=[['oggi','Oggi'],['riepilogo','Riepilogo'],['strategia','Strategia'],['riserve','Debiti e riserve'],['istruzioni','Istruzioni'],['compdiv','Compenso o dividendo'],['pl','P&L mensile'],['be','Break even'],['cassa','Cassa'],['flussi','Cash flow'],['iva','IVA'],['ivasit','Situazione IVA'],['imposte','Imposte (stima)'],['patrimonio','Stato patrimoniale'],['simulazione','Previsione nov-dic'],['utili','Prelievo utili'],['budget','Budget'],['commercialista','Per il commercialista'],['marini','Marini'],['voci','Voci manuali'],['dashboard','Da Dashboard V6'],['param','Parametri'],['controlli','Controlli'],['storico','Storico']];
 function nav(){ document.getElementById('nav').innerHTML=TABS.map(function(t){return '<button class="'+(S.tab===t[0]?'on':'')+'" data-t="'+t[0]+'">'+t[1]+'</button>';}).join(''); }
-function render(){ nav(); var reg=calc(); S.__reg=reg; var r=reg, SIMO=null; if((S.tab==='pl'||S.tab==='be')&&S.plPrev!==false){ try{ SIMO=simRun(); r=SIMO.res; }catch(e){ r=reg; SIMO=null; } } var f={oggi:vOggi,riepilogo:vRiepilogo,strategia:vStrategia,riserve:vRiserve,istruzioni:vIstruzioni,compdiv:vCompDiv,pl:vPL,be:vBE,iva:vIva,imposte:vImposte,patrimonio:vPatrimonio,simulazione:vSimulazione,cassa:vCassa,flussi:vFlussi,utili:vUtili,commercialista:vReport,marini:vMarini,budget:vBudget,voci:vVoci,dashboard:vDash,param:vParam,controlli:vControlli,storico:vStorico}[S.tab]; document.getElementById('main').innerHTML='<div class="bar">'+provvHtml()+'<span id="pdfmsg" class="note"></span><button class="p" data-a="pdf" style="margin:0">⬇ Salva PDF</button></div><div class="pdfhead"'+(S.tab==='commercialista'?' style="display:none!important"':'')+'><b>Bilancio SRL — '+esc(TABS.filter(function(t){return t[0]===S.tab;})[0][1])+'</b><div class="note">Tullio Serci S.r.l. · generato il '+new Date().toLocaleDateString('it-IT')+' · importi in euro, IVA esclusa salvo dove indicato'+esc(provvNota())+'</div></div>'+f(r)+(SIMO?cashFlowHtml(SIMO):'');
+function render(){ nav(); var reg=calc(); S.__reg=reg; var r=reg, SIMO=null; if((S.tab==='pl'||S.tab==='be')&&S.plPrev!==false){ try{ SIMO=simRun(); r=SIMO.res; }catch(e){ r=reg; SIMO=null; } } var f={oggi:vOggi,riepilogo:vRiepilogo,strategia:vStrategia,riserve:vRiserve,istruzioni:vIstruzioni,compdiv:vCompDiv,pl:vPL,be:vBE,iva:vIva,ivasit:vIvaSit,imposte:vImposte,patrimonio:vPatrimonio,simulazione:vSimulazione,cassa:vCassa,flussi:vFlussi,utili:vUtili,commercialista:vReport,marini:vMarini,budget:vBudget,voci:vVoci,dashboard:vDash,param:vParam,controlli:vControlli,storico:vStorico}[S.tab]; document.getElementById('main').innerHTML='<div class="bar">'+provvHtml()+'<span id="pdfmsg" class="note"></span><button class="p" data-a="pdf" style="margin:0">⬇ Salva PDF</button></div><div class="pdfhead"'+(S.tab==='commercialista'?' style="display:none!important"':'')+'><b>Bilancio SRL — '+esc(TABS.filter(function(t){return t[0]===S.tab;})[0][1])+'</b><div class="note">Tullio Serci S.r.l. · generato il '+new Date().toLocaleDateString('it-IT')+' · importi in euro, IVA esclusa salvo dove indicato'+esc(provvNota())+'</div></div>'+f(r)+(SIMO?cashFlowHtml(SIMO):'');
   if(S.tab==='riepilogo') grafico(r); if(S.tab==='voci') bulkInfo(); marcaTabelle(); }
 function marcaRisultati(){ [].forEach.call(document.querySelectorAll('#main .kpi'),function(k){ var b=k.querySelector('b'); k.classList.toggle('kpos',!!(b&&(b.classList.contains('pos')||b.classList.contains('ok')))); k.classList.toggle('kneg',!!(b&&(b.classList.contains('neg')||b.classList.contains('ko')))); });
   [].forEach.call(document.querySelectorAll('#main table tr.t td'),function(td){ if(td.classList.contains('pos')||td.classList.contains('neg')) return; var b=td.querySelector('b.pos,b.neg,b.ok,b.ko'); if(b&&td.children.length===1) td.classList.add(b.classList.contains('pos')||b.classList.contains('ok')?'pos':'neg'); }); }
@@ -1363,6 +1367,64 @@ function vPL(r,ro){ PLRO=!!ro; var h=r.mesi.map(function(m){return etm(m.m)+(plE
    rowP('% utile sul fatturato',r,function(m){return m.utile;},{c:1,tot:r.totali.utile}),
    rowM('Utile cumulato',r,function(m){return m.utileCum;},{c:1,tot:r.totali.utile})]));
   var out=(ro?'':plBanner(r))+plGest(r)+(function(){ var e=r.mesi.filter(function(m){return m.dashEscluso;}).map(function(m){return etm(m.m);}); return e.length?'<div class="note">Dashboard V6 non conteggiata in '+e.join(', ')+': le fatture Paysolution sono già nelle voci manuali (nessun doppio conteggio).</div>':''; })()+tabF24(r)+'<div class="note">F24 ritenute e simili versamenti non sono costi: '+eur(r.totali.uscitaNonCosto)+' € registrati fuori dal P&L.</div>'; PLRO=false; return out; }
+/* ===== Situazione IVA: dichiarazione 2025, versamenti reali (Cassetto fiscale 21/11/2026), rateazione 54-bis, IVA 2026, scadenzario ===== */
+var IVS={fonte:'Modello IVA 2026 (anno 2025) presentato il 29/04/2026 tramite Marini; versamenti dal Cassetto fiscale al 21/11/2026; comunicazione 54-bis del 27/03/2026',
+ dich:[['Volume d\'affari',673089],['Operazioni imponibili al 22%: imponibile',457917],['Operazioni imponibili al 22%: imposta',100742],['Reverse charge (quadro VJ): imposta',10265],['IVA a debito (VL1)',111007],['IVA detraibile (VL2)',48159],['IVA dovuta (VL3)',62848],['Credito IVA 2024 (eccedenza)',10062],['  di cui compensato in F24 (già usato)',621],['  di cui usato in dichiarazione',9441],['Interessi trimestrali dovuti',443],['Versamenti periodici e acconto dichiarati (VL30)',53850],['Saldo annuale (quadro VX): da versare / a credito',0]],
+ riconc:[['I trimestre',9852,9900,'16/05, 16/06, 16/07/2025: 3 × 3.300'],['II trimestre',15560,15560,'16/09 5.560; 16/10 4.500; 17/11/2025 5.500'],['III trimestre',12897,5000,'16/12/2025 5.000. Il resto: comunicazione 54-bis (rateazione)'],['Acconto dicembre',9094,9094,'29/05 4.094 e 30/06/2026 5.000 (scadeva il 27/12/2025)'],['IV trimestre',6447,6447,'31/07 4.094 e 31/08/2026 2.353 (scadeva il 16/03/2026)']],
+ f24:[['16/05/2025','I trim.',3300,'',''],['16/06/2025','I trim.',3300,45.87,''],['16/07/2025','I trim.',3300,45.87,''],['16/09/2025','II trim.',5560,69.50,''],['16/10/2025','II trim.',4500,62.55,''],['17/11/2025','II trim.',5500,76.45,''],['16/12/2025','III trim.',5000,62.50,''],['29/05/2026','Acconto',4094,146.21,34.55],['30/06/2026','Acconto',5000,178.57,50.41],['31/07/2026','IV trim.',4094,146.21,48.68],['31/08/2026','IV trim.',2353,88.24,21.67]],
+ rate:[[1,'2026-05-27',1438.82,0,1],[2,'2026-08-31',1438.80,16.97,1],[3,'2026-11-30',1438.80,29.52,0],[4,'2027-03-01',1438.80,41.94,0],[5,'2027-05-31',1438.80,54.63,0],[6,'2027-08-31',1438.80,67.33,0]],
+ imp54:7848.02, tot54:8632.82};
+function ivsD(s){ var p=String(s).split('-'); return p[2]+'/'+p[1]+'/'+p[0]; }
+function ivsKpi(l,v,arn,n){ return '<div class="kpi card'+(arn?' karn':'')+'"><span>'+l+'</span><b>'+v+' €</b>'+(n?'<span class="note">'+n+'</span>':'')+'</div>'; }
+function vIvaSit(r){
+  var ctx=stCtx(), cfg=stCfg(), R=E.strategia(ctx,cfg), M=R.mesi, RR=R.righe, oggi=new Date().toISOString().slice(0,10), V=IVS;
+  var rateDa=V.rate.filter(function(x){ return !x[4]; }), totRate=rateDa.reduce(function(t,x){ return t+x[2]+x[3]; },0);
+  var tmesi=r.mesi, ult=tmesi.length?tmesi[tmesi.length-1]:{ivaDaVersare:0};
+  var arr26=R.arretrati.reduce(function(t,x){ return t+(x.soloSanz?0:x.imp); },0), extra26=R.arretrati.reduce(function(t,x){ return t+(x.extra||0); },0);
+  var pagReal=V.riconc.reduce(function(t,x){ return t+x[2]; },0), dichTot=V.riconc.reduce(function(t,x){ return t+x[1]; },0);
+  // scadenzario
+  var sc=[]; V.rate.forEach(function(x){ sc.push({d:x[1],dl:ivsD(x[1]),t:'Rateazione 54-bis (III trim. 2025): rata '+x[0]+' di 6 (capitale '+eur(x[2])+' + interessi '+eur(x[3])+')',imp:x[2]+x[3],pag:!!x[4]}); });
+  M.forEach(function(mm,i){ var m=String(mm&&mm.m?mm.m:mm); var a=(RR.ivaArr&&RR.ivaArr[i])||0, v=(RR.ivaVers&&RR.ivaVers[i])||0, av=(RR.avviso&&RR.avviso[i])||0;
+    if(Math.abs(a)>0.5) sc.push({d:m+'-20',dl:'nel mese di '+istMese(m),t:'IVA 2026 arretrata: ravvedimento (imposta + sanzioni + interessi), rata del piano della Strategia',imp:a,pag:false});
+    if(Math.abs(av)>0.5) sc.push({d:m+'-20',dl:'nel mese di '+istMese(m),t:'IVA arretrata: rata dell\'avviso bonario',imp:av,pag:false});
+    if(Math.abs(v)>0.5) sc.push({d:m+'-16',dl:'16/'+m.slice(5,7)+'/'+m.slice(0,4),t:'IVA corrente (liquidazione del mese prima; a dicembre con l\'acconto)',imp:v,pag:false}); });
+  var nonPian=R.arretrati.reduce(function(t,x){ return t+(x.resto>0.5?x.resto:0); },0); if(nonPian>0.5) sc.push({d:'9999-12',dl:'da pianificare',t:'IVA 2026 arretrata non coperta dal piano (la cassa non basta nei mesi del piano): vedi Strategia',imp:nonPian,pag:false});
+  sc.push({d:'2027-02-28',dl:'28/02/2027',t:'Comunicazione LIPE del IV trimestre 2026 (adempimento, nessun importo)',imp:null,pag:false});
+  sc.push({d:'2027-04-30',dl:'30/04/2027',t:'Dichiarazione IVA 2027 (anno 2026): entro questa data il ravvedimento 2026 mantiene la sanzione a 1/8',imp:null,pag:false});
+  sc.sort(function(a,b){ return a.d<b.d?-1:a.d>b.d?1:0; });
+  var totSc=sc.filter(function(x){ return x.imp!==null&&!x.pag; }).reduce(function(t,x){ return t+x.imp; },0);
+  var h='<div class="note">Tutto sull\'IVA in un posto solo: dichiarazione 2025, versamenti realmente fatti, rateazione dell\'Agenzia, IVA 2026 e scadenze. <b>Celle arancioni = importi ancora da pagare.</b> Fonti: '+esc(V.fonte)+'.</div>';
+  h+='<div class="kpis">'+ivsKpi('IVA 2025: rate 54-bis ancora da pagare',eur(totRate),1,rateDa.length+' rate, prossima '+(rateDa[0]?ivsD(rateDa[0][1]):'—'))+ivsKpi('IVA 2026 non versata (imposta)',eur(arr26),1,'gen–nov + acconto, secondo la Strategia')+ivsKpi('Sanzioni e interessi stimati sul 2026',eur(extra26),1,'se paghi con ravvedimento')+ivsKpi('Totale IVA ancora da pagare',eur(totSc),1,'tutte le righe arancioni dello scadenzario')+'</div>';
+  // 1 dichiarazione
+  h+='<div class="card tw"><b>1) Parametri della dichiarazione IVA 2025</b><table class="fit" style="min-width:520px"><thead><tr><th style="text-align:left">Voce</th><th>Importo €</th></tr></thead><tbody>'+V.dich.map(function(x){ return '<tr><td style="text-align:left;white-space:pre">'+esc(x[0])+'</td><td>'+eur(x[1])+'</td></tr>'; }).join('')+'</tbody></table><div class="note">Dovuta 62.848 − credito 2024 usato 9.441 + interessi 443 = 53.850: è esattamente ciò che la dichiarazione considera versato, ma è un dato dichiarato. Il confronto con i versamenti reali è qui sotto.</div></div>';
+  // 2 riconciliazione
+  h+='<div class="card tw"><b>2) IVA 2025: dichiarato e versato davvero (Cassetto fiscale)</b><table class="fit" style="min-width:760px"><thead><tr><th style="text-align:left">Periodo</th><th>Dichiarato</th><th>Versato</th><th>Differenza</th><th style="text-align:left">Come è stato pagato</th></tr></thead><tbody>'
+   +V.riconc.map(function(x){ var d=x[2]-x[1]; return '<tr><td style="text-align:left">'+x[0]+'</td><td>'+eur(x[1])+'</td><td>'+eur(x[2])+'</td><td class="'+(d<-0.5?'arn':'')+'">'+eur(d)+'</td><td style="text-align:left;white-space:normal">'+esc(x[3])+'</td></tr>'; }).join('')
+   +'<tr class="t"><td style="text-align:left">Totale</td><td>'+eur(dichTot)+'</td><td>'+eur(pagReal)+'</td><td class="arn">'+eur(pagReal-dichTot)+'</td><td style="text-align:left;white-space:normal">La differenza è il III trimestre: l\'Agenzia chiede '+eur(V.imp54)+' di imposta, rateizzata (sezione 4)</td></tr></tbody></table>'
+   +'<div class="note">IVA 2024 (storico): III trimestre 4.115 pagato il 16/01/2025 con sanzione 176,53; saldo annuale 704,95 il 17/03/2025.</div></div>';
+  // 3 F24
+  var sS=0,sI=0; V.f24.forEach(function(x){ sS+=+x[3]||0; sI+=+x[4]||0; });
+  h+='<div class="card tw"><b>3) F24 IVA 2025 pagati, con sanzioni e interessi del ravvedimento</b><table class="fit" style="min-width:560px"><thead><tr><th style="text-align:left">Data</th><th style="text-align:left">Periodo</th><th>Imposta</th><th>Sanzione</th><th>Interessi</th></tr></thead><tbody>'
+   +V.f24.map(function(x){ return '<tr><td style="text-align:left">'+x[0]+'</td><td style="text-align:left">'+x[1]+'</td><td>'+eur(x[2])+'</td><td>'+(x[3]===''?'—':eur(x[3]))+'</td><td>'+(x[4]===''?'—':eur(x[4]))+'</td></tr>'; }).join('')
+   +'<tr class="t"><td style="text-align:left" colspan="2">Totale</td><td>'+eur(V.f24.reduce(function(t,x){ return t+x[2]; },0))+'</td><td>'+eur(sS)+'</td><td>'+eur(sI)+'</td></tr></tbody></table><div class="note">Gli interessi del ravvedimento sono indicati solo dove li ho trovati nel Cassetto (2026); per i versamenti del 2025 non li ho letti.</div></div>';
+  // 4 rateazione
+  h+='<div class="card tw"><b>4) Rateazione della comunicazione 54-bis (III trimestre 2025)</b><table class="fit" style="min-width:620px"><thead><tr><th>Rata</th><th>Scadenza</th><th>Capitale</th><th>Interessi</th><th>Totale</th><th>Stato</th></tr></thead><tbody>'
+   +V.rate.map(function(x){ var tot=x[2]+x[3], pg=!!x[4], sca=!pg&&x[1]<oggi; return '<tr><td>'+x[0]+'</td><td>'+ivsD(x[1])+'</td><td>'+eur(x[2])+'</td><td>'+eur(x[3])+'</td><td class="'+(pg?'':'arn')+'"><b>'+eur(tot)+'</b></td><td class="'+(pg?'pos':(sca?'neg':''))+'">'+(pg?'pagata':(sca?'SCADUTA: verifica':'da pagare'))+'</td></tr>'; }).join('')
+   +'<tr class="t"><td colspan="2">Totale</td><td>'+eur(V.rate.reduce(function(t,x){return t+x[2];},0))+'</td><td>'+eur(V.rate.reduce(function(t,x){return t+x[3];},0))+'</td><td>'+eur(V.rate.reduce(function(t,x){return t+x[2]+x[3];},0))+'</td><td>Da pagare '+eur(totRate)+'</td></tr></tbody></table><div class="note">Atto n. 08350842616. Importo originario '+eur(V.tot54)+' (imposta '+eur(V.imp54)+' + sanzione ridotta a un terzo). Pagate le rate 1 e 2 (Cassetto fiscale). Saltare una rata fa decadere la rateazione e la sanzione ridotta.</div></div>';
+  // 5 IVA 2026
+  h+='<div class="card tw"><b>5) IVA 2026 mese per mese (dalle fatture e dalla prima nota caricate)</b><table class="fit" style="min-width:720px"><thead><tr><th style="text-align:left">Mese</th><th>IVA a debito</th><th>IVA a credito</th><th>Saldo del mese</th><th>Versata con F24</th><th>Ancora da versare (cumulato)</th></tr></thead><tbody>'
+   +tmesi.map(function(m){ var dv=m.ivaDaVersare; return '<tr><td style="text-align:left;text-transform:capitalize">'+istMese(m.m)+'</td><td>'+eur(m.ivaDeb)+'</td><td>'+eur(m.ivaCred)+'</td><td>'+eur(m.ivaSaldo)+'</td><td>'+eur(m.ivaVersata)+'</td><td class="'+(dv>0.5?'arn':'')+'">'+eur(dv)+'</td></tr>'; }).join('')
+   +'<tr class="t"><td style="text-align:left">Totale</td><td>'+eur(r.totali.ivaDeb)+'</td><td>'+eur(r.totali.ivaCred)+'</td><td>'+eur(r.totali.ivaSaldo)+'</td><td>'+eur(r.totali.ivaVersata)+'</td><td class="'+(ult.ivaDaVersare>0.5?'arn':'')+'">'+eur(ult.ivaDaVersare)+'</td></tr></tbody></table>'
+   +'<div class="note">Liquidazione '+esc(r.params.ivaPeriodo)+'. Nel Cassetto fiscale non risulta nessun F24 IVA con anno 2026 (controllato il 21/11/2026): per questo l\'IVA 2026 risulta tutta da versare. Se hai pagato con altri mezzi, caricalo in Voci manuali (F24 - SALDO IVA). Acconto IVA 2026 (27/12/2026): '+eur(0.88*Math.max(0,+ctx.ivaDic||0))+' € (88% di dicembre).</div></div>';
+  // 6 piano di rientro 2026
+  h+='<div class="card tw"><b>6) Piano di rientro dell\'IVA 2026 (dalla Strategia)</b><table class="fit" style="min-width:620px"><thead><tr><th style="text-align:left">IVA di</th><th>Imposta</th><th>Scadenza originaria</th><th style="text-align:left">Come la paghi</th><th>Sanzioni e interessi</th><th>Resta</th></tr></thead><tbody>'
+   +R.arretrati.map(function(x){ return '<tr><td style="text-align:left">'+(x.acconto?'acconto IVA '+x.m.slice(0,4):etm(x.m))+'</td><td class="'+(x.soloSanz?'':'arn')+'">'+(x.soloSanz?'<span class="note">solo sanzione su '+eur(x.imp)+'</span>':eur(x.imp))+'</td><td>'+x.scad.split('-').reverse().join('/')+'</td><td style="text-align:left;white-space:normal">'+(x.pagato.map(function(p){ return etm(p.m)+' '+eur(p.imp); }).join('; ')||'—')+'</td><td class="arn">'+eur(x.extra)+'</td><td class="'+(x.resto>0.5?'neg':'')+'">'+eur(x.resto)+'</td></tr>'; }).join('')+'</tbody></table><div class="note">Il piano si cambia dalla pagina Strategia (ravvedimento o avviso bonario, numero di rate). Prima di pagare servono le liquidazioni IVA ufficiali dello studio.</div></div>';
+  // 7 scadenzario
+  h+='<div class="card tw"><b>7) Scadenzario IVA</b><table class="fit" style="min-width:680px"><thead><tr><th style="text-align:left">Quando</th><th style="text-align:left">Che cosa</th><th>Importo €</th><th>Stato</th></tr></thead><tbody>'
+   +sc.map(function(x){ var arn=x.imp!==null&&!x.pag; return '<tr><td style="text-align:left;white-space:nowrap">'+x.dl+'</td><td style="text-align:left;white-space:normal">'+esc(x.t)+'</td><td class="'+(arn?'arn':'')+'">'+(x.imp===null?'—':eur(x.imp))+'</td><td class="'+(x.pag?'pos':'')+'">'+(x.imp===null?'adempimento':(x.pag?'pagata':'da pagare'))+'</td></tr>'; }).join('')
+   +'<tr class="t"><td colspan="2" style="text-align:left">Totale ancora da pagare</td><td class="arn">'+eur(totSc)+'</td><td></td></tr></tbody></table><div class="note">Le righe del piano di rientro e dell\'IVA corrente seguono la Strategia: gli importi cambiano se cambi le leve lì.</div></div>';
+  return h; }
+
 function vIva(r){ var h=r.mesi.map(function(m){return etm(m.m);}).concat(['Totale']);
   return '<div class="note">Questa pagina mostra l\'IVA (l\'imposta), non gli imponibili.</div>'+tab(h,[rowM('IVA a debito (vendite)',r,function(m){return m.ivaDeb;},{tot:r.totali.ivaDeb}),
    rowM('IVA a credito (acquisti detraibili)',r,function(m){return m.ivaCred;},{tot:r.totali.ivaCred}),
@@ -1373,7 +1435,7 @@ function vIva(r){ var h=r.mesi.map(function(m){return etm(m.m);}).concat(['Total
    rowM('IVA da versare ('+r.params.ivaPeriodo+')',r,function(m){return m.ivaVersare;},{t:1,tot:r.totali.ivaVersare}),
    rowM('Credito riportato a fine periodo',r,function(m){return m.ivaCreditoRiportato;},{tot:r.totali.ivaCreditoFinale})],'€ · SOLO IVA (imposta)')+'<div class="note">Calcolo per competenza. Non considera acconto di dicembre, interessi trimestrali (1%) né versamenti effettivi.</div>'; }
 function vImposte(r){ var h=r.mesi.map(function(m){return etm(m.m);}).concat(['Totale']);
-  return '<div class="card wa">STIME: IRES '+r.params.ires+'% sull\'utile cumulato; IRAP '+r.params.irap+'% su utile + compensi amministratori, stipendi e contributi (base semplificata, senza deduzioni). Da confermare con il commercialista. Nessun riporto perdite.</div>'+
+  return '<div class="card wa">STIME: IRES '+r.params.ires+'% sull\'utile cumulato; IRAP '+r.params.irap+'% su utile + compensi amministratori, stipendi e contributi (base con deduzioni IRAP di '+eur(r.params.irapDed==null?52495:r.params.irapDed)+' € l\'anno: contributi assicurativi, personale a tempo indeterminato, ulteriore deduzione, come in Redditi 2025). Da confermare con il commercialista. Nessun riporto perdite.</div>'+
   tab(h,[rowM('Utile cumulato',r,function(m){return m.utileCum;},{c:1,tot:r.totali.utile}),
    rowM('Base IRAP cumulata',r,function(m){return m.irapBaseCum;},{tot:r.mesi.length?r.mesi[r.mesi.length-1].irapBaseCum:0}),
    rowM('IRES del mese',r,function(m){return m.ires;},{tot:r.totali.ires}),rowM('IRAP del mese',r,function(m){return m.irap;},{tot:r.totali.irap}),
@@ -1497,7 +1559,7 @@ function vBudget(){ var B=budS(), ctx=budCtx(), C=E.budgetCalc(B,ctx), o2=ctx.o,
    +budInp('par.ivaPs',P.ivaPs,'IVA sui ricavi da Paysolution %')+budSel('par.ritardoPs',P.ritardoPs,'Incasso Paysolution',[[0,'nello stesso mese'],[1,'il mese dopo']])
    +budInp('par.royTullio',P.royTullio,'Royalty a Tullio % del Fatturato Marchio')+budInp('par.ritRoy',P.ritRoy,'Ritenuta d\'acconto sulle royalty %')
    +budInp('par.nettoPerc',P.nettoPerc,'Netto / lordo dei compensi % (osservato 2026)')+budInp('par.contribPerc',P.contribPerc,'Contributi SRL sui compensi %')+budInp('par.tfmAnno',P.tfmAnno,'Accantonamento TFM annuo €')
-   +budInp('par.ires',P.ires,'IRES %')+budInp('par.irap',P.irap,'IRAP %')+budInp('par.ritDiv',P.ritDiv,'Ritenuta sui dividendi %')+'</div></details></div>';
+   +budInp('par.ires',P.ires,'IRES %')+budInp('par.irap',P.irap,'IRAP %')+budInp('par.irapDed',P.irapDed,'Deduzioni IRAP annue €')+budInp('par.ritDiv',P.ritDiv,'Ritenuta sui dividendi %')+'</div></details></div>';
   var kp='<div class="kpis"><div class="kpi card"><span>Utile ante imposte (anno)</span><b class="'+cls(C.Ucum[11])+'">'+eur(C.Ucum[11])+' €</b></div><div class="kpi card"><span>Utile dopo imposte (stima)</span><b class="'+cls(C.utileNettoCum[11])+'">'+eur(C.utileNettoCum[11])+' €</b></div>'
    +'<div class="kpi card"><span>Compensi lordi + contributi</span><b>'+eur(bsum(C.comp.tullio)+bsum(C.comp.rosanna)+bsum(C.contributi))+' €</b></div><div class="kpi card"><span>Anticipo utili lordo</span><b>'+eur(C.prelievo.totDiv)+' €</b></div><div class="kpi card"><span>Cassa minima (mese)</span><b class="'+cls(C.semafori.cassa.val)+'">'+eur(C.semafori.cassa.val)+' € ('+MESI3[C.semafori.cassa.mese]+')</b></div></div>';
   /* ricavi */
@@ -2474,7 +2536,7 @@ function vAzienda(R,ctx,c,res){ var az=azCfg(), nm=ctx.nomi, P=R.persone[R.anno]
   var sez=function(l){ return '<tr class="s"><td colspan="3" style="text-align:left;font-weight:700;color:var(--ac);padding-top:8px">'+l+'</td></tr>'; };
   var tab=sez('SOCIETÀ')+row('Risultato civilistico prima dei compensi',x.risultato,x.risultato,{s:1})+row('Compensi lordi / dividendi lordi',C&&r.lordo,r.lordo)
    +row('Contributi INPS'+(inl?' e INAIL':'')+' a carico della società (2/3)',C.contrSoc,0)+row('Costo del consulente per le buste paga',C.consulente,0)
-   +row('Utile dopo i compensi (base IRES, prima delle variazioni)',C.utile,D.utile,{s:1})+row('IRES '+eurIn(x.ires)+'%',C.ires,D.ires)+row('IRAP 3,9% (i compensi degli amministratori non si deducono)',C.irap,D.irap)
+   +row('Utile dopo i compensi (base IRES, prima delle variazioni)',C.utile,D.utile,{s:1})+row('IRES '+eurIn(x.ires)+'%',C.ires,D.ires)+row('IRAP '+IT.format(x.irap==null?2.93:+x.irap)+'% (compensi amministratori indeducibili; deduzioni personale 52.495 €)',C.irap,D.irap)
    +row('Imposte e contributi a carico della società',C.societa,D.societa,{t:1})
    +sez('AMMINISTRATORI / SOCI')+row('IRPEF'+(add?' + addizionali':'')+' sui compensi',C.irpef,0)+row('Contributi a carico degli amministratori (1/3)',C.contrAmm,0)+row('Ritenuta 26% sui dividendi',0,D.ritenuta)
    +row('Imposte e contributi a carico delle persone',C.amministratori,D.ritenuta,{t:1})
