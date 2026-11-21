@@ -82,7 +82,7 @@ table.fit{min-width:0!important;width:100%!important;font-size:9.4px}table.fit.w
 .pbk{break-before:page;page-break-before:always}}
 .note{font-size:12px;color:var(--mu)}.hid{display:none}
 </style></head><body>
-<header><h1>Bilancio SRL <small>Tullio Serci S.r.l. · gestionale riservato</small></h1><small id="versione" title="Versione della consolle: se non vedi la data dell'ultimo aggiornamento, ricarica" style="opacity:.85;margin-right:10px">versione 21/11/2026 · dettaglio celle</small><small id="utente"></small><button class="l" id="exit" data-a="logout" style="color:#fff;border-color:#fff8">Esci</button></header>
+<header><h1>Bilancio SRL <small>Tullio Serci S.r.l. · gestionale riservato</small></h1><small id="versione" title="Versione della consolle: se non vedi la data dell'ultimo aggiornamento, ricarica" style="opacity:.85;margin-right:10px">versione 21/11/2026 · riga affitti</small><small id="utente"></small><button class="l" id="exit" data-a="logout" style="color:#fff;border-color:#fff8">Esci</button></header>
 <div id="demo" class="demo hid">MODALITÀ DEMO: dati sintetici salvati solo in questo browser. Nessun dato reale.</div>
 <nav id="nav"></nav>
 <main id="main"></main>
@@ -102,6 +102,7 @@ table.fit{min-width:0!important;width:100%!important;font-size:9.4px}table.fit.w
     { id: 'trasporti', nome: 'Trasporti e spedizioni', tipo: 'costo' },
     { id: 'pubblicita', nome: 'Pubblicita', tipo: 'costo' },
     { id: 'servizi_prof', nome: 'Commercialista, consulenti e servizi', tipo: 'costo' },
+    { id: 'affitti', nome: 'Affitti e locazioni', tipo: 'costo' },
     { id: 'abbonamenti_utenze', nome: 'Abbonamenti, utenze, sicurezza, assicurazioni', tipo: 'costo' },
     { id: 'trasferte_welfare', nome: 'Trasferte, welfare e rappresentanza', tipo: 'costo' },
     { id: 'oneri_bancari', nome: 'Commissioni e oneri bancari', tipo: 'costo' },
@@ -1253,7 +1254,7 @@ function sum(r,f){ return r.mesi.reduce(function(s,m){return s+f(m);},0); }
 
 /* ── P&L gestionale: ricavi → costi variabili → margine di contribuzione → costi fissi e personale → EBITDA → EBIT (RO) → gestione finanziaria → ante imposte → imposte → utile netto ── */
 var PL_VAR=['acquisti_materiali','intercompany_costo','trasporti','pubblicita','oneri_bancari','royalties'],
-    PL_FIS=['servizi_prof','abbonamenti_utenze','trasferte_welfare','altri'],
+    PL_FIS=['servizi_prof','affitti','abbonamenti_utenze','trasferte_welfare','altri'],
     PL_PERS=['compensi_amm','stipendi','contributi','accantonamenti'], PL_AMM=['ammortamenti'], PL_FIN=['oneri_finanziari'];
 function plSc(ids){ return function(m){ return ids.reduce(function(a,k){ return a+plVal(m,k); },0); }; }
 function plCalc(m){ var o={};
@@ -1932,6 +1933,7 @@ function mcConto(v){ var d=String(v.descrizione||'').toUpperCase(), c=v.categori
    case 'pubblicita': return t(/AMAZON EU|COMMISSION/)?'402.03070':'402.01016';
    case 'trasferte_welfare': return t(/DAY S\.?P|WELFARE|BUONI PASTO/)?'402.03041':(t(/RAPPRESENTANZA|RISTOR/)?'402.02010':'402.02009');
    case 'abbonamenti_utenze': return t(/FASTWEB|VODAFONE|TELECOM|TELEFON|HOLAFLY|\bTIM\b/)?'402.03002':(t(/GENERALI|ASSICUR|POLIZZA/)?'402.03007':(t(/VERISURE|SICUREZZA/)?'402.02013':'402.03008'));
+   case 'affitti': return t(/NOLEGG|LEASING/)?'402.02014':'403.01001';
    case 'servizi_prof': return t(/ELETTROMECCANIC|AFFITT/)?'403.01001':(t(/COMMERCIALIST|FISCAL|PARCELLA/)?'402.03010':(t(/PULIZI/)?'402.03019':(t(/RIFIUT|PILE|BATTERIE/)?'402.03020':'402.02013')));
    case 'intercompany_costo': return '402.03029';
    case 'compensi_amm': return '402.03065';
@@ -2159,7 +2161,7 @@ async function importaPacchetto(o){
   var esist={}; (S.voci||[]).forEach(function(x){ if(!x.eliminata&&x.riferimento) esist[String(x.riferimento)]=1; });
   var tutte=Array.isArray(o.voci)?o.voci:[], nuove=tutte.filter(function(v){ return !(v.riferimento&&esist[String(v.riferimento)]); }), gia=tutte.length-nuove.length, mods=[], righe=[], dett=function(v){ return eur(+v.imponibile||0)+' € ('+(v.competenza||'')+')'; };
   (o.modifiche||[]).forEach(function(m){ var q=m.cerca||null; if(q) m.riferimento=m.riferimento||('"'+q.testo+'" '+(q.competenza||''));
-    var hit=(S.voci||[]).filter(function(x){ if(x.eliminata) return false; if(!q) return String(x.riferimento||'')===String(m.riferimento);
+    var hit=(S.voci||[]).filter(function(x){ if(x.eliminata) return false; if(m.id) return x.id===m.id; if(!q) return String(x.riferimento||'')===String(m.riferimento);
       return String(x.descrizione||'').toUpperCase().indexOf(String(q.testo).toUpperCase())>=0&&(!q.competenza||String(x.competenza||'').slice(0,7)===q.competenza)&&(!q.categoria||x.categoria===q.categoria); });
     if(!hit.length&&!q&&nuove.some(function(v){ return String(v.riferimento||'')===String(m.riferimento); })){ righe.push('✓ '+m.riferimento+': è tra le voci nuove'); return; }
     if(!hit.length&&q&&m.campi&&m.campi.riferimento&&(S.voci||[]).some(function(x){ return !x.eliminata&&String(x.riferimento||'')===String(m.campi.riferimento); })){ righe.push('✓ '+m.campi.riferimento+': già a posto'); return; }
@@ -2730,7 +2732,7 @@ var AG_CAT={'ABBONAMENTI':'abbonamenti_utenze','SICUREZZA':'abbonamenti_utenze',
   'MATERIALI X GETT.':'acquisti_materiali','MATERIALI INDIRETTI':'acquisti_materiali','MATERIALI DA RIVENDERE':'acquisti_materiali','MATERIALI IMPO PER GETTONIERE':'acquisti_materiali','GETTONIERE':'acquisti_materiali',
   'TRASPORTI':'trasporti','IMBALLAGGI':'trasporti',"PUBBLICITA'":'pubblicita','PUBBLICITA':'pubblicita','SPESE TRASFERTA':'trasferte_welfare','WELFARE':'trasferte_welfare','RAPPRESENTANZA':'trasferte_welfare','RIMBORSO TRASFERTA':'trasferte_welfare',
   'SERVIZI AUSILIARI':'servizi_prof','COMMERCIALISTA':'servizi_prof','SERVIZI':'servizi_prof','SERVIZI DI TERZI':'servizi_prof','CONSULENTI ESTERNI':'servizi_prof','FORMAZIONE':'servizi_prof','COMMISSIONI SIBILL':'oneri_bancari',
-  'PULIZIE':'altri','BONUS':'altri','LOCAZIONI':'altri','AFFITTO':'altri','COMMISSIONI A RIVENDITORE':'altri','ATTREZZATURE DA LAVORO':'altri','RIFIUTI INDUSTRIALI':'altri','MANUTENZIONE':'altri','SPESE LOCALE':'altri','CAPEX':'altri'};
+  'PULIZIE':'altri','BONUS':'altri','LOCAZIONI':'affitti','AFFITTO':'affitti','AFFITTI':'affitti','COMMISSIONI A RIVENDITORE':'altri','ATTREZZATURE DA LAVORO':'altri','RIFIUTI INDUSTRIALI':'altri','MANUTENZIONE':'altri','SPESE LOCALE':'altri','CAPEX':'altri'};
 /* prima nota: categorie che non sono costi (o che entrano da altre fonti: fatture, paghe, F24, royalty, dividendi, giroconti, incassi) */
 var AG_PN_ESCL=/^(GIROCONT|IMPOSTE E TASSE|IVA E DAZI|PERSONALE|STIPENDI|DIVIDENDI|FINANZIAMENTI|AMERICAN EXPRESS|FONDO STRIPE|ACCREDITO|GETTONIERE|ROYALTIES|ADLER|STORNO|BONIFICO \/ CANCELLATO|RIMBORSO|NOTA DI CREDITO|FRODE|RICARICA CONTO|PRELIEVO BANCOMAT|CAPEX|ABBONAMENTI CLIENTI|ADDEBITO STRIPE|COMMISSIONI SIBILL)/;
 var AG_MESI=['GENNAIO','FEBBRAIO','MARZO','APRILE','MAGGIO','GIUGNO','LUGLIO','AGOSTO','SETTEMBRE','OTTOBRE','NOVEMBRE','DICEMBRE'];
