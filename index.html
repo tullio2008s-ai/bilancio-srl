@@ -82,7 +82,7 @@ table.fit{min-width:0!important;width:100%!important;font-size:9.4px}table.fit.w
 .pbk{break-before:page;page-break-before:always}}
 .note{font-size:12px;color:var(--mu)}.hid{display:none}
 </style></head><body>
-<header><h1>Bilancio SRL <small>Tullio Serci S.r.l. · gestionale riservato</small></h1><small id="versione" title="Versione della consolle: se non vedi la data dell'ultimo aggiornamento, ricarica" style="opacity:.85;margin-right:10px">versione 21/11/2026 · riga affitti</small><small id="utente"></small><button class="l" id="exit" data-a="logout" style="color:#fff;border-color:#fff8">Esci</button></header>
+<header><h1>Bilancio SRL <small>Tullio Serci S.r.l. · gestionale riservato</small></h1><small id="versione" title="Versione della consolle: se non vedi la data dell'ultimo aggiornamento, ricarica" style="opacity:.85;margin-right:10px">versione 21/11/2026 · riga affitti 2</small><small id="utente"></small><button class="l" id="exit" data-a="logout" style="color:#fff;border-color:#fff8">Esci</button></header>
 <div id="demo" class="demo hid">MODALITÀ DEMO: dati sintetici salvati solo in questo browser. Nessun dato reale.</div>
 <nav id="nav"></nav>
 <main id="main"></main>
@@ -1284,7 +1284,7 @@ function plGest(r){
   ln('TOTALE COSTI VARIABILI (incluso il consumo di magazzino)',function(x){return x.varT-x.varRim;},{t:1});
   ln('MARGINE DI CONTRIBUZIONE',function(x){return x.mdc;},{t:1,c:1}); pr('% margine di contribuzione',function(x){return x.mdc;});
   sez('3 · COSTI FISSI DI STRUTTURA');
-  PL_FIS.forEach(function(id){ cat(id); });
+  PL_FIS.forEach(function(id){ cat(id,true); });   /* le righe dei costi fissi si vedono sempre, anche a zero */
   if(Math.abs(T(function(x){return x.altriNC;}))>0.005) ln('Altri costi non classificati',function(x){return x.altriNC;},{ind:1});
   ln('TOTALE COSTI FISSI',function(x){return x.fis;},{t:1});
   sez('4 · PERSONALE E AMMINISTRATORI');
