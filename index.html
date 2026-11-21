@@ -1117,7 +1117,7 @@ function calc(){ return E.calcola({voci:vociCalc(),dash:S.dash||{},params:params
 function cls(x){ return x<-0.004?'neg':(x>0.004?'pos':''); }
 
 /* ── Viste ── */
-var TABS=[['oggi','Oggi'],['riepilogo','Riepilogo'],['strategia','Strategia'],['riserve','Debiti e riserve'],['istruzioni','Istruzioni'],['compdiv','Compenso o dividendo'],['pl','P&L mensile'],['be','Break even'],['cassa','Cassa'],['flussi','Cash flow'],['iva','IVA'],['ivasit','Situazione IVA'],['conf25','Confronto 2025'],['imposte','Imposte (stima)'],['patrimonio','Stato patrimoniale'],['simulazione','Previsione nov-dic'],['utili','Prelievo utili'],['budget','Budget'],['commercialista','Per il commercialista'],['marini','Marini'],['voci','Voci manuali'],['dashboard','Da Dashboard V6'],['param','Parametri'],['controlli','Controlli'],['storico','Storico']];
+var TABS=[['oggi','Oggi'],['riepilogo','Riepilogo'],['strategia','Strategia'],['riserve','Debiti e riserve'],['istruzioni','Istruzioni'],['compdiv','Compenso o dividendo'],['pl','P&L mensile'],['be','Break even'],['cassa','Cassa'],['flussi','Cash flow'],['iva','IVA'],['ivasit','Situazione IVA'],['conf25','Confronto 2025'],['imposte','Imposte (stima)'],['patrimonio','Stato patrimoniale'],['simulazione','Previsione nov-dic'],['utili','Prelievo utili'],['budget','Budget'],['commercialista','Incontro Marini (stampa)'],['marini','Marini'],['voci','Voci manuali'],['dashboard','Da Dashboard V6'],['param','Parametri'],['controlli','Controlli'],['storico','Storico']];
 function nav(){ document.getElementById('nav').innerHTML=TABS.map(function(t){return '<button class="'+(S.tab===t[0]?'on':'')+'" data-t="'+t[0]+'">'+t[1]+'</button>';}).join(''); }
 function render(){ nav(); var reg=calc(); S.__reg=reg; var r=reg, SIMO=null; if((S.tab==='pl'||S.tab==='be')&&S.plPrev!==false){ try{ SIMO=simRun(); r=SIMO.res; }catch(e){ r=reg; SIMO=null; } } var f={oggi:vOggi,riepilogo:vRiepilogo,strategia:vStrategia,riserve:vRiserve,istruzioni:vIstruzioni,compdiv:vCompDiv,pl:vPL,be:vBE,iva:vIva,ivasit:vIvaSit,conf25:vConf25,imposte:vImposte,patrimonio:vPatrimonio,simulazione:vSimulazione,cassa:vCassa,flussi:vFlussi,utili:vUtili,commercialista:vReport,marini:vMarini,budget:vBudget,voci:vVoci,dashboard:vDash,param:vParam,controlli:vControlli,storico:vStorico}[S.tab]; document.getElementById('main').innerHTML='<div class="bar">'+provvHtml()+'<span id="pdfmsg" class="note"></span><button class="p" data-a="pdf" style="margin:0">⬇ Salva PDF</button></div><div class="pdfhead"'+(S.tab==='commercialista'?' style="display:none!important"':'')+'><b>Bilancio SRL — '+esc(TABS.filter(function(t){return t[0]===S.tab;})[0][1])+'</b><div class="note">Tullio Serci S.r.l. · generato il '+new Date().toLocaleDateString('it-IT')+' · importi in euro, IVA esclusa salvo dove indicato'+esc(provvNota())+'</div></div>'+f(r)+(SIMO?cashFlowHtml(SIMO):'');
   if(S.tab==='riepilogo') grafico(r); if(S.tab==='voci') bulkInfo(); marcaTabelle(); }
@@ -1932,8 +1932,8 @@ function vMarini(r){ var X=mcCalcola(r), C=X.conti, eu=function(x){ return x?eur
    +''+(X.nonMap.length?'<div class="note neg">Voci senza conto specifico (messe in conti generici): '+X.nonMap.length+'</div>':'')
    +'<div class="note">Non incluse: F24 (sono pagamenti, non costi), imposte sul reddito, previsioni della pagina Previsione nov-dic.</div></div>'+dett; }
 
-function vReport(){
-  var R=repMesi(), p=params(), s=simS(), rOct=E.calcola({voci:vociCalc(),dash:S.dash||{},params:Object.assign({},p,{mesi:R.n})}),
+function vReport(r0){
+  r0=r0||S.__reg; var R=repMesi(), p=params(), s=simS(), rOct=E.calcola({voci:vociCalc(),dash:S.dash||{},params:Object.assign({},p,{mesi:R.n})}),
       o=simRun(), rf=o.res, u=o.utili, fl=o.flusso, a=rOct.totali, t=rf.totali, fine=fineMese(R.m), anno=R.all[R.all.length-1].slice(0,4), ultimo=rOct.mesi[rOct.mesi.length-1]||{};
   var oggi=new Date().toLocaleDateString('it-IT');
   var cc=function(x){ return '<td class="'+cls(x)+'">'+eur(x)+'</td>'; };
@@ -1982,20 +1982,25 @@ function vReport(){
   var ip=E.SIM_RIGHE.filter(function(rg){ return s.righe[rg.id].some(function(x){return +x;}); }).map(function(rg){ return '<tr><td style="text-align:left">'+esc(rg.nome)+'</td>'+s.righe[rg.id].map(function(x){return '<td>'+eur(+x||0)+'</td>';}).join('')+'<td>'+(rg.noIva?'–':IT.format(+s.iva[rg.id]||0)+' %')+'</td></tr>'; }).join('');
   var ipo='<div class="note">Importi IVA esclusa che si aggiungono a quanto già registrato nei mesi della previsione.</div><div class="card tw"><table><tr><th style="text-align:left">Voce</th>'+s.mesi.map(function(m){return '<th>'+etm(m)+' €</th>';}).join('')+'<th>IVA %</th></tr>'+(ip||'<tr><td colspan="4" class="note">Nessuna voce di previsione.</td></tr>')+'</table></div>'
    +'<div class="card"><ul><li>Contributi su compensi calcolati al '+IT.format(+s.contribPerc||0)+'%; quota netta dei compensi pagata in banca '+IT.format(+s.nettoPerc||0)+'%.</li><li>Accantonamento TFM 2026: '+eur(s.altreRettifiche)+' € (non monetario, indeducibile IRAP).</li><li>Ripartizione dei dividendi: '+s.soci.map(function(x){ return esc(x.nome)+' '+IT.format(+x.div||0)+'% (capitale '+IT.format(+x.cap||0)+'%)'; }).join('; ')+'.</li><li>Aliquote usate: IRES '+IT.format(p.ires)+'%, IRAP '+IT.format(p.irap)+'% (stime).</li><li>Cash flow per data del movimento (IVA inclusa); non include debiti già maturati e non pagati.</li></ul></div>';
+  var mOld=S.mariniData; S.mariniData=fine; var bil=''; try{ bil=vMarini(r0); }catch(e){ bil='<div class="card wa">Bilancino non disponibile: '+esc(e.message)+'</div>'; } S.mariniData=mOld;
+  bil=bil.replace(/<div class="g" style="margin-top:8px"><div><label>Conto economico al<\/label>[\s\S]*?<\/label><\/div><\/div>/,'');
+  var ivaSit=''; try{ ivaSit=vIvaSit(r0); }catch(e){ ivaSit='<div class="card wa">Situazione IVA non disponibile: '+esc(e.message)+'</div>'; }
   var sel='<select id="repmese">'+R.all.map(function(m){ return '<option value="'+m+'"'+(m===R.m?' selected':'')+'>'+etm(m)+'</option>'; }).join('')+'</select>';
-  var top='<div class="card norep" style="margin-bottom:12px"><b>Report per il commercialista</b><div class="note">Pagina 1 riepilogo, a seguire i dettagli: conto economico mensile consuntivo e previsionale, IVA, imposte, stato patrimoniale, prelievo utili e cash flow, ipotesi e controlli.</div>'
+  var top='<div class="card norep" style="margin-bottom:12px"><b>Pacchetto per l\'incontro mensile con Marini</b><div class="note">Scegli il mese appena chiuso. Il PDF contiene: riepilogo, bilancino del mese (piano dei conti dello studio), conto economico consuntivo e previsionale, IVA (liquidazioni e situazione dal Cassetto fiscale), imposte, stato patrimoniale con magazzino, utili e saldi di cassa a fine mese, ipotesi e controlli. Le note per lo studio si scrivono nella pagina Marini.</div>'
    +'<div class="g" style="margin-top:8px"><div><label>Situazione chiusa al mese di</label>'+sel+'</div></div>'
-   +'<button class="p" data-a="pdfcomm" style="margin-top:8px">⬇ Genera PDF per il commercialista</button><span id="pdfmsg2" class="note" style="margin-left:8px"></span></div>';
+   +'<button class="p" data-a="pdfcomm" style="margin-top:8px">⬇ Genera il PDF per l\'incontro con Marini</button><span id="pdfmsg2" class="note" style="margin-left:8px"></span></div>';
   return top+riep
+   +sez('Bilancino del mese — conto economico al '+dmy(fine)+' (piano dei conti Marini)',bil)
    +sez('Conto economico mensile — consuntivo al '+dmy(fine),vPL(rOct,true))
    +sez('Conto economico mensile — previsionale a fine anno (consuntivo + previsione)',vPL(rf,true))
    +sez('IVA — liquidazioni',vIva(rf))
+   +sez('IVA — situazione dal Cassetto fiscale, rateazione e scadenze',ivaSit)
    +sez('Imposte — stima',vImposte(rf))
-   +sez('Stato patrimoniale — saldi inseriti',vPatrimonio(rOct,true))
-   +sez('Prelievo utili, ritenute e cash flow',utiliRes(o))
+   +sez('Stato patrimoniale e magazzino — saldi inseriti',vPatrimonio(rOct,true))
+   +sez('Situazione utili, ritenute e saldi di cassa a fine mese',utiliRes(o))
    +sez('Ipotesi della previsione',ipo)
    +sez('Controlli incrociati',vControlli(rOct)); }
-async function pdfCommercialista(){ var sc0=[0,0], pm=document.getElementById('pdfmsg2'), nome='Bilancio_SRL_per_commercialista_'+new Date().toISOString().slice(0,10)+'.pdf';
+async function pdfCommercialista(){ var sc0=[0,0], pm=document.getElementById('pdfmsg2'), nome='Incontro_Marini_'+(repMesi().m)+'_'+new Date().toISOString().slice(0,10)+'.pdf';
   try{
     if(pm){ pm.textContent='Preparo il PDF…'; pm.className='note'; }
     await caricaLib(); sc0=[window.scrollX,window.scrollY]; window.scrollTo(0,0); document.body.classList.add('pdfmode'); await new Promise(function(r){setTimeout(r,250);}); fissaSvg(true);
