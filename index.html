@@ -82,7 +82,7 @@ table.fit{min-width:0!important;width:100%!important;font-size:9.4px}table.fit.w
 .pbk{break-before:page;page-break-before:always}}
 .note{font-size:12px;color:var(--mu)}.hid{display:none}
 </style></head><body>
-<header><h1>Bilancio SRL <small>Tullio Serci S.r.l. · gestionale riservato</small></h1><small id="versione" title="Versione della consolle: se non vedi la data dell'ultimo aggiornamento, ricarica" style="opacity:.85;margin-right:10px">versione 21/11/2026 · domande studio</small><small id="utente"></small><button class="l" id="exit" data-a="logout" style="color:#fff;border-color:#fff8">Esci</button></header>
+<header><h1>Bilancio SRL <small>Tullio Serci S.r.l. · gestionale riservato</small></h1><small id="versione" title="Versione della consolle: se non vedi la data dell'ultimo aggiornamento, ricarica" style="opacity:.85;margin-right:10px">versione 21/11/2026 · mese in corso</small><small id="utente"></small><button class="l" id="exit" data-a="logout" style="color:#fff;border-color:#fff8">Esci</button></header>
 <div id="demo" class="demo hid">MODALITÀ DEMO: dati sintetici salvati solo in questo browser. Nessun dato reale.</div>
 <nav id="nav"></nav>
 <main id="main"></main>
@@ -224,6 +224,7 @@ table.fit{min-width:0!important;width:100%!important;font-size:9.4px}table.fit.w
       if (c.nonCosto) { r.uscitaNonCosto += imp + iva; r.f24[v.categoria] = (r.f24[v.categoria] || 0) + imp + iva; return; }
       if (c.finanziario) { r.interessi += imp; return; }
       if (c.tipo === 'ricavo' && imp < 0) r.ncRicavi += imp;
+      if (/^intercompany_/.test(v.categoria) && !/^LASER-/.test(String(v.riferimento || ''))) r.icVoci = (r.icVoci || {}), r.icVoci[v.categoria] = (r.icVoci[v.categoria] || 0) + imp;   /* operazioni una tantum (laser) non sostituiscono la chiusura mensile TS/PS */
       if (c.tipo === 'ricavo') { r.ricaviMan += imp; r.ivaDeb += iva; r.cat[v.categoria] = (r.cat[v.categoria] || 0) + imp; }
       else {
         var detr = v.detraibile !== false;
@@ -237,11 +238,11 @@ table.fit{min-width:0!important;width:100%!important;font-size:9.4px}table.fit.w
        Le voci manuali prevalgono: sono i documenti reali e trattano le note di credito, la Dashboard no. */
     mesi.forEach(function (m) {
       var r = rows[m], es = [];
-      if ((r.cat.intercompany_ricavo || 0) !== 0 && (r.ricaviDash || r.dashIvaDeb)) {
+      if (((r.icVoci || {}).intercompany_ricavo || 0) !== 0 && (r.ricaviDash || r.dashIvaDeb)) {
         avvisi.push('Mese ' + m + ': ricavi Dashboard V6 (' + r2(r.ricaviDash) + ' €) esclusi perche\' le fatture a Paysolution sono gia\' nelle voci manuali');
         r.ricaviDash = 0; r.ivaDeb -= r.dashIvaDeb; es.push('ricavi');
       }
-      if ((r.cat.intercompany_costo || 0) !== 0 && (r.costiDash || r.dashIvaCred)) {
+      if (((r.icVoci || {}).intercompany_costo || 0) !== 0 && (r.costiDash || r.dashIvaCred)) {
         avvisi.push('Mese ' + m + ': costi Dashboard V6 (' + r2(r.costiDash) + ' €) esclusi perche\' le fatture da Paysolution sono gia\' nelle voci manuali');
         r.costiDash = 0; r.ivaCred -= r.dashIvaCred; es.push('costi');
       }
@@ -534,7 +535,7 @@ table.fit{min-width:0!important;width:100%!important;font-size:9.4px}table.fit.w
       compensi: [10163.93, 1147.54], contributi: [0, 0], stipendi: [0, 0], royalties: [0, 0], paysCosto: [1800, 1800], acqServizi: [375, 375], collab: [0, 0], acqMateriali: [0, 0], pubblicita: [1600, 1600],
       trasferte: [0, 0], abbonamenti: [0, 0], trasporti: [0, 0], oneri: [0, 0], oneriFin: [0, 0], altri: [1800, 1800], f24: [0, 0] },
     iva: { serviziFatt: 0, paysRicavo: 22, venditeGett: 22, amazon: 22, corrisp: 22, paysCosto: 22, acqServizi: 22, acqMateriali: 22, pubblicita: 22, trasferte: 0, abbonamenti: 22, trasporti: 22, altri: 22 },
-    contribPerc: 17, nettoPerc: 61, rimanenze: ['', ''], altreRettifiche: 0, mariniNote: '', cf: null, includiProvvisorie: true, strategia: null, cd: null, agg: null, paghe: null, studio: [],
+    contribPerc: 17, nettoPerc: 61, rimanenze: ['', ''], altreRettifiche: 0, mariniNote: '', cf: null, includiProvvisorie: true, strategia: null, cd: null, agg: null, paghe: null, studio: [], plModo: {},
     laser: { attiva: false, costo: 4642.22, ricarico: 8, iva: 22, mese: '2026-12' },
     prelievi: [{ data: '2026-11-20', lordo: 5000 }, { data: '2026-12-18', lordo: 15000 }], cassaIniziale: '', ritenuta: 26, usaRiserve: true, budget: null, cassa: null,
     soci: [{ nome: 'Tullio Serci', cap: 60, div: 10 }, { nome: 'Rosanna Garaguso', cap: 30, div: 50 },
@@ -605,14 +606,14 @@ table.fit{min-width:0!important;width:100%!important;font-size:9.4px}table.fit.w
     SIM_RIGHE.forEach(function (rg) {
       if (rg.id === 'compensi' || rg.id === 'contributi') return;
       S.mesi.forEach(function (m, i) {
-        var imp = Math.max(0, num(S.righe[rg.id] && S.righe[rg.id][i])); if (!imp) return;   /* una stima negativa non è un incasso: vale zero */
+        var imp = rigaVal(S, rg, i, input.voci); if (!imp) return;   /* stima negativa = zero; mese 'dati in memoria' = niente stime */
         if (rg.soloCassa) { push(m + '-28', 'F24 inserito nella previsione', -imp, 'Previsione', ''); return; }
         var iva = rg.noIva ? 0 : r2(imp * num(S.iva[rg.id]) / 100), v = { descrizione: 'PREVISIONE ' + rg.nome, riferimento: '', competenza: m, data: m + '-28' };
         var e = ev(v, rg.ricavo ? imp + iva : -(imp + iva)); push(e.data, 'Previsione: ' + rg.nome + ' (' + etmC(m) + ')', e.tot, 'Previsione', '');
       });
     });
     S.mesi.forEach(function (m, i) {      // F24 su compensi: ritenute e INPS del lordo + contributi ditta, versati il 16 del mese dopo
-      var lordo = num(S.righe.compensi[i]); if (!lordo) return;
+      var lordo = rigaVal(S, SIM_RIGHE.filter(function (x) { return x.id === 'compensi'; })[0], i, input.voci); if (!lordo) return;
       var f = lordo * (100 - num(S.nettoPerc)) / 100 + lordo * num(S.contribPerc) / 100 + num(S.righe.contributi[i]);
       push(mesePiu(m) + '-16', 'F24 su compensi ' + etmC(m) + ' (ritenute + INPS, stimato)', -f, 'Previsione', 'Stima: lordo − quota netta + contributi ditta');
     });
@@ -907,11 +908,19 @@ table.fit{min-width:0!important;width:100%!important;font-size:9.4px}table.fit.w
   }
   function num(x) { var n = parseFloat(x); return isFinite(n) ? n : 0; }
 
+  /* Mese "usa dati in memoria": niente stime (righe della Previsione e voci PREVISIONE); restano compensi, contributi, stipendi e royalty
+     finché le paghe del mese non sono caricate. Default: il mese in corso usa i dati in memoria, gli altri mesi si scrivono a mano. */
+  var PREV_AUTO_TIENI = { compensi: 1, contributi: 1, stipendi: 1, royalties: 1 };
+  function modoMese(S, m) { var p = (S && S.plModo) || {}; return p[m] || (m === new Date().toISOString().slice(0, 7) ? 'auto' : 'manuale'); }
+  function rigaVal(S, rg, i, voci) { var m = S.mesi[i], v = Math.max(0, num(S.righe[rg.id] && S.righe[rg.id][i])); if (rg.soloCassa || modoMese(S, m) !== 'auto') return v;
+    if (!PREV_AUTO_TIENI[rg.id]) return 0;
+    var reg = (voci || []).some(function (x) { return !x.eliminata && x.categoria === rg.cat && String(x.competenza).slice(0, 7) === m && !/^\s*PREVISIONE/i.test(String(x.descrizione || '')); });
+    return reg ? 0 : v; }
   function simula(input, simIn) {
     var S = simNorm(simIn), voci = (input.voci || []).slice(), cassa = { incassi: 0, pagamenti: 0 };
     SIM_RIGHE.forEach(function (rg) {
       S.mesi.forEach(function (m, i) {
-        var imp = Math.max(0, num(S.righe[rg.id][i])); if (!imp) return;   /* stima negativa = zero (il registrato non si cancella con una stima) */
+        var imp = rigaVal(S, rg, i, input.voci); if (!imp) return;   /* stima negativa = zero; nei mesi 'dati in memoria' solo compensi e simili non ancora caricati */
         var iva = rg.noIva ? 0 : r2(imp * num(S.iva[rg.id]) / 100), data = m + '-28';
         if (rg.soloCassa) { cassa.pagamenti += imp; return; }
         voci.push({ id: 'sim-' + rg.id + '-' + m, categoria: rg.cat, data: data, competenza: m, descrizione: 'SIMULAZIONE ' + rg.nome, imponibile: imp, iva: iva, detraibile: true, simulata: true });
@@ -1043,7 +1052,7 @@ table.fit{min-width:0!important;width:100%!important;font-size:9.4px}table.fit.w
       acc25: r2(acc25), impostePatrimoniali: r2(T.imposte), caricoFiscale: r2(T.imposte + totRit), avvisi: avv };
   }
 
-  var api = { budgetCalc: budgetCalc, budgetSim: budgetSim, budgetNorm: budgetNorm, BUD_RIC: BUD_RIC, BUD_COS: BUD_COS, SCENARIO: SCENARIO, CATEGORIE: CATEGORIE, PARAMS_DEFAULT: PARAMS_DEFAULT, calcola: calcola, simula: simula, dividendi: dividendi, SIM_RIGHE: SIM_RIGHE, SIM_DEFAULT: SIM_DEFAULT, simNorm: simNorm, cassaPiano: cassaPiano, cassaDefault: cassaDefault, cfCalc: cfCalc, cfDefault: cfDefault, cfNorm: cfNorm, strategia: strategia, strategiaProponi: strategiaProponi, compDiv: compDiv, confrontoAz: confrontoAz, strategiaNorm: strategiaNorm, stPersona: stPersona, stLordoDaNetto: stLordoDaNetto, stFattoreRavv: stFattoreRavv, statoPatrimoniale: statoPatrimoniale, daDashboard: daDashboard, elencoMesi: elencoMesi, r2: r2 };
+  var api = { modoMese: modoMese, rigaVal: rigaVal, budgetCalc: budgetCalc, budgetSim: budgetSim, budgetNorm: budgetNorm, BUD_RIC: BUD_RIC, BUD_COS: BUD_COS, SCENARIO: SCENARIO, CATEGORIE: CATEGORIE, PARAMS_DEFAULT: PARAMS_DEFAULT, calcola: calcola, simula: simula, dividendi: dividendi, SIM_RIGHE: SIM_RIGHE, SIM_DEFAULT: SIM_DEFAULT, simNorm: simNorm, cassaPiano: cassaPiano, cassaDefault: cassaDefault, cfCalc: cfCalc, cfDefault: cfDefault, cfNorm: cfNorm, strategia: strategia, strategiaProponi: strategiaProponi, compDiv: compDiv, confrontoAz: confrontoAz, strategiaNorm: strategiaNorm, stPersona: stPersona, stLordoDaNetto: stLordoDaNetto, stFattoreRavv: stFattoreRavv, statoPatrimoniale: statoPatrimoniale, daDashboard: daDashboard, elencoMesi: elencoMesi, r2: r2 };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.Engine = api;
 })(typeof window !== 'undefined' ? window : this);
 
@@ -1111,7 +1120,8 @@ function params(){ var c=S.config||{}; return {inizio:c.inizio||'2026-01',mesi:+
   ivaPeriodo:c.ivaPeriodo||'mensile',includeAcquistiSrl:String(c.includeAcquistiSrl)==='true',includeDashboard:String(c.includeDashboard)!=='false',includeRimanenze:String(c.includeRimanenze)!=='false'}; }
 /* Voci "PROVVISORIA" (es. fattura di competenza dell'anno precedente registrata dallo studio nell'anno): si includono o escludono da tutti i calcoli con un solo interruttore */
 function provvisorie(){ return (S.voci||[]).filter(function(v){ return !v.eliminata&&/^\s*PROVVISORI/i.test(String(v.descrizione||'')); }); }
-function vociCalc(){ if(simS().includiProvvisorie!==false) return S.voci||[]; return (S.voci||[]).filter(function(v){ return !/^\s*PROVVISORI/i.test(String(v.descrizione||'')); }); }
+function vociCalc(){ var sm=simS(), L=S.voci||[]; if(sm.includiProvvisorie===false) L=L.filter(function(v){ return !/^\s*PROVVISORI/i.test(String(v.descrizione||'')); });
+  return L.filter(function(v){ return !(/^\s*PREVISIONE/i.test(String(v.descrizione||''))&&E.modoMese(sm,String(v.competenza).slice(0,7))==='auto'); }); }   /* mese 'dati in memoria': le voci PREVISIONE non contano */
 function provvHtml(){ var P=provvisorie(); if(!P.length) return ''; var on=simS().includiProvvisorie!==false, tot=P.reduce(function(a,v){ return a+(+v.imponibile||0); },0), tip=P.map(function(v){ return String(v.descrizione||'').slice(0,110)+' – '+eur(+v.imponibile||0)+' €'; }).join('\n');
   return '<label class="norep" title="'+esc(tip)+'" style="display:inline-flex;align-items:center;gap:6px;margin:0 12px 0 0;font-size:13px;cursor:pointer;color:'+(on?'inherit':'var(--wa)')+'"><input type="checkbox" id="provv"'+(on?' checked':'')+' style="width:auto;margin:0"> Includi voci provvisorie ('+P.length+': '+eur(tot)+' €)</label>'; }
 function provvNota(){ var P=provvisorie(); if(!P.length) return ''; var on=simS().includiProvvisorie!==false; return ' · voci provvisorie '+(on?'INCLUSE':'ESCLUSE')+' ('+P.map(function(v){ return String(v.descrizione||'').replace(/^\s*PROVVISORIA\s*-\s*/i,'').slice(0,45)+' '+eur(+v.imponibile||0)+' €'; }).join('; ')+')'; }
@@ -1153,7 +1163,7 @@ function grafico(r){ var svg=document.getElementById('gr'); if(!svg) return;
   svg.setAttribute('viewBox','0 0 '+W+' '+H); svg.innerHTML=h; }
 var PLRO=false;
 function plRiga(id){ return E.SIM_RIGHE.filter(function(x){return x.cat===id&&!x.soloCassa;})[0]||null; }
-function plEdit(mese){ return !PLRO&&S.plPrev!==false&&simS().mesi.indexOf(mese)>=0; }
+function plEdit(mese){ return !PLRO&&S.plPrev!==false&&simS().mesi.indexOf(mese)>=0&&E.modoMese(simS(),mese)!=='auto'; }
 function plVal(m,id){ return id==='interessi_attivi'?(m.interessi||0):((m.cat||{})[id]||0); }
 function eurIn(x){ return (Math.round(x*100)/100).toFixed(2).replace('.',','); }
 function plParse(t){ t=String(t).replace(/\s/g,''); if(t==='') return 0; if(t.indexOf(',')>=0) t=t.replace(/\./g,'').replace(',','.'); var n=parseFloat(t); return isFinite(n)?n:null; }
@@ -1168,8 +1178,14 @@ function plSet(id,mese,txt){ var rg=plRiga(id), s=simS(), i=s.mesi.indexOf(mese)
 var plTimer,plRT;
 function plSalva(){ clearTimeout(plTimer); plTimer=setTimeout(async function(){ var m=document.getElementById('plmsg'); try{ S.config=await call('apiSalvaConfig',{sim:JSON.stringify(simS())}); m=document.getElementById('plmsg'); if(m){ m.textContent='Previsione salvata'; m.className='ok'; } }catch(e){ m=document.getElementById('plmsg'); if(m){ m.textContent='Salvataggio non riuscito: '+e.message; m.className='ko'; } } },700); }
 function plRender(){ var a=document.activeElement, k=a&&a.dataset&&a.dataset.pl; render(); if(k){ var el=document.querySelector('[data-pl="'+k+'"]'); if(el){ el.focus(); if(el.select) el.select(); } } }
+/* scelta per mese: "Usa dati in memoria" (voci caricate + consolle TS/PS, niente stime) o "Scrivi tu i dati" (Previsione modificabile) */
+function plModi(){ var sm=simS(), oggi=new Date().toISOString().slice(0,7);
+  return '<div class="card norep"><b>Come si alimentano i mesi della previsione</b><div style="display:flex;gap:18px;flex-wrap:wrap;margin-top:6px">'+(sm.mesi||[]).map(function(m){ var md=E.modoMese(sm,m);
+    return '<div><div class="note" style="margin-bottom:3px;text-transform:capitalize">'+etm(m)+(m===oggi?' (mese in corso)':'')+'</div><div style="display:inline-flex;border-radius:10px;overflow:hidden;border:1px solid #c9b8e0">'
+      +'<button class="'+(md==='auto'?'p':'l')+'" data-a="plmodo" data-id="'+m+'|auto" style="border-radius:0;margin:0">Usa dati in memoria</button><button class="'+(md!=='auto'?'p':'l')+'" data-a="plmodo" data-id="'+m+'|manuale" style="border-radius:0;margin:0">Scrivi tu i dati</button></div></div>'; }).join('')+'</div>'
+    +'<div class="note" style="margin-top:6px"><b>Usa dati in memoria</b>: il mese è fatto solo di dati veri, cioè le voci caricate (fatture, prima nota, corrispettivi, paghe) e i dati della consolle TS/PS (fatture e chiusure con Paysolution); si aggiorna da solo a ogni caricamento. Le stime (righe della Previsione e voci "PREVISIONE") non contano; compensi e contributi restano quelli previsti finché non carichi le paghe del mese. <b>Scrivi tu i dati</b>: il mese si compila a mano nelle celle tratteggiate.</div></div>'; }
 function plBanner(r){ var b=S.__reg.totali, t=r.totali, on=S.plPrev!==false;
-  return '<div class="card"><div class="bar" style="margin:0"><span class="note">'+(on?'<b>Novembre e dicembre sono modificabili</b>: nelle celle tratteggiate scrivi l\'importo atteso del mese (IVA esclusa): i ricavi in questa tabella, i costi nelle righe dello stesso schema. La differenza rispetto a quanto è già registrato diventa la previsione. Compensi: inserisci il lordo; i contributi della società si aggiungono in automatico. Previsione inclusa: ricavi '+eur(t.ricavi-b.ricavi)+' € · costi '+eur(t.costi-b.costi)+' €. ':'Stai vedendo solo i dati registrati. ')+'<span id="plmsg"></span></span><button class="l" data-a="plprev">'+(on?'Mostra solo il registrato':'Includi la previsione nov-dic')+'</button></div></div>'; }
+  return plModi()+'<div class="card"><div class="bar" style="margin:0"><span class="note">'+(on?'<b>I mesi "Scrivi tu i dati" sono modificabili</b>: nelle celle tratteggiate scrivi l\'importo atteso del mese (IVA esclusa): i ricavi in questa tabella, i costi nelle righe dello stesso schema. La differenza rispetto a quanto è già registrato diventa la previsione. Compensi: inserisci il lordo; i contributi della società si aggiungono in automatico. Previsione inclusa: ricavi '+eur(t.ricavi-b.ricavi)+' € · costi '+eur(t.costi-b.costi)+' €. ':'Stai vedendo solo i dati registrati. ')+'<span id="plmsg"></span></span><button class="l" data-a="plprev">'+(on?'Mostra solo il registrato':'Includi la previsione nov-dic')+'</button></div></div>'; }
 function tab(head,rows,lab){ return '<div class="card tw"><table class="fit"><thead><tr><th style="text-align:left">'+(lab||'€ · IVA ESCLUSA')+'</th>'+head.map(function(h){return '<th>'+h+'</th>';}).join('')+'</tr></thead><tbody>'+rows.join('')+'</tbody></table></div>'; }
 function rowM(l,r,f,o){ o=o||{}; return '<tr class="'+(o.t?'t':'')+(o.s?' s':'')+'"><td>'+l+'</td>'+r.mesi.map(function(m){var x=f(m);return '<td class="'+(o.c?cls(x):'')+'">'+eur(x)+'</td>';}).join('')+'<td class="'+(o.c?cls(o.tot):'')+'">'+eur(o.tot)+'</td></tr>'; }
 var pct=function(x,tot){ return tot>0.004 ? IT.format(Math.round(x/tot*1000)/10)+' %' : '–'; };
@@ -2070,6 +2086,7 @@ async function azione(a,id){
     else if(a==='salvaparam'){ S.config=await call('apiSalvaConfig',{inizio:val('p_inizio'),mesi:val('p_mesi'),ires:val('p_ires'),irap:val('p_irap'),ivaPeriodo:val('p_ivaPeriodo'),includeAcquistiSrl:val('p_inc'),includeDashboard:val('p_dash'),includeRimanenze:val('p_rim')}); msg('Parametri salvati'); render(); }
     else if(a==='login'){ var rr=await call('apiLogin',val('l_u'),val('l_p')); TOKEN=rr.token; try{sessionStorage.setItem('bsrl_t',TOKEN);}catch(e){} await avvia(); }
     else if(a==='logout'){ try{await call('apiLogout');}catch(e){} esci(); }
+    else if(a==='plmodo'){ var q=String(id).split('|'), sm=simS(); if(!sm.plModo||typeof sm.plModo!=='object') sm.plModo={}; sm.plModo[q[0]]=q[1]; render(); S.config=await call('apiSalvaConfig',{sim:JSON.stringify(sm)}); }
     else if(a==='plprev'){ S.plPrev=(S.plPrev===false); render(); }
     else if(a==='simzero'){ var z=simS(); Object.keys(z.righe).forEach(function(k){ z.righe[k]=z.righe[k].map(function(){return 0;}); }); render(); msg('Previsione azzerata: premi "Salva previsione" per conservarla'); }
     else if(a==='budprefill'){ var bb=budS(), cc=budCtx(), rf={}; cc.o.res.mesi.forEach(function(m){ Object.keys(m.cat||{}).forEach(function(k){ rf[k]=(rf[k]||0)+m.cat[k]; }); }); E.BUD_RIC.concat(E.BUD_COS).forEach(function(r){ if(r.cat&&rf[r.cat]!==undefined){ var v=Math.round(rf[r.cat]/12*100)/100; bb.righe[r.id]=bb.righe[r.id].map(function(){return v;}); } }); budSalva(); render(); msg('Precompilato con la media mensile 2026: modifica le celle che vuoi'); }
