@@ -82,7 +82,7 @@ table.fit{min-width:0!important;width:100%!important;font-size:9.4px}table.fit.w
 .pbk{break-before:page;page-break-before:always}}
 .note{font-size:12px;color:var(--mu)}.hid{display:none}
 </style></head><body>
-<header><h1>Bilancio SRL <small>Tullio Serci S.r.l. · gestionale riservato</small></h1><small id="versione" title="Versione della consolle: se non vedi la data dell'ultimo aggiornamento, ricarica" style="opacity:.85;margin-right:10px">versione 21/11/2026 · riga affitti 2</small><small id="utente"></small><button class="l" id="exit" data-a="logout" style="color:#fff;border-color:#fff8">Esci</button></header>
+<header><h1>Bilancio SRL <small>Tullio Serci S.r.l. · gestionale riservato</small></h1><small id="versione" title="Versione della consolle: se non vedi la data dell'ultimo aggiornamento, ricarica" style="opacity:.85;margin-right:10px">versione 21/11/2026 · affitti 3</small><small id="utente"></small><button class="l" id="exit" data-a="logout" style="color:#fff;border-color:#fff8">Esci</button></header>
 <div id="demo" class="demo hid">MODALITÀ DEMO: dati sintetici salvati solo in questo browser. Nessun dato reale.</div>
 <nav id="nav"></nav>
 <main id="main"></main>
@@ -1072,7 +1072,7 @@ var API = window.BILANCIO_API || '', DEMO = !API, TOKEN = '';
 try { TOKEN = sessionStorage.getItem('bsrl_t') || ''; } catch (e) {}
 /* Il server (Apps Script) accetta solo le categorie originali. Le categorie nuove viaggiano con una categoria di base valida
    e un'etichetta [[cat:...]] nelle note; la pagina le ricompone quando legge le voci. */
-var CAT_BASE={vendite_amazon:'vendite',corrispettivi:'vendite',interessi_attivi:'vendite',f24_iva2025:'f24_ritenute',f24_acconto_iva:'f24_ritenute',f24_saldo_iva:'f24_ritenute',f24_irpef_stipendi:'f24_ritenute',f24_irpef_compensi:'f24_ritenute',f24_inps:'f24_ritenute',f24_gs_inps:'f24_ritenute',f24_altre:'f24_ritenute'};
+var CAT_BASE={affitti:'altri',vendite_amazon:'vendite',corrispettivi:'vendite',interessi_attivi:'vendite',f24_iva2025:'f24_ritenute',f24_acconto_iva:'f24_ritenute',f24_saldo_iva:'f24_ritenute',f24_irpef_stipendi:'f24_ritenute',f24_irpef_compensi:'f24_ritenute',f24_inps:'f24_ritenute',f24_gs_inps:'f24_ritenute',f24_altre:'f24_ritenute'};
 var TOKCAT=/\s*\[\[cat:([a-z0-9_]+)\]\]/;
 /* [[src:...]] nelle note = fonte della voce (file Sibill, prima nota, paghe, pacchetto, manuale, modificata a mano) */
 var TOKSRC=/\s*\[\[src:([a-z0-9_-]+)\]\]/, TOKMOV=/\s*\[\[mov:([^\]]*)\]\]/;   /* mov = movimenti della prima nota dentro una voce raggruppata: data|importo;... */
