@@ -82,7 +82,7 @@ table.fit{min-width:0!important;width:100%!important;font-size:9.4px}table.fit.w
 .pbk{break-before:page;page-break-before:always}}
 .note{font-size:12px;color:var(--mu)}.hid{display:none}
 </style></head><body>
-<header><h1>Bilancio SRL <small>Tullio Serci S.r.l. · gestionale riservato</small></h1><small id="versione" title="Versione della consolle: se non vedi la data dell'ultimo aggiornamento, ricarica" style="opacity:.85;margin-right:10px">versione 21/11/2026 · consulenze</small><small id="utente"></small><button class="l" id="exit" data-a="logout" style="color:#fff;border-color:#fff8">Esci</button></header>
+<header><h1>Bilancio SRL <small>Tullio Serci S.r.l. · gestionale riservato</small></h1><small id="versione" title="Versione della consolle: se non vedi la data dell'ultimo aggiornamento, ricarica" style="opacity:.85;margin-right:10px">versione 21/11/2026 · commercialista</small><small id="utente"></small><button class="l" id="exit" data-a="logout" style="color:#fff;border-color:#fff8">Esci</button></header>
 <div id="demo" class="demo hid">MODALITÀ DEMO: dati sintetici salvati solo in questo browser. Nessun dato reale.</div>
 <nav id="nav"></nav>
 <main id="main"></main>
@@ -101,8 +101,8 @@ table.fit{min-width:0!important;width:100%!important;font-size:9.4px}table.fit.w
     { id: 'intercompany_costo', nome: 'Fatture da Paysolution (intercompany)', tipo: 'costo' },
     { id: 'trasporti', nome: 'Trasporti e spedizioni', tipo: 'costo' },
     { id: 'pubblicita', nome: 'Pubblicita', tipo: 'costo' },
-    { id: 'servizi_prof', nome: 'Commercialista e paghe', tipo: 'costo' },
-    { id: 'consulenze', nome: 'Consulenze e servizi esterni', tipo: 'costo' },
+    { id: 'servizi_prof', nome: 'Commercialista della società', tipo: 'costo' },
+    { id: 'consulenze', nome: 'Altri consulenti, paghe e servizi', tipo: 'costo' },
     { id: 'affitti', nome: 'Affitti e locazioni', tipo: 'costo' },
     { id: 'abbonamenti_utenze', nome: 'Abbonamenti, utenze, sicurezza, assicurazioni', tipo: 'costo' },
     { id: 'trasferte_welfare', nome: 'Trasferte, welfare e rappresentanza', tipo: 'costo' },
@@ -380,7 +380,7 @@ table.fit{min-width:0!important;width:100%!important;font-size:9.4px}table.fit.w
     { id: 'stipendi', gruppo: 'COSTI', nome: 'Stipendi', cat: 'stipendi', noIva: true },
     { id: 'royalties', gruppo: 'COSTI', nome: 'Royalties (a Tullio Serci)', cat: 'royalties', noIva: true },
     { id: 'paysCosto', gruppo: 'COSTI', nome: 'Fatture da Paysolution', cat: 'intercompany_costo' },
-    { id: 'acqServizi', gruppo: 'COSTI', nome: 'Commercialista e paghe (stime per consulenze comprese)', cat: 'servizi_prof' },
+    { id: 'acqServizi', gruppo: 'COSTI', nome: 'Commercialista della società (stime per gli altri consulenti comprese)', cat: 'servizi_prof' },
     { id: 'collab', gruppo: 'COSTI', nome: 'Collaboratori a fattura (es. Matteo), senza IVA', cat: 'servizi_prof', noIva: true },
     { id: 'acqMateriali', gruppo: 'COSTI', nome: 'Acquisti materiali e merci', cat: 'acquisti_materiali' },
     { id: 'pubblicita', gruppo: 'COSTI', nome: 'Pubblicita', cat: 'pubblicita' },
@@ -2766,7 +2766,9 @@ function agCol(t,r,n){ return t.h[n]===undefined?'':r[t.h[n]]; }
 /* Riclassifica: se in Sibill hai cambiato la categoria di una spesa già registrata, propone lo stesso cambio nella consolle (solo tra le categorie di costo "normali") */
 var AG_RICL={}; Object.keys(AG_CAT).forEach(function(k){ AG_RICL[AG_CAT[k]]=1; });
 /* categoria di costo da Sibill + controparte: gli studi (commercialista, paghe, consulente del lavoro) vanno in 'Commercialista e paghe' anche se Sibill li chiama servizi */
-function agCatCosto(catS,cp){ var c=AG_CAT[catS]; if(c==='consulenze'&&/\bSTUDIO\b|PAGHE|CONSULENT[EI] DEL LAVORO|COMMERCIALIST|ELABORAZIONE DATI/i.test(String(cp||''))) return 'servizi_prof'; return c; }
+function agCatCosto(catS,cp){ var c=AG_CAT[catS]; if(c!=='servizi_prof'&&c!=='consulenze') return c; var x=String(cp||'').toUpperCase(), n=String((simS()||{}).commNome||'').trim().toUpperCase();
+  if(n) return x.indexOf(n)>=0?'servizi_prof':'consulenze';   /* nome del commercialista della società (impostazioni): solo lui nella riga del commercialista */
+  return c==='consulenze'&&/\bSTUDIO\b|PAGHE|CONSULENT[EI] DEL LAVORO|COMMERCIALIST|ELABORAZIONE DATI/.test(x)?'servizi_prof':c; }
 function agRiclassifica(v,catS,fonte,fino){ if(!v||v.eliminata||agTipo(v)!=='costo'||/riclassificata/.test(String(v.note||''))) return null;   /* già riclassificata: vale l'ultima scelta confermata */ var nc=agCatCosto(catS,v.descrizione); if(!nc||nc===v.categoria||!AG_RICL[v.categoria]) return null;
   var nv=Object.assign({},v,{categoria:nc,note:(String(v.note||'').replace(/\s*· riclassificata.*$/,'')+' · riclassificata da '+catNome(v.categoria)+' a '+catNome(nc)+' come in Sibill ('+fonte+', '+agFmt(agOggi())+')').trim()});
   return {sel:!fino||String(v.data).slice(0,10)>fino,esito:'riclassifica',ex:v,v:nv,nota:catNome(v.categoria)+' → '+catNome(nc)+' (in Sibill: '+catS.toLowerCase()+')'}; }
@@ -2909,7 +2911,7 @@ function agPrimaNota(t){ var st=agStato(), fino=st.pnRegistrataFino||'2026-10-31
     /* fattura già registrata per questo pagamento: stesso totale, data entro 45 giorni prima o dopo; si sceglie la più vicina e non si riusa */
     var f=null, fd=1e9; vv.forEach(function(v){ if(usateF[v.id]) return; var tot=(+v.imponibile||0)+(+v.iva||0), dd=Math.abs(Date.parse(String(v.data).slice(0,10))-Date.parse(d))/864e5; if(Math.abs(tot-imp)<0.011&&dd<=45&&dd<fd&&/fonte: (Sibill )?documenti/i.test(String(v.note||''))){ f=v; fd=dd; } });
     if(f){ usateF[f.id]=1; abb++; return; }
-    m.g='spa'; m.c=AG_CAT[cat]; mov.push(m); });
+    m.g='spa'; m.c=agCatCosto(cat,desc+' '+agCol(t,r,'Controparte')); mov.push(m); });
   var gr={}; mov.forEach(function(m){ var mm=m.d.slice(0,7), k=m.g==='comm'?'PN-'+m.cat+'-'+mm:'SPA-'+mm+'-'+m.c; if(!gr[k]) gr[k]={k:k,m:mm,g:m.g,cat:m.cat,c:m.c||'oneri_bancari',imp:0,mov:[]}; gr[k].imp+=m.imp; gr[k].mov.push(m); });
   var esist={}; (S.voci||[]).forEach(function(v){ if(!v.eliminata&&v.riferimento) esist[String(v.riferimento)]=v; });
   /* data = ultimo movimento del gruppo (non fine mese): sono spese già uscite dalla banca, la cassa non deve contarle di nuovo dopo il saldo */
