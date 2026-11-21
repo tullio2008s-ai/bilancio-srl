@@ -82,7 +82,7 @@ table.fit{min-width:0!important;width:100%!important;font-size:9.4px}table.fit.w
 .pbk{break-before:page;page-break-before:always}}
 .note{font-size:12px;color:var(--mu)}.hid{display:none}
 </style></head><body>
-<header><h1>Bilancio SRL <small>Tullio Serci S.r.l. · gestionale riservato</small></h1><small id="versione" title="Versione della consolle: se non vedi la data dell'ultimo aggiornamento, ricarica" style="opacity:.85;margin-right:10px">versione 21/11/2026 · correzioni</small><small id="utente"></small><button class="l" id="exit" data-a="logout" style="color:#fff;border-color:#fff8">Esci</button></header>
+<header><h1>Bilancio SRL <small>Tullio Serci S.r.l. · gestionale riservato</small></h1><small id="versione" title="Versione della consolle: se non vedi la data dell'ultimo aggiornamento, ricarica" style="opacity:.85;margin-right:10px">versione 21/11/2026 · import sicuro</small><small id="utente"></small><button class="l" id="exit" data-a="logout" style="color:#fff;border-color:#fff8">Esci</button></header>
 <div id="demo" class="demo hid">MODALITÀ DEMO: dati sintetici salvati solo in questo browser. Nessun dato reale.</div>
 <nav id="nav"></nav>
 <main id="main"></main>
@@ -2127,16 +2127,25 @@ async function importaPacchetto(o){
   var txt=(o.titolo?o.titolo+'\n\n':'')+'Voci da aggiungere: '+nuove.length+(gia?' ('+gia+' già presenti, saltate)':'')+'\n'+nuove.map(function(v){ return '+ '+String(v.descrizione||'').slice(0,70)+' – '+dett(v); }).join('\n')+(righe.length?'\n\n'+righe.join('\n'):'')+'\n\nConfermi?';
   if(!confirm(txt)) { msg('Aggiornamento annullato: nessuna modifica'); return; }
   var out=[];
-  if(nuove.length){ var n=await call('apiImportaVoci',nuove.map(function(v){ return voceVersoServer(Object.assign({src:'pacchetto'},v)); })); out.push(typeof n==='object'?(n.importate+' voci aggiunte, '+n.saltate+' già presenti'):(n+' voci aggiunte')); }
-  for(var i=0;i<mods.length;i++){ var v=mods[i].v, c=mods[i].c, nv={id:v.id,categoria:v.categoria,data:v.data,competenza:v.competenza,imponibile:+v.imponibile,iva:+v.iva||0,detraibile:!!v.detraibile,descrizione:v.descrizione||'',riferimento:v.riferimento||'',note:v.note||''};
-    if(v.src) nv.src=v.src; Object.keys(c).forEach(function(k){ nv[k]=c[k]; }); await call('apiSalvaVoce',voceVersoServer(nv)); }
-  if(mods.length) out.push(mods.length+' voci modificate');
-  for(var de=0;de<daEl.length;de++) await call('apiEliminaVoce',daEl[de].id,false); if(daEl.length) out.push(daEl.length+' voci eliminate');
+  /* ordine: impostazioni e voci nuove, poi eliminazioni, poi modifiche; avanzamento sempre visibile; un errore non ferma il resto */
+  var errori=[], fatte=0, totOp=(nuove.length?1:0)+daEl.length+mods.length+1;
+  var bar=document.getElementById('pkbar'); if(!bar){ bar=document.createElement('div'); bar.id='pkbar'; bar.style.cssText='position:fixed;left:50%;top:12px;transform:translateX(-50%);z-index:9999;background:#4a148c;color:#fff;padding:10px 18px;border-radius:12px;box-shadow:0 6px 20px rgba(0,0,0,.3);font:600 14px system-ui;max-width:90vw'; document.body.appendChild(bar); }
+  var avanza=function(t){ fatte++; bar.textContent='Aggiornamento in corso: '+Math.min(fatte,totOp)+' di '+totOp+' – '+t+'. NON chiudere e NON ricaricare la pagina.'; };
+  var prova=async function(t,f){ try{ await f(); }catch(err){ errori.push(t+': '+(err&&err.message||err)); } avanza(t); };
   var simCambia=false; if(sp.laserAttiva!==undefined&&!!sp.laserAttiva!==!!sm.laser.attiva){ sm.laser.attiva=!!sp.laserAttiva; simCambia=true; }
   opsOk.forEach(function(op){ if(op.op==='imposta'){ simPath(op.percorso,JSON.parse(JSON.stringify(op.valore))); } else if(op.op==='aggiungi'){ prendi(op.lista).push(JSON.parse(JSON.stringify(op.voce))); } else if(op.op==='modifica'){ Object.keys(op.campi||{}).forEach(function(k){ op._h[k]=op.campi[k]; }); } simCambia=true; });
   if(togli.length){ sm.prelievi=sm.prelievi.filter(function(p){ return !togli.some(function(r){ return p.data===r.data&&Math.abs(nn(p.lordo)-nn(r.lordo))<0.01; }); }); simCambia=true; }
-  if(simCambia){ S.config=await call('apiSalvaConfig',{sim:JSON.stringify(sm)}); out.push('impostazioni salvate'); }
-  await ricarica(); render(); msg('Aggiornamento applicato: '+(out.join('; ')||'nessuna modifica necessaria'));
+  await prova('impostazioni',async function(){ if(simCambia){ S.config=await call('apiSalvaConfig',{sim:JSON.stringify(sm)}); out.push('impostazioni salvate'); } });
+  if(nuove.length) await prova('voci nuove',async function(){ var n=await call('apiImportaVoci',nuove.map(function(v){ return voceVersoServer(Object.assign({src:'pacchetto'},v)); })); out.push(typeof n==='object'?(n.importate+' voci aggiunte, '+n.saltate+' già presenti'):(n+' voci aggiunte')); });
+  var nEl=0; for(var de=0;de<daEl.length;de++){ (function(v){ })(daEl[de]); await prova('eliminazione '+String(daEl[de].descrizione||'').slice(0,30),(function(v){ return async function(){ await call('apiEliminaVoce',v.id,false); nEl++; }; })(daEl[de])); }
+  if(daEl.length) out.push(nEl+' voci eliminate');
+  var nMod=0; for(var i=0;i<mods.length;i++){ await prova('modifica '+String(mods[i].v.riferimento||mods[i].v.descrizione||'').slice(0,30),(function(m){ return async function(){ var v=m.v, c=m.c, nv={id:v.id,categoria:v.categoria,data:v.data,competenza:v.competenza,imponibile:+v.imponibile,iva:+v.iva||0,detraibile:!!v.detraibile,descrizione:v.descrizione||'',riferimento:v.riferimento||'',note:v.note||''};
+    if(v.src) nv.src=v.src; Object.keys(c).forEach(function(k){ nv[k]=c[k]; }); await call('apiSalvaVoce',voceVersoServer(nv)); nMod++; }; })(mods[i])); }
+  if(mods.length) out.push(nMod+' voci modificate');
+  bar.remove();
+  if(!errori.length) alert('Aggiornamento completato: '+(out.join('; ')||'nessuna modifica necessaria')+'.');
+  if(errori.length) alert('Aggiornamento completato con '+errori.length+' errori (le altre operazioni sono state fatte; puoi reimportare lo stesso file: quello che è già a posto viene saltato):\n'+errori.slice(0,10).join('\n'));
+  await ricarica(); render(); msg('Aggiornamento applicato: '+(out.join('; ')||'nessuna modifica necessaria')+(errori.length?' – '+errori.length+' errori':''));
 }
 async function ricarica(){ var st=await call('apiStato'); S.voci=(st.voci||[]).map(voceDaServer); S.config=st.config||{}; document.getElementById('utente').textContent=st.utente||''; if(S.tab==='storico') S.storico=await call('apiStorico'); render(); }
 document.addEventListener('click',function(e){ var t=e.target.closest('[data-t]'); if(t){ S.tab=t.dataset.t; if(S.tab==='storico') call('apiStorico').then(function(x){S.storico=x;render();}); else render(); return; }
