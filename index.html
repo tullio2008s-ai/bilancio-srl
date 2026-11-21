@@ -2707,6 +2707,8 @@ function agCorr(t){ var I=agIndice(), righe=[], gia=0, ult='', vecchie=0, anno0=
     if(d>ult) ult=d;
     var desc=(rimb?'Rimborso corrispettivo ':'Corrispettivo ')+(canale!=='Vendita'?canale+' ':'')+(ric||('n. '+n))+(cliente?' - '+cliente.trim():'');
     righe.push({sel:esito==='nuova',esito:esito,ex:ex,nota:nt,v:{categoria:'vendite',data:d,competenza:comp,descrizione:desc,imponibile:Math.round(imp*100)/100,iva:Math.round(iva*100)/100,detraibile:true,riferimento:'CORRAdE-'+(n||d)+'-'+d.slice(0,4),note:'fonte: corrispettivi (export Agenzia Entrate), caricati il '+agFmt(agOggi())+(ric?', ricevuta '+ric:'')+(ord?', ordine '+ord:'')}}); });
+  /* stessa ricevuta o stesso ordine con lo stesso importo ripetuti nello stesso file: probabile doppione */
+  var vistiC={}; righe.forEach(function(r){ var m=/ricevuta (\S+)|ordine (\S+)/.exec(String(r.v.note||'')); if(!m) return; var k=(m[1]||m[2])+'|'+r.v.imponibile; if(r.esito==='nuova'&&vistiC[k]){ r.esito='doppione'; r.sel=false; r.nota='Stessa ricevuta o stesso ordine e stesso importo di un\'altra riga nello stesso file: probabile doppione (spunta tolta).'; } else vistiC[k]=1; });
   righe=righe.filter(function(x){ return x.esito!=='uguale'; });
   return {tipo:'corr',righe:righe,gia:gia,fino:ult,vecchie:vecchie}; }
 
@@ -2763,6 +2765,8 @@ function agFatture(t){ var I=agIndice(), usate={}, da=new Date(Date.now()-75*864
     var desc=x.em?((nc?'Nota di credito ':'Fattura ')+x.num+' - '+cp+(cat==='servizi'?' (competenza '+comp+')':'')):(cp+' - '+(catS||x.td)+(causale&&catS===''?' '+causale.slice(0,40):''));
     righe.push({sel:sel,esito:esito,ex:sost,nota:nota,num:x.num,cp:cp,catS:catS,v:{categoria:cat,data:x.d,competenza:comp,descrizione:desc,imponibile:imp,iva:iva,detraibile:true,riferimento:x.num,
       note:'fonte: Sibill documenti '+(x.em?'emessi':'ricevuti')+(auto?' (reverse charge, IVA neutra)':'')+(/^(PAGATO|INCASSATO)$/i.test(String(agCol(t,r,'Stato fattura')).trim())?', già '+(x.em?'incassata':'pagata')+' in Sibill':'')+', caricati il '+agFmt(agOggi())}}); });
+  /* stesso numero e stesso importo ripetuti nello stesso file: probabile doppione, tolto di default */
+  var vistiF={}; righe.forEach(function(r){ var k=agNorm(r.num)+'|'+r.v.categoria+'|'+r.v.imponibile; if(r.esito==='nuova'&&vistiF[k]){ r.esito='doppione'; r.sel=false; r.nota='Stesso numero e stesso importo di un\'altra riga nello stesso file: probabile doppione (spunta tolta).'; } else vistiF[k]=1; });
   var ult=docs.length?docs[docs.length-1].d:'', mesi={}; righe.forEach(function(r){ if(r.sel) mesi[r.v.competenza]=1; });
   var prev=I.voci.filter(function(v){ return !v.eliminata&&!usate[v.id]&&mesi[String(v.competenza).slice(0,7)]&&/^PREVISIONE/i.test(String(v.descrizione||''))&&agTipo(v)==='costo'; });
   righe=righe.concat(ricl);
