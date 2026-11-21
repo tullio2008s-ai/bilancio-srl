@@ -82,7 +82,7 @@ table.fit{min-width:0!important;width:100%!important;font-size:9.4px}table.fit.w
 .pbk{break-before:page;page-break-before:always}}
 .note{font-size:12px;color:var(--mu)}.hid{display:none}
 </style></head><body>
-<header><h1>Bilancio SRL <small>Tullio Serci S.r.l. · gestionale riservato</small></h1><small id="versione" title="Versione della consolle: se non vedi la data dell'ultimo aggiornamento, ricarica" style="opacity:.85;margin-right:10px">versione 21/11/2026 · mese in corso</small><small id="utente"></small><button class="l" id="exit" data-a="logout" style="color:#fff;border-color:#fff8">Esci</button></header>
+<header><h1>Bilancio SRL <small>Tullio Serci S.r.l. · gestionale riservato</small></h1><small id="versione" title="Versione della consolle: se non vedi la data dell'ultimo aggiornamento, ricarica" style="opacity:.85;margin-right:10px">versione 21/11/2026 · prima nota fa fede</small><small id="utente"></small><button class="l" id="exit" data-a="logout" style="color:#fff;border-color:#fff8">Esci</button></header>
 <div id="demo" class="demo hid">MODALITÀ DEMO: dati sintetici salvati solo in questo browser. Nessun dato reale.</div>
 <nav id="nav"></nav>
 <main id="main"></main>
@@ -1074,10 +1074,11 @@ try { TOKEN = sessionStorage.getItem('bsrl_t') || ''; } catch (e) {}
 var CAT_BASE={vendite_amazon:'vendite',corrispettivi:'vendite',interessi_attivi:'vendite',f24_iva2025:'f24_ritenute',f24_acconto_iva:'f24_ritenute',f24_saldo_iva:'f24_ritenute',f24_irpef_stipendi:'f24_ritenute',f24_irpef_compensi:'f24_ritenute',f24_inps:'f24_ritenute',f24_gs_inps:'f24_ritenute',f24_altre:'f24_ritenute'};
 var TOKCAT=/\s*\[\[cat:([a-z0-9_]+)\]\]/;
 /* [[src:...]] nelle note = fonte della voce (file Sibill, prima nota, paghe, pacchetto, manuale, modificata a mano) */
-var TOKSRC=/\s*\[\[src:([a-z0-9_-]+)\]\]/;
+var TOKSRC=/\s*\[\[src:([a-z0-9_-]+)\]\]/, TOKMOV=/\s*\[\[mov:([^\]]*)\]\]/;   /* mov = movimenti della prima nota dentro una voce raggruppata: data|importo;... */
 function voceDaServer(v){ var m=TOKCAT.exec(String(v.note||'')); if(m&&CAT_BASE[m[1]]){ v=Object.assign({},v); v.categoria=m[1]; v.note=String(v.note||'').replace(TOKCAT,''); }
-  var q=TOKSRC.exec(String(v.note||'')); if(q){ v=Object.assign({},v); v.src=q[1]; v.note=String(v.note||'').replace(TOKSRC,''); } return v; }
-function voceVersoServer(v){ v=Object.assign({},v); var n=String(v.note||'').replace(TOKCAT,'').replace(TOKSRC,''); if(v.src) n=(n+' [[src:'+v.src+']]').trim(); v.note=n; delete v.src;
+  var q=TOKSRC.exec(String(v.note||'')); if(q){ v=Object.assign({},v); v.src=q[1]; v.note=String(v.note||'').replace(TOKSRC,''); }
+  var mv=TOKMOV.exec(String(v.note||'')); if(mv){ v=Object.assign({},v); v.mov=mv[1].split(';').filter(Boolean).map(function(z){ var a=z.split('|'); return {d:a[0],i:+a[1]||0}; }); v.note=String(v.note||'').replace(TOKMOV,''); } return v; }
+function voceVersoServer(v){ v=Object.assign({},v); var n=String(v.note||'').replace(TOKCAT,'').replace(TOKSRC,'').replace(TOKMOV,''); if(Array.isArray(v.mov)&&v.mov.length) n=(n+' [[mov:'+v.mov.map(function(m){ return m.d+'|'+(Math.round(m.i*100)/100); }).join(';')+']]').trim(); if(v.src) n=(n+' [[src:'+v.src+']]').trim(); v.note=n; delete v.src; delete v.mov;
   var b=CAT_BASE[v.categoria]; if(!b) return v; v.note=(v.note+' [[cat:'+v.categoria+']]').trim(); v.categoria=b; return v; }
 async function call(fn){
   var args = [].slice.call(arguments,1);
@@ -2065,7 +2066,7 @@ async function azione(a,id){
   try{
     if(a==='salva'){ var v={id:(S.edit&&S.edit.id)||'',categoria:val('f_categoria'),data:val('f_data'),competenza:val('f_competenza'),imponibile:+val('f_imponibile'),iva:+val('f_iva')||0,detraibile:val('f_detraibile')==='1',descrizione:val('f_descrizione'),riferimento:val('f_riferimento'),note:val('f_note')};
       if(!v.data||!v.competenza||isNaN(v.imponibile)||val('f_imponibile')===''){ msg('Compila data, competenza e imponibile',1); return; }
-      var vecchia=S.edit&&S.edit.id?S.edit:null, fv=vecchia?voceFonte(vecchia):null; v.src=!vecchia?'manuale':(fv&&fv.auto?'modificata':(vecchia.src||'manuale'));
+      var vecchia=S.edit&&S.edit.id?S.edit:null, fv=vecchia?voceFonte(vecchia):null; if(vecchia&&vecchia.mov) v.mov=vecchia.mov; v.src=!vecchia?'manuale':(fv&&fv.auto?'modificata':(vecchia.src||'manuale'));
       if(vecchia&&fv&&fv.auto&&!/modificata a mano/.test(v.note)) v.note=(v.note?v.note+' · ':'')+'modificata a mano il '+new Date().toLocaleDateString('it-IT')+' (era: '+fv.nome+')';
       await call('apiSalvaVoce',voceVersoServer(v)); S.edit=null; await ricarica(); }
     else if(/^sd[a-z]+$/.test(a)){ await sdAzione(a,id); }
@@ -2158,7 +2159,7 @@ async function importaPacchetto(o){
   var nEl=0; for(var de=0;de<daEl.length;de++){ (function(v){ })(daEl[de]); await prova('eliminazione '+String(daEl[de].descrizione||'').slice(0,30),(function(v){ return async function(){ await call('apiEliminaVoce',v.id,false); nEl++; }; })(daEl[de])); }
   if(daEl.length) out.push(nEl+' voci eliminate');
   var nMod=0; for(var i=0;i<mods.length;i++){ await prova('modifica '+String(mods[i].v.riferimento||mods[i].v.descrizione||'').slice(0,30),(function(m){ return async function(){ var v=m.v, c=m.c, nv={id:v.id,categoria:v.categoria,data:v.data,competenza:v.competenza,imponibile:+v.imponibile,iva:+v.iva||0,detraibile:!!v.detraibile,descrizione:v.descrizione||'',riferimento:v.riferimento||'',note:v.note||''};
-    if(v.src) nv.src=v.src; Object.keys(c).forEach(function(k){ nv[k]=c[k]; }); await call('apiSalvaVoce',voceVersoServer(nv)); nMod++; }; })(mods[i])); }
+    if(v.src) nv.src=v.src; if(v.mov) nv.mov=v.mov; Object.keys(c).forEach(function(k){ nv[k]=c[k]; }); await call('apiSalvaVoce',voceVersoServer(nv)); nMod++; }; })(mods[i])); }
   if(mods.length) out.push(nMod+' voci modificate');
   bar.remove();
   if(!errori.length) alert('Aggiornamento completato: '+(out.join('; ')||'nessuna modifica necessaria')+'.');
@@ -2829,11 +2830,16 @@ function agFatture(t){ var I=agIndice(), usate={}, da=new Date(Date.now()-75*864
   var vistiF={}; righe.forEach(function(r){ var k=agNorm(r.num)+'|'+r.v.categoria+'|'+r.v.imponibile; if(r.esito==='nuova'&&vistiF[k]){ r.esito='doppione'; r.sel=false; r.nota='Stesso numero e stesso importo di un\'altra riga nello stesso file: probabile doppione (spunta tolta).'; } else vistiF[k]=1; });
   var ult=docs.length?docs[docs.length-1].d:'', mesi={}; righe.forEach(function(r){ if(r.sel) mesi[r.v.competenza]=1; });
   var prev=I.voci.filter(function(v){ return !v.eliminata&&!usate[v.id]&&mesi[String(v.competenza).slice(0,7)]&&/^PREVISIONE/i.test(String(v.descrizione||''))&&agTipo(v)==='costo'; });
+  /* la prima nota fa fede: se una fattura ricevuta corrisponde a un movimento già nelle "Spese senza e-fattura", il costo passa dalla prima nota alla fattura (totale invariato) */
+  var spa=I.voci.filter(function(v){ return !v.eliminata&&/^SPA-/.test(String(v.riferimento||''))&&Array.isArray(v.mov)&&v.mov.length; }).map(function(v){ return {v:v,mov:v.mov.map(function(m){ return {d:m.d,i:m.i,usato:false}; })}; });
+  righe.forEach(function(r){ if(r.esito!=='nuova'||/^intercompany|^servizi$/.test(r.v.categoria)) return; var tot=Math.round(((+r.v.imponibile||0)+(+r.v.iva||0))*100)/100, d0=Date.parse(r.v.data); if(!(tot>0)) return;
+    var best=null, bd=1e9; for(var a=0;a<spa.length;a++){ var M=spa[a].mov; for(var b=0;b<M.length;b++){ var m=M[b], dd=Math.abs(Date.parse(m.d)-d0)/864e5; if(!m.usato&&Math.abs(m.i-tot)<0.011&&dd<=45&&dd<bd){ best={a:a,m:m}; bd=dd; } } }
+    if(best){ best.m.usato=true; r.spa={voce:spa[best.a].v,d:best.m.d,i:best.m.i}; r.nota=(r.nota?r.nota+' · ':'')+'già pagata in prima nota il '+agFmt(best.m.d)+': il costo passa dalle spese senza fattura a questa fattura (totale invariato)'; } });
   righe=righe.concat(ricl);
   return {tipo:'fatture',righe:righe,gia:gia,vecchie:vecchie,tot:docs.length,fino:ult,prevAperte:prev}; }
 
 /* ── 3. Prima nota Sibill: commissioni bancarie e spese senza fattura, raggruppate per mese ── */
-function agPrimaNota(t){ var st=agStato(), fino=st.pnRegistrataFino||'2026-10-31', conFatt=[], mov=[], scart={}, ignote=[], ult='', fatt=0, abb=0;
+function agPrimaNota(t){ var st=agStato(), fino=st.pnRegistrataFino||'2026-10-31', usateF={}, conFatt=[], mov=[], scart={}, ignote=[], ult='', fatt=0, abb=0;
   var vv=(S.voci||[]).filter(function(v){ return !v.eliminata&&agTipo(v)==='costo'; });
   t.r.forEach(function(r){ var d=agData(agCol(t,r,'Data Contabile')); if(!d) return; if(d>ult) ult=d; if(d<=fino) return;
     var cat=String(agCol(t,r,'Categoria')).trim().toUpperCase(), imp=Math.round((agNum(agCol(t,r,'Addebiti'))-agNum(agCol(t,r,'Accrediti')))*100)/100; if(!imp) return;
@@ -2844,16 +2850,20 @@ function agPrimaNota(t){ var st=agStato(), fino=st.pnRegistrataFino||'2026-10-31
     if(!cat){ ignote.push(m); return; }
     if(AG_PN_ESCL.test(cat)||!AG_CAT[cat]){ if(!AG_CAT[cat]&&!AG_PN_ESCL.test(cat)) ignote.push(m); else scart[cat]=(scart[cat]||0)+1; return; }
     // spesa già coperta da una fattura registrata (stesso importo IVA compresa, da 10 giorni prima a 45 dopo)
-    var f=vv.filter(function(v){ var tot=(+v.imponibile||0)+(+v.iva||0), dd=(Date.parse(String(v.data).slice(0,10))-Date.parse(d))/864e5; return Math.abs(tot-imp)<0.011&&dd>=-45&&dd<=10&&/fonte: (Sibill )?documenti/i.test(String(v.note||'')); })[0];
-    if(f){ abb++; return; }
+    /* fattura già registrata per questo pagamento: stesso totale, data entro 45 giorni prima o dopo; si sceglie la più vicina e non si riusa */
+    var f=null, fd=1e9; vv.forEach(function(v){ if(usateF[v.id]) return; var tot=(+v.imponibile||0)+(+v.iva||0), dd=Math.abs(Date.parse(String(v.data).slice(0,10))-Date.parse(d))/864e5; if(Math.abs(tot-imp)<0.011&&dd<=45&&dd<fd&&/fonte: (Sibill )?documenti/i.test(String(v.note||''))){ f=v; fd=dd; } });
+    if(f){ usateF[f.id]=1; abb++; return; }
     m.g='spa'; m.c=AG_CAT[cat]; mov.push(m); });
   var gr={}; mov.forEach(function(m){ var mm=m.d.slice(0,7), k=m.g==='comm'?'PN-'+m.cat+'-'+mm:'SPA-'+mm+'-'+m.c; if(!gr[k]) gr[k]={k:k,m:mm,g:m.g,cat:m.cat,c:m.c||'oneri_bancari',imp:0,mov:[]}; gr[k].imp+=m.imp; gr[k].mov.push(m); });
   var esist={}; (S.voci||[]).forEach(function(v){ if(!v.eliminata&&v.riferimento) esist[String(v.riferimento)]=v; });
   /* data = ultimo movimento del gruppo (non fine mese): sono spese già uscite dalla banca, la cassa non deve contarle di nuovo dopo il saldo */
-  var righe=Object.keys(gr).sort().map(function(k){ var g=gr[k], imp=Math.round(g.imp*100)/100, ex=esist[k], dt=g.mov.reduce(function(a,m){ return m.d>a?m.d:a; },''), esito=ex?(Math.abs((+ex.imponibile||0)-imp)<0.005&&String(ex.data).slice(0,10)===dt?'uguale':'aggiorna'):'nuova';
+  var righe=Object.keys(gr).sort().map(function(k){ var g=gr[k], imp=Math.round(g.imp*100)/100, ex=esist[k], dt=g.mov.reduce(function(a,m){ return m.d>a?m.d:a; },''), esito=ex?(Math.abs((+ex.imponibile||0)-imp)<0.005&&String(ex.data).slice(0,10)===dt&&(g.g!=='spa'||(ex.mov&&ex.mov.length===g.mov.length))?'uguale':'aggiorna'):'nuova';
     return {sel:esito!=='uguale',esito:esito,ex:ex||null,mov:g.mov,v:{categoria:g.c,data:dt,competenza:g.m,
       descrizione:g.g==='comm'?agTitolo(g.cat)+' '+g.m+' (prima nota, raggruppato)':'Spese senza e-fattura '+g.m+' ('+g.c+')',imponibile:imp,iva:0,detraibile:false,riferimento:k,
-      note:'fonte: prima nota Sibill ('+g.mov.length+' movimenti), caricata il '+agFmt(agOggi())+(g.g==='spa'?'; si ricalcola a ogni caricamento: se arriva la fattura il movimento esce da qui':'')}}; });
+      note:'fonte: prima nota Sibill ('+g.mov.length+' movimenti), caricata il '+agFmt(agOggi())+(g.g==='spa'?'; la prima nota fa fede: quando arriva la fattura il costo passa alla fattura':''),mov:g.g==='spa'?g.mov.map(function(m){ return {d:m.d,i:m.imp}; }):undefined}}; });
+  /* gruppi che non hanno più movimenti senza fattura (sono arrivate tutte le fatture): la voce va a zero */
+  Object.keys(esist).forEach(function(k){ var ex=esist[k], mm=String(ex.competenza).slice(0,7); if(!/^(SPA|PN)-/.test(k)||gr[k]||mm<=fino.slice(0,7)||mm>ult.slice(0,7)||Math.abs(+ex.imponibile||0)<0.005) return;
+    righe.push({sel:true,esito:'aggiorna',ex:ex,mov:[],nota:'nessun movimento senza fattura rimasto nella prima nota',v:{categoria:ex.categoria,data:String(ex.data).slice(0,10),competenza:mm,descrizione:ex.descrizione,imponibile:0,iva:0,detraibile:false,riferimento:k,note:'fonte: prima nota Sibill (0 movimenti), caricata il '+agFmt(agOggi()),mov:[]}}); });
   var I=agIndice(), vist={}; conFatt.forEach(function(c){ var k=agNorm(c.nf), v=((I.ref[k]||[]).concat(I.tok[k]||[])).filter(function(x){ return !x.eliminata&&agTipo(x)==='costo'; })[0]; if(!v||vist[v.id]) return; var rc=agRiclassifica(v,c.cat,'prima nota'); if(rc){ vist[v.id]=1; righe.push(rc); } });
   return {tipo:'pn',righe:righe,fino:ult,da:fino,fatt:fatt,abb:abb,scart:scart,ignote:ignote}; }
 
@@ -2933,8 +2943,11 @@ async function agApplica(){ var P=AG.prev; if(!P) return; var sel=P.righe.filter
   if(!confirm('Aggiungo '+nuove.length+' voci e ne aggiorno '+mod.length+'.'+(P.tipo==='paghe'&&P.lul.length?' Salvo i dati di '+P.lul.length+' cedolini (netto, IRPEF, imponibile da inizio anno).':'')+(extra.length?'\n\n'+extra.join('\n'):'')+'\n\nConfermi?')) return;
   var srcT={fatture:'sibill-doc',pn:'primanota',paghe:'paghe',corr:'corrispettivi'}[P.tipo]; nuove.forEach(function(v){ v.src=srcT; });
   if(nuove.length) await call('apiImportaVoci',nuove.map(voceVersoServer));
+  var spaMod={}; sel.forEach(function(r){ if(!r.spa||r.esito!=='nuova') return; var k=r.spa.voce.id; if(!spaMod[k]) spaMod[k]={v:r.spa.voce,togli:[]}; spaMod[k].togli.push(r.spa); });
+  for(var sk in spaMod){ var z=spaMod[sk], v0=z.v, movN=(v0.mov||[]).slice(); z.togli.forEach(function(t){ for(var q=0;q<movN.length;q++){ if(movN[q].d===t.d&&Math.abs(movN[q].i-t.i)<0.011){ movN.splice(q,1); return; } } });
+    var nI=Math.round(movN.reduce(function(a,m){ return a+m.i; },0)*100)/100; await call('apiSalvaVoce',voceVersoServer({id:v0.id,categoria:v0.categoria,data:v0.data,competenza:v0.competenza,imponibile:nI,iva:0,detraibile:false,descrizione:v0.descrizione||'',riferimento:v0.riferimento||'',note:v0.note||'',src:v0.src||'primanota',mov:movN})); }
   for(var i=0;i<mod.length;i++){ var r=mod[i], v=r.ex, nv={id:v.id,categoria:v.categoria,data:v.data,competenza:v.competenza,imponibile:+v.imponibile,iva:+v.iva||0,detraibile:!!v.detraibile,descrizione:v.descrizione||'',riferimento:v.riferimento||'',note:v.note||''};
-    ['categoria','data','competenza','imponibile','iva','detraibile','riferimento','note'].forEach(function(k){ nv[k]=r.v[k]; }); if(r.v.descrizione) nv.descrizione=r.v.descrizione; nv.src=r.esito==='riclassifica'?(v.src||srcT):srcT; await call('apiSalvaVoce',voceVersoServer(nv)); }
+    ['categoria','data','competenza','imponibile','iva','detraibile','riferimento','note'].forEach(function(k){ nv[k]=r.v[k]; }); if(r.v.descrizione) nv.descrizione=r.v.descrizione; if(r.v.mov) nv.mov=r.v.mov; else if(v.mov) nv.mov=v.mov; nv.src=r.esito==='riclassifica'?(v.src||srcT):srcT; await call('apiSalvaVoce',voceVersoServer(nv)); }
   if(P.tipo==='paghe'){ P.azzera.forEach(function(a){ sm.righe[a.k][a.i]=0; }); if(!sm.paghe||typeof sm.paghe!=='object') sm.paghe={};
     P.lul.forEach(function(l){ var M=l.mese; if(!sm.paghe[M]) sm.paghe[M]={}; sm.paghe[M][l.nome]={lordo:l.lordo,netto:l.netto,trattenute:l.trattenute,impMese:l.impMese,irpefMese:l.irpefMese,impAnno:l.impAnno,inps:l.inps}; });
     var ms=P.cont.map(function(x){ return x.mese; }).concat(P.lul.map(function(x){ return x.mese; })).sort(); st.paghe={il:agOggi(),fino:ms[ms.length-1]||''}; }
