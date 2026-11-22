@@ -82,7 +82,7 @@ table.fit{min-width:0!important;width:100%!important;font-size:9.4px}table.fit.w
 .pbk{break-before:page;page-break-before:always}}
 .note{font-size:12px;color:var(--mu)}.hid{display:none}
 </style></head><body>
-<header><h1>Bilancio SRL <small>Tullio Serci S.r.l. · gestionale riservato</small></h1><small id="versione" title="Versione della consolle: se non vedi la data dell'ultimo aggiornamento, ricarica" style="opacity:.85;margin-right:10px">versione 21/11/2026 · commercialista</small><small id="utente"></small><button class="l" id="exit" data-a="logout" style="color:#fff;border-color:#fff8">Esci</button></header>
+<header><h1>Bilancio SRL <small>Tullio Serci S.r.l. · gestionale riservato</small></h1><small id="versione" title="Versione della consolle: se non vedi la data dell'ultimo aggiornamento, ricarica" style="opacity:.85;margin-right:10px">versione 22/11/2026 · conti Marini</small><small id="utente"></small><button class="l" id="exit" data-a="logout" style="color:#fff;border-color:#fff8">Esci</button></header>
 <div id="demo" class="demo hid">MODALITÀ DEMO: dati sintetici salvati solo in questo browser. Nessun dato reale.</div>
 <nav id="nav"></nav>
 <main id="main"></main>
@@ -1934,8 +1934,8 @@ function mcConto(v){ var d=String(v.descrizione||'').toUpperCase(), c=v.categori
    case 'pubblicita': return t(/AMAZON EU|COMMISSION/)?'402.03070':'402.01016';
    case 'trasferte_welfare': return t(/DAY S\.?P|WELFARE|BUONI PASTO/)?'402.03041':(t(/RAPPRESENTANZA|RISTOR/)?'402.02010':'402.02009');
    case 'abbonamenti_utenze': return t(/FASTWEB|VODAFONE|TELECOM|TELEFON|HOLAFLY|\bTIM\b/)?'402.03002':(t(/GENERALI|ASSICUR|POLIZZA/)?'402.03007':(t(/VERISURE|SICUREZZA/)?'402.02013':'402.03008'));
-   case 'consulenze': return t(/RIFIUT|PILE|BATTERIE/)?'402.03020':(t(/PULIZI/)?'402.03019':'402.02013');
    case 'affitti': return t(/NOLEGG|LEASING/)?'402.02014':'403.01001';
+   case 'consulenze':   /* stessi conti del commercialista: il conto segue la natura della spesa, non la riga del P&L */
    case 'servizi_prof': return t(/ELETTROMECCANIC|AFFITT/)?'403.01001':(t(/COMMERCIALIST|FISCAL|PARCELLA/)?'402.03010':(t(/PULIZI/)?'402.03019':(t(/RIFIUT|PILE|BATTERIE/)?'402.03020':'402.02013')));
    case 'intercompany_costo': return '402.03029';
    case 'compensi_amm': return '402.03065';
