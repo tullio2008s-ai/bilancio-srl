@@ -82,7 +82,7 @@ table.fit{min-width:0!important;width:100%!important;font-size:9.4px}table.fit.w
 .pbk{break-before:page;page-break-before:always}}
 .note{font-size:12px;color:var(--mu)}.hid{display:none}
 </style></head><body>
-<header><h1>Bilancio SRL <small>Tullio Serci S.r.l. · gestionale riservato</small></h1><small id="versione" title="Versione della consolle: se non vedi la data dell'ultimo aggiornamento, ricarica" style="opacity:.85;margin-right:10px">versione 22/11/2026 · conti Marini</small><small id="utente"></small><button class="l" id="exit" data-a="logout" style="color:#fff;border-color:#fff8">Esci</button></header>
+<header><h1>Bilancio SRL <small>Tullio Serci S.r.l. · gestionale riservato</small></h1><small id="versione" title="Versione della consolle: se non vedi la data dell'ultimo aggiornamento, ricarica" style="opacity:.85;margin-right:10px">versione 22/11/2026 · dettaglio conti Marini</small><small id="utente"></small><button class="l" id="exit" data-a="logout" style="color:#fff;border-color:#fff8">Esci</button></header>
 <div id="demo" class="demo hid">MODALITÀ DEMO: dati sintetici salvati solo in questo browser. Nessun dato reale.</div>
 <nav id="nav"></nav>
 <main id="main"></main>
@@ -1959,7 +1959,7 @@ function mcCalcola(r){ var P=params(), m0=P.inizio||'2026-01', mesi=r.mesi.map(f
     var m=String(v.competenza).slice(0,7); if(m<m0||m>mSel) return;
     var imp=+v.imponibile||0, iva=+v.iva||0, val=(c.tipo==='ricavo'||c.finanziario)?imp:imp+(v.detraibile!==false?0:iva);
     var k=mcConto(v); if(!k){ k=c.tipo==='ricavo'?'501.02001':'410.09999'; nonMap.push(v.descrizione); }
-    conti[k]=(conti[k]||0)+val; (voci[k]=voci[k]||[]).push({d:v.data,c:v.competenza,desc:v.descrizione,imp:val}); });
+    conti[k]=(conti[k]||0)+val; (voci[k]=voci[k]||[]).push({d:v.data,c:v.competenza,desc:v.descrizione,ref:v.riferimento||'',imp:val}); });
   var rim=r.rimanenze||[], ini=rim.length?rim[0].saldo:0, fin=ini; rim.forEach(function(x){ if(x.m<=mSel) fin=x.saldo; });
   if(ini) conti['408.00001']=ini; if(fin) conti['508.00001']=fin;
   var tc=0,tr=0; Object.keys(conti).forEach(function(k){ if(k<'500') tc+=conti[k]; else tr+=conti[k]; });
@@ -1967,12 +1967,12 @@ function mcCalcola(r){ var P=params(), m0=P.inizio||'2026-01', mesi=r.mesi.map(f
   var ric=0; Object.keys(conti).forEach(function(k){ if(k.slice(0,3)==='501') ric+=conti[k]; });
   var mine={ricavi:ric, costi:tc-(conti['408.00001']||0), varRim:(conti['508.00001']||0)-(conti['408.00001']||0), interessi:conti['506.00001']||0, utile:tr-tc};
   return {mSel:mSel, data:mcFineMese(mSel), conti:conti, voci:voci, tc:tc, tr:tr, utile:tr-tc, q:q, mine:mine, nonMap:nonMap, mesi:mesi}; }
-function vMarini(r){ var X=mcCalcola(r), C=X.conti, eu=function(x){ return x?eur(x):''; };
+function vMarini(r){ var X=mcCalcola(r); S.__mc=X; var C=X.conti, eu=function(x){ return x?eur(x):''; };
   var lato=function(lo,hi){ var gr=Object.keys(MC).filter(function(k){ return k.length===3&&k>=lo&&k<hi; }), h='';
     gr.forEach(function(g){ var sub=Object.keys(C).filter(function(k){ return k.slice(0,3)===g&&Math.abs(C[k])>0.004; }).sort(); if(!sub.length) return;
       var tot=sub.reduce(function(a,k){return a+C[k];},0);
       h+='<tr class="mg"><td>'+g+'</td><td><b>'+esc(MC[g])+'</b></td><td><b>'+eur(tot)+'</b></td></tr>';
-      sub.forEach(function(k){ h+='<tr><td class="note">'+k+'</td><td>'+esc(MC[k]||k)+'</td><td>'+eu(C[k])+'</td></tr>'; }); });
+      sub.forEach(function(k){ h+='<tr><td class="note"><span class="mclk" data-a="mcdet" data-id="'+k+'" title="Apri le voci di questo conto">'+k+'</span></td><td><span class="mclk2" data-a="mcdet" data-id="'+k+'">'+esc(MC[k]||k)+'</span></td><td>'+eu(C[k])+'</td></tr>'; }); });
     return '<table class="mct"><thead><tr><th>Conto</th><th>Descrizione</th><th>Importo</th></tr></thead><tbody>'+h+'</tbody></table>'; };
   var ok=function(a,b){ return Math.abs(a-b)<0.005; }, Q=X.q, M=X.mine, tutto=ok(Q.ricavi,M.ricavi)&&ok(Q.costi,M.costi)&&ok(Q.varRim,M.varRim)&&ok(Q.interessi,M.interessi)&&ok(Q.utile,M.utile);
   var qr=function(l,a,b){ return '<tr><td style="text-align:left">'+l+'</td><td>'+eur(b)+'</td><td>'+eur(a)+'</td><td class="'+(ok(a,b)?'pos':'neg')+'">'+(ok(a,b)?'✓':eur(b-a))+'</td></tr>'; };
@@ -1980,10 +1980,12 @@ function vMarini(r){ var X=mcCalcola(r), C=X.conti, eu=function(x){ return x?eur
   var dett='';
   if(S.mariniDett){ dett='<div class="card pbk"><b>Dettaglio delle voci per conto</b>'+Object.keys(X.voci).sort().map(function(k){ var L=X.voci[k].slice().sort(function(a,b){return a.d<b.d?-1:1;});
       return '<div style="margin-top:8px"><b>'+k+' '+esc(MC[k]||'')+'</b> — '+eur(C[k])+' €<table class="mct"><tbody>'+L.map(function(x){ return '<tr><td class="note" style="white-space:nowrap">'+dmy(x.d)+'</td><td>'+esc(x.desc)+'</td><td>'+eur(x.imp)+'</td></tr>'; }).join('')+'</tbody></table></div>'; }).join('')+'</div>'; }
-  return '<style>.mct{width:100%;border-collapse:collapse}.mct td,.mct th{padding:3px 6px;border-bottom:1px solid #e5e7eb;text-align:left}.mct td:last-child,.mct th:last-child{text-align:right;white-space:nowrap}.mct tr.mg td{background:#f3f4f6;padding-top:7px}.mcg{display:grid;grid-template-columns:1fr 1fr;gap:14px}</style>'
+  return '<style>.mct{width:100%;border-collapse:collapse}.mct td,.mct th{padding:3px 6px;border-bottom:1px solid #e5e7eb;text-align:left}.mct td:last-child,.mct th:last-child{text-align:right;white-space:nowrap}.mct tr.mg td{background:#f3f4f6;padding-top:7px}.mcg{display:grid;grid-template-columns:1fr 1fr;gap:14px}.mclk{color:#1d4ed8;text-decoration:underline;cursor:pointer}.mclk2{cursor:pointer}.mclk2:hover{color:#1d4ed8}@media print{.mclk{color:inherit;text-decoration:none}}</style>'
    +'<div class="card"><b>Bilancio Marini — conto economico con il piano dei conti dello studio</b>'
    +'<div class="note">Stessi conti del bilancino di Marini, alimentati dalle voci della consolle (fatture emesse e ricevute, corrispettivi, spese senza fattura allineate alle banche Sibill, paghe, royalty). Periodo dal 01/01 alla fine del mese scelto, per competenza. A differenza del bilancino, qui ci sono anche le rimanenze finali e le consulenze Adler per mese di competenza.</div>'
-   +'<div class="g" style="margin-top:8px"><div><label>Conto economico al</label><select id="marinidata">'+opts+'</select></div><div><label><input type="checkbox" id="marinidett"'+(S.mariniDett?' checked':'')+'> mostra il dettaglio delle voci (anche nel PDF)</label></div></div></div>'
+   +'<div class="g" style="margin-top:8px"><div><label>Conto economico al</label><select id="marinidata">'+opts+'</select></div><div><label><input type="checkbox" id="marinidett"'+(S.mariniDett?' checked':'')+'> mostra il dettaglio delle voci (anche nel PDF)</label></div>'
+   +'<div class="norep"><button class="l" data-a="mcexp">Scarica per Marini</button><div class="note">Un file con solo questo conto economico: cliccando su ogni conto si vedono le voci che lo compongono. Da mandare per e-mail o con un link Dropbox; non dà accesso alla consolle.</div></div></div>'
+   +'<div class="note norep" style="margin-top:6px">Clicca sul numero o sul nome di un conto per vedere le voci che lo compongono.</div></div>'
    +'<div class="card"><div style="text-align:center"><b>TULLIO SERCI S.R.L.</b><br><b>CONTO ECONOMICO dal 01/01/'+X.mSel.slice(2,4)+' al '+dmy(X.data).slice(0,6)+X.mSel.slice(2,4)+'</b></div>'
    +'<div class="mcg" style="margin-top:10px"><div><b>COSTI</b>'+lato('400','500')+'</div><div><b>RICAVI</b>'+lato('500','600')+'</div></div>'
    +'<table class="mct" style="margin-top:12px"><tbody><tr><td><b>TOTALE COSTI</b></td><td><b>'+eur(X.tc)+'</b></td><td><b>TOTALE RICAVI</b></td><td><b>'+eur(X.tr)+'</b></td></tr>'
@@ -1998,6 +2000,37 @@ function vMarini(r){ var X=mcCalcola(r), C=X.conti, eu=function(x){ return x?eur
    +qr('Ricavi delle vendite e prestazioni',Q.ricavi,M.ricavi)+qr('Costi (escluse rimanenze)',Q.costi,M.costi)+qr('Variazione rimanenze (finali − iniziali)',Q.varRim,M.varRim)+qr('Interessi attivi',Q.interessi,M.interessi)+qr('Utile prima delle imposte',Q.utile,M.utile)+'</tbody></table>'
    +''+(X.nonMap.length?'<div class="note neg">Voci senza conto specifico (messe in conti generici): '+X.nonMap.length+'</div>':'')
    +'<div class="note">Non incluse: F24 (sono pagamenti, non costi), imposte sul reddito, previsioni della pagina Previsione nov-dic.</div></div>'+dett; }
+
+/* dettaglio di un conto del bilancino: voci che lo compongono (stesso calcolo della pagina) */
+function mcRigheConto(X,k){ var L=(X.voci[k]||[]).slice().sort(function(a,b){ return String(a.d)<String(b.d)?-1:String(a.d)>String(b.d)?1:0; });
+  if(!L.length&&(k==='408.00001'||k==='508.00001')) return {html:'<tr><td colspan="3" style="text-align:left">'+(k==='408.00001'?'Rimanenze iniziali al 01/01':'Rimanenze finali al '+dmy(X.data))+' (dallo Stato patrimoniale, inventario di magazzino)</td><td>'+eur(X.conti[k])+'</td></tr>',n:0};
+  var h=L.map(function(x){ var dd=String(x.d||'').slice(0,10), cc=String(x.c||'').slice(0,7), dc=dd.slice(0,7)!==cc&&cc?'<div class="note">competenza '+etm(cc)+'</div>':'';
+    return '<tr><td style="text-align:left;white-space:nowrap">'+dmy(dd)+dc+'</td><td style="text-align:left;white-space:nowrap">'+esc(x.ref||'')+'</td><td style="text-align:left;white-space:normal">'+esc(x.desc||'')+'</td><td style="white-space:nowrap">'+eur(x.imp)+'</td></tr>'; }).join('');
+  return {html:h,n:L.length}; }
+function mcDettaglio(k){ var X=S.__mc; if(!X) return; var R=mcRigheConto(X,k);
+  var d=document.getElementById('pldet'); if(!d){ d=document.createElement('div'); d.id='pldet'; d.style.cssText='position:fixed;right:16px;top:70px;bottom:16px;width:min(760px,94vw);overflow:auto;z-index:9000;background:#fff;border-radius:14px;box-shadow:0 10px 40px rgba(0,0,0,.35);padding:14px'; document.body.appendChild(d); }
+  d.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;gap:10px"><b>'+k+' '+esc(MC[k]||'')+' — '+eur(X.conti[k])+' €</b><button class="l" data-a="pldetx">Chiudi</button></div><div class="note">Dal 01/01 al '+dmy(X.data)+', per competenza. '+(R.n?R.n+' voci, in ordine di data. ':'')+'Importi IVA esclusa; l\'IVA indetraibile è compresa nel costo.</div>'
+    +'<table class="fit" style="margin-top:6px"><thead><tr><th style="text-align:left;width:13%">Data</th><th style="text-align:left;width:16%">Documento</th><th style="text-align:left">Descrizione</th><th style="width:14%">Importo €</th></tr></thead><tbody>'+R.html+'<tr class="t"><td></td><td></td><td style="text-align:left">Totale conto</td><td>'+eur(X.conti[k])+'</td></tr></tbody></table>'; }
+function mcEsporta(){ var X=S.__mc; if(!X) return; var C=X.conti, oggi=dmy(new Date().toISOString().slice(0,10));
+  var lato=function(lo,hi){ var h=''; Object.keys(MC).filter(function(g){ return g.length===3&&g>=lo&&g<hi; }).forEach(function(g){
+      var sub=Object.keys(C).filter(function(k){ return k.slice(0,3)===g&&Math.abs(C[k])>0.004; }).sort(); if(!sub.length) return;
+      h+='<div class="gr"><span>'+g+' '+esc(MC[g])+'</span><span>'+eur(sub.reduce(function(a,k){ return a+C[k]; },0))+'</span></div>';
+      sub.forEach(function(k){ var R=mcRigheConto(X,k); h+='<details><summary><span class="k">'+k+'</span><span class="d">'+esc(MC[k]||k)+(R.n?' <small>('+R.n+')</small>':'')+'</span><span class="i">'+eur(C[k])+'</span></summary>'
+        +'<table><thead><tr><th>Data</th><th>Documento</th><th>Descrizione</th><th>Importo €</th></tr></thead><tbody>'+R.html+'<tr class="t"><td></td><td></td><td>Totale conto</td><td>'+eur(C[k])+'</td></tr></tbody></table></details>'; }); });
+    return h; };
+  var nota=String(simS().mariniNote||'').trim();
+  var html='<!DOCTYPE html><html lang="it"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Tullio Serci S.r.l. – Conto economico al '+dmy(X.data)+'</title><style>'
+   +'body{font:14px/1.4 system-ui,-apple-system,Segoe UI,Arial,sans-serif;color:#1f2937;max-width:1100px;margin:24px auto;padding:0 16px}h1{font-size:20px;margin:0}h2{font-size:16px;margin:22px 0 6px;border-bottom:2px solid #1f2937}.n{color:#6b7280;font-size:12.5px}'
+   +'.gr{display:flex;justify-content:space-between;background:#f3f4f6;font-weight:600;padding:6px 8px;margin-top:8px}details{border-bottom:1px solid #e5e7eb}summary{display:flex;gap:10px;padding:5px 8px;cursor:pointer;list-style:none}summary::-webkit-details-marker{display:none}summary:before{content:"▸";color:#1d4ed8}details[open]>summary:before{content:"▾"}'
+   +'.k{color:#1d4ed8;text-decoration:underline;min-width:86px}.d{flex:1}.i{white-space:nowrap;text-align:right}table{width:100%;border-collapse:collapse;margin:4px 0 10px;font-size:12.5px}th,td{padding:3px 6px;border-bottom:1px solid #eef0f3;text-align:left;vertical-align:top}th:last-child,td:last-child{text-align:right;white-space:nowrap}tr.t td{font-weight:600;border-top:1px solid #9ca3af}'
+   +'.tot{display:grid;grid-template-columns:1fr auto;gap:4px 24px;max-width:520px;margin-top:14px;font-weight:600}.pre{white-space:pre-wrap;background:#fafafa;border:1px solid #e5e7eb;padding:10px;border-radius:6px}@media print{details{break-inside:avoid}}</style></head><body>'
+   +'<h1>TULLIO SERCI S.R.L. – Conto economico dal 01/01/'+X.mSel.slice(0,4)+' al '+dmy(X.data)+'</h1>'
+   +'<div class="n">Estratto il '+oggi+' dalla consolle di gestione. Piano dei conti dello studio; importi in euro, IVA esclusa (IVA indetraibile compresa nel costo); per competenza. Clicca su un conto per vedere le voci che lo compongono (data, numero del documento, descrizione, importo). Utile prima delle imposte: IRES e IRAP non incluse.</div>'
+   +'<h2>COSTI</h2>'+lato('400','500')+'<h2>RICAVI</h2>'+lato('500','600')
+   +'<div class="tot"><span>TOTALE COSTI</span><span>'+eur(X.tc)+'</span><span>TOTALE RICAVI</span><span>'+eur(X.tr)+'</span><span>'+(X.utile>=0?'UTILE':'PERDITA')+' PRIMA DELLE IMPOSTE</span><span>'+eur(Math.abs(X.utile))+'</span></div>'
+   +(nota?'<h2>Note e ipotesi</h2><div class="pre">'+esc(nota)+'</div>':'')+'</body></html>';
+  var a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([html],{type:'text/html'})); a.download='Conto_economico_Tullio_Serci_SRL_al_'+dmy(X.data).replace(/\//g,'-')+'.html'; document.body.appendChild(a); a.click(); setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); },1500);
+  msg('File scaricato: mandalo a Marini per e-mail o con un link Dropbox. È una fotografia al '+dmy(X.data)+': se aggiorni i dati, riscaricalo.'); }
 
 function vReport(r0){
   r0=r0||S.__reg; var R=repMesi(), p=params(), s=simS(), rOct=E.calcola({voci:vociCalc(),dash:S.dash||{},params:Object.assign({},p,{mesi:R.n})}),
@@ -2135,6 +2168,8 @@ async function azione(a,id){
     else if(a==='login'){ var rr=await call('apiLogin',val('l_u'),val('l_p')); TOKEN=rr.token; try{sessionStorage.setItem('bsrl_t',TOKEN);}catch(e){} await avvia(); }
     else if(a==='logout'){ try{await call('apiLogout');}catch(e){} esci(); }
     else if(a==='pldet'){ var qd=String(id).split('|'); plDettaglio(qd[0],qd[1]); }
+    else if(a==='mcdet'){ mcDettaglio(id); }
+    else if(a==='mcexp'){ mcEsporta(); }
     else if(a==='pldetx'){ var dd=document.getElementById('pldet'); if(dd) dd.remove(); }
     else if(a==='plcrit'){ var smc=simS(); smc.plCriterio=id; smc.plCritScelto=true; PL_PROV=null; render(); S.config=await call('apiSalvaConfig',{sim:JSON.stringify(smc)}); }
     else if(a==='plmodo'){ var q=String(id).split('|'), sm=simS(); if(!sm.plModo||typeof sm.plModo!=='object') sm.plModo={}; sm.plModo[q[0]]=q[1]; render(); S.config=await call('apiSalvaConfig',{sim:JSON.stringify(sm)}); }
