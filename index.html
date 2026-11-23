@@ -1420,14 +1420,14 @@ function buGriglia(B){ var X=B.X, U=['a','p','v'], n=B.n, R=B.ricTot;
   var griglia='<div style="display:grid;grid-template-columns:repeat(3,minmax(300px,1fr));gap:10px;overflow-x:auto;align-items:start">'+tabBU(0)+tabBU(1)+tabBU(2)+'</div>';
   return griglia; }
 /* ── Budget 2027 per business unit: base = media ott-nov-dic 2026 (con previsione) × 12, con leve e piano delle azioni ── */
-var B27_DEF={ric:{a:null,p:null,v:null},prezzo:0,pvar:0,compM:8000,contrP:null,adsTot:2500,trasf:1000,cons:0,str:0,dip:0};   /* ipotesi del 23/11/2026: compensi 2 x 4.000 lordi, magazzino fisso (consumo 0), pubblicita+telefoni 2.500, trasferte 1.000, nessun affitto */
-function b27L(){ var s=simS(); if(!s.b27||typeof s.b27!=='object') s.b27={}; var o=s.b27; if(!o.ric) o.ric={a:B27_DEF.ric.a,p:B27_DEF.ric.p,v:B27_DEF.ric.v}; ['pvar','str','dip','prezzo','compM','contrP','adsTot','trasf','cons'].forEach(function(k){ if(o[k]===undefined) o[k]=B27_DEF[k]; }); if(o.contrP===null) o.contrP=+simS().contribPerc||23; return o; }
+var B27_DEF={ric:{a:null,p:null,v:null},prezzo:0,pvar:0,compM:8000,contrP:null,adsTot:2500,trasf:1000,cons:0,acq:0,str:0,dip:0};   /* ipotesi del 23/11/2026: compensi 2 x 4.000 lordi, magazzino fisso (consumo 0), pubblicita+telefoni 2.500, trasferte 1.000, nessun affitto */
+function b27L(){ var s=simS(); if(!s.b27||typeof s.b27!=='object') s.b27={}; var o=s.b27; if(!o.ric) o.ric={a:B27_DEF.ric.a,p:B27_DEF.ric.p,v:B27_DEF.ric.v}; ['pvar','str','dip','prezzo','compM','contrP','adsTot','trasf','cons','acq'].forEach(function(k){ if(o[k]===undefined) o[k]=B27_DEF[k]; }); if(o.contrP===null) o.contrP=+simS().contribPerc||23; return o; }
 var b27Timer;
 function b27Salva(){ clearTimeout(b27Timer); b27Timer=setTimeout(async function(){ var m=document.getElementById('b27msg'); try{ S.config=await call('apiSalvaConfig',{sim:JSON.stringify(simS())}); m=document.getElementById('b27msg'); if(m){ m.textContent='Leve salvate'; m.className='ok'; } }catch(e){ m=document.getElementById('b27msg'); if(m){ m.textContent='Salvataggio non riuscito: '+e.message; m.className='ko'; } } },600); }
 function b27Num(t){ t=String(t||'').trim(); if(/^-?\d{1,3}(\.\d{3})+(,\d+)?$/.test(t)) t=t.replace(/\./g,''); return plParse(t); }
 function b27Set(el){ var k=el.dataset.b27.split('|'), L=b27L(), n=b27Num(el.value);
   if(k[0]==='ric'){ L.ric[k[1]]=(el.value.trim()===''||n===null)?null:Math.max(0,n); }
-  else if(['compM','adsTot','trasf','cons','contrP'].indexOf(k[0])>=0){ L[k[0]]=(el.value.trim()===''||n===null)?null:Math.max(0,n); }
+  else if(['compM','adsTot','trasf','cons','contrP','acq'].indexOf(k[0])>=0){ L[k[0]]=(el.value.trim()===''||n===null)?null:Math.max(0,n); }
   else { L[k[0]]=(n===null?0:n); }
   render(); b27Salva(); }
 function b27Base(r){
@@ -1451,7 +1451,7 @@ function b27Model(base,L){
   var compBase=gl('compensi_amm'), compAnn=((L.compM!==null&&L.compM!==undefined)?L.compM:compBase)*12, abbA=gl('abbonamenti_utenze')*12*(1+L.str/100);
   base.lines.forEach(function(ln){ var t=ln.m*12, id=ln.id;
     if(id==='consumo') t=(L.cons!==null&&L.cons!==undefined)?(L.cons/100)*(vol.p+vol.v):t*gpv;
-    else if(id==='acquisti_materiali') t*=gpv;
+    else if(id==='acquisti_materiali') t=(L.acq!==null&&L.acq!==undefined)?L.acq*12:t*gpv;
     else if(id==='intercompany_costo'||id==='costiDash') t*=g('p')*(1-L.pvar/100);
     else if(id==='royalties') t*=gpv*(1-L.pvar/100);
     else if(id==='trasporti'||id==='oneri_bancari') t*=g('v');
@@ -1469,9 +1469,9 @@ function b27Model(base,L){
   B.X=X; B.ricTot=ric.a+ric.p+ric.v; B.ebtTot=U.reduce(function(a,k){return a+X[k].ebt;},0); B.netTot=B.ebtTot; B.impT=0; B.ric0=ric; return B; }
 function b27Eff(base,L0,mod){ var L1=JSON.parse(JSON.stringify(L0)); mod(L1); var a=b27Model(base,L0), b=b27Model(base,L1), o={}; ['a','p','v'].forEach(function(k){ o[k]=b.X[k].ebt-a.X[k].ebt; }); o.t=o.a+o.p+o.v; return o; }
 function vB27(r){
-  var base=b27Base(r), L=b27L(), M=b27Model(base,L), M0=b27Model(base,{ric:{a:null,p:null,v:null},prezzo:0,pvar:0,compM:null,contrP:null,adsTot:null,trasf:null,cons:null,str:0,dip:0}), X=M.X, X0=M0.X, U=['a','p','v'];
+  var base=b27Base(r), L=b27L(), M=b27Model(base,L), M0=b27Model(base,{ric:{a:null,p:null,v:null},prezzo:0,pvar:0,compM:null,contrP:null,adsTot:null,trasf:null,cons:null,acq:null,str:0,dip:0}), X=M.X, X0=M0.X, U=['a','p','v'];
   var on=S.plPrev!==false, f0=function(x){ return eur(x); }, gb=function(id){ var x=base.lines.filter(function(l){return l.id===id;})[0]; return x?x.m:0; };
-  var bar='<div class="card"><div class="bar" style="margin:0"><span class="note">Base: <b>media di ottobre, novembre e dicembre 2026</b> (compresa la previsione di nov-dic) moltiplicata per 12. La base normalizza il <b>consumo di magazzino</b> ('+IT.format(Math.round(base.ratioCons*1000)/10)+' % dei ricavi Paysolution + gettoniere, invece della riduzione una tantum di ottobre). <b>Ipotesi 2027 indicate da te:</b> nessun affitto; compensi 2 × 4.000 € lordi al mese più contributi; magazzino fisso (consumo 0); pubblicità, telefoni e abbonamenti 2.500 € al mese; trasferte 1.000 € al mese. <span id="b27msg"></span></span></div></div>';
+  var bar='<div class="card"><div class="bar" style="margin:0"><span class="note">Base: <b>media di ottobre, novembre e dicembre 2026</b> (compresa la previsione di nov-dic) moltiplicata per 12. La base normalizza il <b>consumo di magazzino</b> ('+IT.format(Math.round(base.ratioCons*1000)/10)+' % dei ricavi Paysolution + gettoniere, invece della riduzione una tantum di ottobre). <b>Ipotesi 2027 indicate da te:</b> nessun affitto; compensi 2 × 4.000 € lordi al mese più contributi; magazzino fisso (consumo 0); <b>nessun costo per materiali e merci</b> (si pagano la percentuale sul MOL e le royalty); pubblicità, telefoni e abbonamenti 2.500 € al mese; trasferte 1.000 € al mese. <span id="b27msg"></span></span></div></div>';
   /* leve */
   var inp=function(path,val,suf){ return '<input type="text" inputmode="decimal" data-b27="'+path+'" value="'+(val===null||val===undefined?'':eurIn(val))+'" style="width:92px;text-align:right"> '+suf; };
   var lev='<div class="card tw"><b>Leve del budget 2027 (modificabili)</b><div class="note" style="white-space:normal">Lascia vuoto un campo per tenere il valore della base. Ricavi in euro al mese, IVA esclusa.</div><table style="width:100%;table-layout:auto;min-width:760px"><thead><tr><th style="text-align:left">Leva</th><th>Base</th><th style="text-align:left">Valore budget</th><th style="text-align:left">Cosa fa</th></tr></thead><tbody>'
@@ -1484,6 +1484,7 @@ function vB27(r){
    +'<tr><td style="text-align:left">Contributi sui compensi</td><td>'+(gb('compensi_amm')>0.004?IT.format(Math.round(gb('contributi')/gb('compensi_amm')*1000)/10)+' %':'–')+'</td><td style="text-align:left">'+inp('contrP',L.contrP,'%')+'</td><td style="text-align:left;white-space:normal">INPS gestione separata a carico società, in % dei compensi (come nella Previsione: 23 %).</td></tr>'
    +'<tr><td style="text-align:left">Pubblicità, telefoni, abbonamenti: totale</td><td>'+f0(gb('pubblicita')+gb('abbonamenti_utenze'))+'</td><td style="text-align:left">'+inp('adsTot',L.adsTot,'€/mese')+'</td><td style="text-align:left;white-space:normal">Pubblicità Amazon + abbonamenti, telefoni e utenze. Gli abbonamenti restano alla base, la pubblicità è la differenza.</td></tr>'
    +'<tr><td style="text-align:left">Trasferte</td><td>'+f0(gb('trasferte_welfare'))+'</td><td style="text-align:left">'+inp('trasf',L.trasf,'€/mese')+'</td><td style="text-align:left;white-space:normal">Tutte su Adler.</td></tr>'
+   +'<tr><td style="text-align:left">Acquisti di materiali e merci</td><td>'+f0(gb('acquisti_materiali'))+'</td><td style="text-align:left">'+inp('acq',L.acq,'€/mese')+'</td><td style="text-align:left;white-space:normal">Zero: dal 2027 i materiali non sono un costo, si pagano la percentuale sul MOL e le royalty.</td></tr>'
    +'<tr><td style="text-align:left">Consumo di magazzino, in % dei ricavi Paysolution + gettoniere</td><td>'+IT.format(Math.round(base.ratioCons*1000)/10)+' %</td><td style="text-align:left">'+inp('cons',L.cons,'%')+'</td><td style="text-align:left;white-space:normal">Magazzino fisso: nessuna variazione di rimanenze, quindi 0.</td></tr>'
    +'<tr><td style="text-align:left">Altri costi di struttura: variazione</td><td>0 %</td><td style="text-align:left">'+inp('str',L.str,'%')+'</td><td style="text-align:left;white-space:normal">Commercialista, consulenti, abbonamenti.</td></tr>'
    +'<tr><td style="text-align:left">Dipendente su vendita gettoniere</td><td>0</td><td style="text-align:left">'+inp('dip',L.dip,'€/mese')+'</td><td style="text-align:left;white-space:normal">Costo mensile di un eventuale dipendente (va tutto sulle gettoniere).</td></tr>'
@@ -1503,6 +1504,7 @@ function vB27(r){
   if(L.compM!==null&&L.compM!==undefined) eA('compM','Compensi amministratori a '+eur(L.compM)+' € lordi al mese (2 × '+eur(L.compM/2)+')','Tutte (in proporzione ai ricavi)','delibera di inizio anno');
   if(L.adsTot!==null&&L.adsTot!==undefined) eA('adsTot','Pubblicità, telefoni e abbonamenti: tetto di '+eur(L.adsTot)+' € al mese (pubblicità Amazon da monitorare ogni settimana)','Vendita gettoniere','da gen 2027');
   if(L.trasf!==null&&L.trasf!==undefined) eA('trasf','Trasferte a '+eur(L.trasf)+' € al mese','Adler','da gen 2027');
+  if(L.acq!==null&&L.acq!==undefined) eA('acq','Materiali e merci non più a carico: '+eur(L.acq)+' € al mese (restano la percentuale sul MOL e le royalty)','Paysolution e gettoniere','da gen 2027');
   if(L.cons!==null&&L.cons!==undefined) eA('cons','Magazzino fisso: nessun consumo di rimanenze ('+IT.format(L.cons)+' % dei ricavi)','Paysolution','da gen 2027');
   if(Math.abs(L.str)>0.0001){ var e4=b27Eff(base,L,function(l){ l.str=0; }); push('Tutte (in proporzione ai ricavi)','Altri costi di struttura: variazione del '+IT.format(L.str)+' %',{a:-e4.a,p:-e4.p,v:-e4.v,t:-e4.t},'gen 2027'); }
   if(Math.abs(L.dip)>0.0001){ var e5=b27Eff(base,L,function(l){ l.dip=0; }); push('Vendita gettoniere','Dipendente a '+eur(L.dip)+' €/mese',{a:-e5.a,p:-e5.p,v:-e5.v,t:-e5.t},'—'); }
