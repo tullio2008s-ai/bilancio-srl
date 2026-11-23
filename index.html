@@ -1626,7 +1626,8 @@ function bulkCard(){ var cs=E.CATEGORIE.filter(function(c){return c.tipo!=='sp';
    +'<div><label>Da competenza</label><input type="month" id="b_da" value="2026-01"></div><div><label>A competenza</label><input type="month" id="b_a" value="2026-12"></div></div>'
    +'<div id="b_info" class="note" style="margin-top:6px"></div><button class="l" data-a="bulkdel" style="margin-top:8px;color:var(--ko)">Elimina in blocco</button></div>'; }
 function vVoci(){ return formVoce(false)+bulkCard()+elencoVoci(false); }
-function vPatrimonio(r,noform){ var sp=E.statoPatrimoniale(r,S.voci), cats=E.CATEGORIE.filter(function(c){return c.tipo==='sp';});
+function vPatrimonio(r,noform,maxM){ var sp=E.statoPatrimoniale(r,S.voci), cats=E.CATEGORIE.filter(function(c){return c.tipo==='sp';});
+  if(maxM) sp=sp.filter(function(x){ return x.apertura||String(x.m)<=maxM; });
   var h='';
   if(sp.length){
     var head='<tr><th style="text-align:left;font-size:11px;color:var(--mu)">€ · valori di bilancio (crediti/debiti al lordo IVA)</th>'+sp.map(function(s){return '<th>'+(s.apertura?'Apertura ':'')+esc(s.m)+'</th>';}).join('')+'</tr>';
@@ -1642,6 +1643,7 @@ function vPatrimonio(r,noform){ var sp=E.statoPatrimoniale(r,S.voci), cats=E.CAT
     var ult=sp[sp.length-1], pre=sp.length>1?sp[0]:null;
     if(pre&&!ult.apertura){ var manca=cats.filter(function(c){return !c.riporta&&pre.items[c.id]!==undefined&&ult.items[c.id]===undefined;}).map(function(c){return c.nome;});
       if(manca.length) h+='<div class="card wa">Voci presenti all\'apertura ma non nel saldo '+esc(ult.m)+': '+esc(manca.join('; '))+'.</div>'; }
+    if(maxM&&!sp.some(function(x){return x.m===maxM;})) h+='<div class="card wa">Manca il saldo patrimoniale al '+esc(maxM)+': le colonne mostrano solo i saldi inseriti fino a quella data. Inserisci i saldi di fine mese in “Voci manuali”.</div>';
   } else h='<div class="card">Nessun saldo patrimoniale inserito. Inserisci i valori del bilancio 2025 (mese 2025-12) e poi i saldi 2026.</div>';
   var rt=(r.rimanenze||[]).map(function(x){ return '<tr><td style="text-align:left">'+etm(x.m)+'</td><td>'+eur(x.saldo)+'</td><td class="'+cls(x.variazione)+'">'+(x.variazione?eur(x.variazione):'–')+'</td><td style="text-align:left">'+(x.reale?'saldo inserito':'da report magazzino (parametro)')+'</td></tr>'; }).join('');
   h+='<div class="card"><b>Magazzino mese per mese ↔ P&amp;L</b><div class="note">Valore del magazzino SRL (merce consegnata a Paysolution da recuperare con le fatture) a fine mese. La variazione rispetto al mese prima entra nel P&amp;L: calo = costo del venduto. Dal 01/03 i saldi seguono il report del commercialista (consegna 40.983,61 + acquisti +8% − recuperi fatturati nel mese di emissione); al 31/10 il magazzino è 0. Un saldo inserito a mano in "Voci manuali" prevale sul parametro.</div>'
@@ -2096,7 +2098,7 @@ function vReport(r0){
    +sez('IVA — liquidazioni',vIva(rf))
    +sez('IVA — situazione dal Cassetto fiscale, rateazione e scadenze',ivaSit)
    +sez('Imposte — stima',vImposte(rf))
-   +sez('Stato patrimoniale e magazzino — saldi inseriti',vPatrimonio(rOct,true))
+   +sez('Stato patrimoniale e magazzino — saldi inseriti fino a '+etm(R.m),vPatrimonio(rOct,true,R.m))
    +sez('Situazione utili, ritenute e saldi di cassa a fine mese',utiliRes(o))
    +sez('Ipotesi della previsione',ipo)
    +sez('Controlli incrociati',vControlli(rOct)); }
