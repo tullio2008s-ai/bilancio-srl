@@ -1136,16 +1136,16 @@ function vociPL(){ var L=vociCalc(); if(!plDoc()) return L; return L.filter(func
 function cls(x){ return x<-0.004?'neg':(x>0.004?'pos':''); }
 
 /* ── Viste ── */
-var TABS=[['oggi','Oggi'],['riepilogo','Riepilogo'],['strategia','Strategia'],['riserve','Debiti e riserve'],['istruzioni','Istruzioni'],['compdiv','Compenso o dividendo'],['pl','P&L mensile'],['be','Break even'],['cassa','Cassa'],['flussi','Cash flow'],['iva','IVA'],['ivasit','Situazione IVA'],['conf25','Confronto 2025'],['imposte','Imposte (stima)'],['patrimonio','Stato patrimoniale'],['simulazione','Previsione nov-dic'],['utili','Prelievo utili'],['budget','Budget'],['commercialista','Incontro Marini (stampa)'],['marini','Marini'],['studio','Da chiarire con lo studio'],['voci','Voci manuali'],['dashboard','Da Dashboard V6'],['param','Parametri'],['controlli','Controlli'],['storico','Storico']];
+var TABS=[['oggi','Oggi'],['riepilogo','Riepilogo'],['strategia','Strategia'],['riserve','Debiti e riserve'],['istruzioni','Istruzioni'],['compdiv','Compenso o dividendo'],['pl','P&L mensile'],['bu','Business unit'],['be','Break even'],['cassa','Cassa'],['flussi','Cash flow'],['iva','IVA'],['ivasit','Situazione IVA'],['conf25','Confronto 2025'],['imposte','Imposte (stima)'],['patrimonio','Stato patrimoniale'],['simulazione','Previsione nov-dic'],['utili','Prelievo utili'],['budget','Budget'],['commercialista','Incontro Marini (stampa)'],['marini','Marini'],['studio','Da chiarire con lo studio'],['voci','Voci manuali'],['dashboard','Da Dashboard V6'],['param','Parametri'],['controlli','Controlli'],['storico','Storico']];
 var NAV_TOP=['pl','iva','ivasit','imposte','patrimonio','simulazione','marini'];
-var NAV_GRP=[['info','Informazioni',['istruzioni','oggi','riepilogo','strategia','conf25','voci','dashboard','param','controlli','commercialista','storico','studio']],['fin','Finanza',['be','cassa','flussi','utili','budget','riserve','compdiv']]];
+var NAV_GRP=[['info','Informazioni',['istruzioni','oggi','riepilogo','strategia','conf25','voci','dashboard','param','controlli','commercialista','storico','studio']],['fin','Finanza',['bu','be','cassa','flussi','utili','budget','riserve','compdiv']]];
 function navLab(id){ return TABS.filter(function(t){return t[0]===id;})[0][1]; }
 function navGrpDi(id){ for(var i=0;i<NAV_GRP.length;i++){ if(NAV_GRP[i][2].indexOf(id)>=0) return NAV_GRP[i][0]; } return null; }
 function nav(){ var g=S.navG===undefined?navGrpDi(S.tab):S.navG; var bt=function(id){ return '<button class="'+(S.tab===id?'on':'')+'" data-t="'+id+'">'+navLab(id)+'</button>'; };
   var h='<div class="nr">'+NAV_TOP.map(bt).join('')+'</div><div class="nr">'+NAV_GRP.map(function(x){ return '<button class="grp'+(g===x[0]?' open':'')+'" data-g="'+x[0]+'">'+x[1]+(g===x[0]?' ▴':' ▾')+'</button>'; }).join('')+'</div>';
   NAV_GRP.forEach(function(x){ if(g===x[0]) h+='<div class="nr sub">'+x[2].map(bt).join('')+'</div>'; });
   document.getElementById('nav').innerHTML=h; }
-function render(){ nav(); var plT=(S.tab==='pl'||S.tab==='be'), reg=plT?E.calcola({voci:vociPL(),dash:S.dash||{},params:params()}):calc(); S.__reg=reg; var r=reg, SIMO=null; if(plT&&S.plPrev!==false){ try{ SIMO=E.simula({voci:vociPL(),dash:S.dash||{},params:params()},simS()); r=SIMO.res; }catch(e){ r=reg; SIMO=null; } } var impSim=false; if(S.tab==='imposte'&&S.plPrev!==false){ try{ r=simRun().res; impSim=true; }catch(e){ r=reg; } } var f={oggi:vOggi,riepilogo:vRiepilogo,strategia:vStrategia,riserve:vRiserve,istruzioni:vIstruzioni,compdiv:vCompDiv,pl:vPL,be:vBE,iva:vIva,ivasit:vIvaSit,conf25:vConf25,imposte:vImposte,patrimonio:vPatrimonio,simulazione:vSimulazione,cassa:vCassa,flussi:vFlussi,utili:vUtili,commercialista:vReport,marini:vMarini,studio:vStudio,budget:vBudget,voci:vVoci,dashboard:vDash,param:vParam,controlli:vControlli,storico:vStorico}[S.tab]; document.getElementById('main').innerHTML='<div class="bar">'+provvHtml()+'<span id="pdfmsg" class="note"></span><button class="p" data-a="pdf" style="margin:0">⬇ Salva PDF</button></div><div class="pdfhead"'+(S.tab==='commercialista'?' style="display:none!important"':'')+'><b>Bilancio SRL — '+esc(TABS.filter(function(t){return t[0]===S.tab;})[0][1])+'</b><div class="note">Tullio Serci S.r.l. · generato il '+new Date().toLocaleDateString('it-IT')+' · importi in euro, IVA esclusa salvo dove indicato'+esc(provvNota())+'</div></div>'+(impSim?'<div class="card"><div class="note">Le stime comprendono la previsione di novembre e dicembre e il TFM inseriti nella pagina Previsione nov-dic, come nel pacchetto Incontro Marini. Per vedere solo i dati già registrati, togli la previsione dal P&amp;L mensile.</div></div>':'')+f(r)+(SIMO?cashFlowHtml(SIMO):'');
+function render(){ nav(); var plT=(S.tab==='pl'||S.tab==='be'||S.tab==='bu'), reg=plT?E.calcola({voci:vociPL(),dash:S.dash||{},params:params()}):calc(); S.__reg=reg; var r=reg, SIMO=null; if(plT&&S.plPrev!==false){ try{ SIMO=E.simula({voci:vociPL(),dash:S.dash||{},params:params()},simS()); r=SIMO.res; }catch(e){ r=reg; SIMO=null; } } var impSim=false; if(S.tab==='imposte'&&S.plPrev!==false){ try{ r=simRun().res; impSim=true; }catch(e){ r=reg; } } var f={oggi:vOggi,riepilogo:vRiepilogo,strategia:vStrategia,riserve:vRiserve,istruzioni:vIstruzioni,compdiv:vCompDiv,pl:vPL,be:vBE,bu:vBU,iva:vIva,ivasit:vIvaSit,conf25:vConf25,imposte:vImposte,patrimonio:vPatrimonio,simulazione:vSimulazione,cassa:vCassa,flussi:vFlussi,utili:vUtili,commercialista:vReport,marini:vMarini,studio:vStudio,budget:vBudget,voci:vVoci,dashboard:vDash,param:vParam,controlli:vControlli,storico:vStorico}[S.tab]; document.getElementById('main').innerHTML='<div class="bar">'+provvHtml()+'<span id="pdfmsg" class="note"></span><button class="p" data-a="pdf" style="margin:0">⬇ Salva PDF</button></div><div class="pdfhead"'+(S.tab==='commercialista'?' style="display:none!important"':'')+'><b>Bilancio SRL — '+esc(TABS.filter(function(t){return t[0]===S.tab;})[0][1])+'</b><div class="note">Tullio Serci S.r.l. · generato il '+new Date().toLocaleDateString('it-IT')+' · importi in euro, IVA esclusa salvo dove indicato'+esc(provvNota())+'</div></div>'+(impSim?'<div class="card"><div class="note">Le stime comprendono la previsione di novembre e dicembre e il TFM inseriti nella pagina Previsione nov-dic, come nel pacchetto Incontro Marini. Per vedere solo i dati già registrati, togli la previsione dal P&amp;L mensile.</div></div>':'')+f(r)+(SIMO?cashFlowHtml(SIMO):'');
   if(S.tab==='riepilogo') grafico(r); if(S.tab==='voci') bulkInfo(); marcaTabelle(); }
 function marcaRisultati(){ [].forEach.call(document.querySelectorAll('#main .kpi'),function(k){ var b=k.querySelector('b'); k.classList.toggle('kpos',!!(b&&(b.classList.contains('pos')||b.classList.contains('ok')))); k.classList.toggle('kneg',!!(b&&(b.classList.contains('neg')||b.classList.contains('ko')))); });
   [].forEach.call(document.querySelectorAll('#main table tr.t td'),function(td){ if(td.classList.contains('pos')||td.classList.contains('neg')) return; var b=td.querySelector('b.pos,b.neg,b.ok,b.ko'); if(b&&td.children.length===1) td.classList.add(b.classList.contains('pos')||b.classList.contains('ok')?'pos':'neg'); }); }
@@ -1321,6 +1321,111 @@ function plGest(r){
    +'<div class="note"><b>Come leggerlo.</b> Costi variabili = quelli che crescono con le vendite (acquisti merci, intercompany Paysolution, trasporti, pubblicità, commissioni bancarie, royalty) più la variazione delle rimanenze. Costi fissi = struttura (consulenti, abbonamenti, trasferte, altri). Personale e amministratori sono mostrati a parte e l\'EBITDA è dopo di essi. La colonna % ricavi è sul totale del periodo, le righe in corsivo sono % del singolo mese. Le imposte sono la stima IRES/IRAP della pagina Imposte, non il bilancio ufficiale. Classificazione fisso/variabile gestionale, da condividere con il commercialista.</div>'
    +(diff>0.01?'<div class="wa note">Attenzione: il risultato ante imposte di questa tabella differisce di '+eur(diff)+' € dall\'utile del motore. Controllare le categorie.</div>':'')
    +'<div class="note">'+(sum(r,function(m){return m.costiDash;})?'':'')+'IVA esclusa; fa eccezione l\'IVA indetraibile, che è un costo. Le righe "da Dashboard V6" non hanno dettaglio per categoria.</div>'; }
+
+/* ── Pagina Business unit: P&L accumulato per Adler, Paysolution, Vendita gettoniere (Amazon) ── */
+var BU_UN=[['a','Adler'],['p','Paysolution'],['v','Vendita gettoniere (Amazon)']];
+function buCfg(){ var s=simS(); if(!s.bu||typeof s.bu!=='object') s.bu={}; if(!s.bu.alloc) s.bu.alloc={}; return s.bu; }
+var BU_RICL=[
+  {id:'servizi',k:'a',nome:function(){return catNome('servizi');},f:function(m){return plVal(m,'servizi');}},
+  {id:'intercompany_ricavo',k:'p',nome:function(){return catNome('intercompany_ricavo');},f:function(m){return plVal(m,'intercompany_ricavo');}},
+  {id:'ricaviDash',k:'p',nome:function(){return 'Ricavi da Dashboard V6';},f:function(m){return m.ricaviDash||0;}},
+  {id:'vendite',k:'v',nome:function(){return catNome('vendite');},f:function(m){return plVal(m,'vendite');}},
+  {id:'vendite_amazon',k:'v',nome:function(){return catNome('vendite_amazon');},f:function(m){return plVal(m,'vendite_amazon');}},
+  {id:'corrispettivi',k:'v',nome:function(){return catNome('corrispettivi');},f:function(m){return plVal(m,'corrispettivi');}},
+  {id:'ricaviAltri',k:'v',nome:function(){return 'Altri ricavi non classificati';},f:function(m){ var s=0; ['servizi','intercompany_ricavo','vendite','vendite_amazon','corrispettivi'].forEach(function(i){ s+=plVal(m,i); }); s+=(m.ricaviDash||0); var d=m.ricavi-s; return Math.abs(d)<0.005?0:d; }}];
+function buCosti(){ var L=[], add=function(id,nome,s,f){ L.push({id:id,nome:nome,s:s,f:f}); };
+  PL_VAR.forEach(function(id){ add(id,catNome(id),'var',function(m){return plVal(m,id);}); });
+  add('costiDash','Costi Paysolution da Dashboard V6','var',function(m){return m.costiDash||0;});
+  add('consumo','Consumo di magazzino (diminuzione delle rimanenze)','var',function(m){return -(m.varRim||0);});
+  PL_FIS.forEach(function(id){ add(id,catNome(id),'fis',function(m){return plVal(m,id);}); });
+  add('altriNC','Altri costi non classificati','fis',function(m){return plCalc(m).altriNC;});
+  PL_PERS.forEach(function(id){ add(id,catNome(id),'pers',function(m){return plVal(m,id);}); });
+  PL_AMM.forEach(function(id){ add(id,catNome(id),'amm',function(m){return plVal(m,id);}); });
+  PL_FIN.forEach(function(id){ add(id,catNome(id),'fin',function(m){return plVal(m,id);}); });
+  return L; }
+function buIsBe(id){ return BE_COSTI.some(function(c){return c.id===id;}); }
+function buAl(id){ var st=buCfg().alloc[id]||{}; return {mode:st.mode||(buIsBe(id)?'be':'rev3'), a:+st.a||0, p:+st.p||0, v:+st.v||0}; }
+function buShare(ric){ var t=ric.a+ric.p+ric.v; return t>0.004?{a:ric.a/t,p:ric.p/t,v:ric.v/t}:{a:1/3,p:1/3,v:1/3}; }
+function buQ(id,ric){ var al=buAl(id), sh=buShare(ric), q;
+  if(al.mode==='be'&&buIsBe(id)){ var b=beQuote(id,ric); q={a:b.a,p:b.p,v:b.v}; }
+  else if(al.mode==='man'){ q={a:al.a/100,p:al.p/100,v:al.v/100}; }
+  else q={a:0,p:0,v:0};
+  var s=q.a+q.p+q.v; if(s>1.0001){ q={a:q.a/s,p:q.p/s,v:q.v/s}; s=1; }
+  var rest=Math.max(0,1-s); return {a:q.a+rest*sh.a,p:q.p+rest*sh.p,v:q.v+rest*sh.v,rest:rest}; }
+var buTimer;
+function buSalva(){ clearTimeout(buTimer); buTimer=setTimeout(async function(){ var m=document.getElementById('bumsg'); try{ S.config=await call('apiSalvaConfig',{sim:JSON.stringify(simS())}); m=document.getElementById('bumsg'); if(m){ m.textContent='Ripartizione salvata'; m.className='ok'; } }catch(e){ m=document.getElementById('bumsg'); if(m){ m.textContent='Salvataggio non riuscito: '+e.message; m.className='ko'; } } },600); }
+function buSet(el){ var k=el.dataset.bu.split('|'), id=k[0], f=k[1], st=buCfg().alloc, cur=buAl(id);
+  if(!st[id]) st[id]={mode:cur.mode,a:cur.a,p:cur.p,v:cur.v};
+  if(f==='mode'){ st[id].mode=el.value; if(el.value==='man'){ var q=buQ(id,beRic(S.__buR)); st[id].a=Math.round(q.a*1000)/10; st[id].p=Math.round(q.p*1000)/10; st[id].v=Math.round(q.v*1000)/10; } }
+  else { var n=plParse(el.value); if(n===null) n=0; st[id][f]=Math.max(0,Math.min(100,n)); }
+  render(); buSalva(); }
+function buCalc(r){
+  S.__buR=r;
+  var ric=beRic(r), n=r.mesi.length||1, U=['a','p','v'], c=r.mesi.map(plCalc);
+  var T=function(f){ return r.mesi.reduce(function(a,m){return a+f(m);},0); };
+  var Z=function(){ return {a:0,p:0,v:0}; };
+  var B={ric:Z(),ricL:[],varL:[],fisL:[],persL:[],ammL:[],finL:[],n:n,rows:[]};
+  BU_RICL.forEach(function(x){ var t=T(x.f); if(Math.abs(t)<0.005) return; var o=Z(); o[x.k]=t; B.ricL.push({nome:x.nome(),v:o}); B.ric[x.k]+=t; });
+  var costi=buCosti(), tot={var:Z(),fis:Z(),pers:Z(),amm:Z(),fin:Z()};
+  costi.forEach(function(cx){ var t=T(cx.f), q=buQ(cx.id,ric); var o={a:t*q.a,p:t*q.p,v:t*q.v}; var lista={var:B.varL,fis:B.fisL,pers:B.persL,amm:B.ammL,fin:B.finL}[cx.s];
+    var show=Math.abs(t)>=0.005||cx.s==='fis'&&cx.id!=='altriNC'||cx.s==='amm'||cx.s==='fin';
+    if(show) lista.push({nome:cx.nome,v:o}); U.forEach(function(k){ tot[cx.s][k]+=o[k]; }); });
+  var shR=buShare(ric), intT=T(function(m){return m.interessi||0;}), intV={a:intT*shR.a,p:intT*shR.p,v:intT*shR.v};
+  var X={}; U.forEach(function(k){ var x={}; x.ric=B.ric[k]; x.varT=tot.var[k]; x.mdc=x.ric-x.varT; x.fis=tot.fis[k]; x.pers=tot.pers[k]; x.ebitda=x.mdc-x.fis-x.pers; x.amm=tot.amm[k]; x.ebit=x.ebitda-x.amm;
+    x.int=intV[k]; x.oneri=tot.fin[k]; x.fin=x.int-x.oneri; x.ebt=x.ebit+x.fin; X[k]=x; });
+  var impT=c.reduce(function(a,x){return a+x.imp;},0), w={}, sw=0; U.forEach(function(k){ w[k]=Math.max(0,X[k].ebt); sw+=w[k]; });
+  U.forEach(function(k){ X[k].imp=impT*(sw>0.004?w[k]/sw:shR[k]); X[k].net=X[k].ebt-X[k].imp; });
+  var okm=function(k){ return X[k].ric>0.004&&X[k].mdc/X[k].ric>0.0001; };
+  U.forEach(function(k){ var x=X[k]; x.F=x.fis+x.pers+x.amm; x.mdcP=X[k].ric>0.004?x.mdc/x.ric:null; x.bep=okm(k)?x.F/(x.mdc/x.ric):null; x.Ffin=x.F-x.fin; x.bepF=okm(k)?x.Ffin/(x.mdc/x.ric):null; });
+  B.X=X; B.impT=impT; B.ebtTot=c.reduce(function(a,x){return a+x.ebt;},0); B.netTot=c.reduce(function(a,x){return a+x.net;},0); B.ricTot=r.totali.ricavi; B.ric0=ric; return B; }
+function vBU(r){ var B=buCalc(r), X=B.X, U=['a','p','v'], n=B.n, on=S.plPrev!==false, R=B.ricTot;
+  var bar='<div class="card"><div class="bar" style="margin:0"><span class="note">'+(on?'Calcolo su ricavi e costi dell\'anno <b>compresa la previsione nov-dic</b> (la stessa del P&L, modificabile da lì).':'Calcolo solo sui dati <b>già registrati</b>.')+' <span id="bumsg"></span></span><button class="l" data-a="plprev">'+(on?'Mostra solo il registrato':'Includi la previsione nov-dic')+'</button></div></div>';
+  var rows=[]; /* ogni riga: {k:tipo,l:etichetta,v:[a,p,v]} */
+  var sez=function(t){ rows.push({k:'sez',l:t}); }, ln=function(l,v,o){ rows.push({k:'ln',l:l,v:v,ind:1}); }, tt=function(l,v,cc){ rows.push({k:'t',l:l,v:v,c:cc}); }, pc=function(l,v){ rows.push({k:'pr',l:l,v:v}); };
+  var vec=function(f){ return U.map(function(k){ return f(X[k]); }); };
+  sez('1 · RICAVI (IVA esclusa)'); B.ricL.forEach(function(x){ ln(x.nome,U.map(function(k){return x.v[k];})); }); tt('TOTALE RICAVI',vec(function(x){return x.ric;}));
+  sez('2 · COSTI VARIABILI'); B.varL.forEach(function(x){ ln(x.nome,U.map(function(k){return x.v[k];})); }); tt('TOTALE COSTI VARIABILI',vec(function(x){return x.varT;}));
+  tt('MARGINE DI CONTRIBUZIONE',vec(function(x){return x.mdc;}),1); pc('% margine di contribuzione',vec(function(x){return x.ric>0.004?x.mdc/x.ric:null;}));
+  sez('3 · COSTI FISSI DI STRUTTURA'); B.fisL.forEach(function(x){ ln(x.nome,U.map(function(k){return x.v[k];})); }); tt('TOTALE COSTI FISSI',vec(function(x){return x.fis;}));
+  sez('4 · PERSONALE E AMMINISTRATORI'); B.persL.forEach(function(x){ ln(x.nome,U.map(function(k){return x.v[k];})); }); tt('TOTALE PERSONALE E AMMINISTRATORI',vec(function(x){return x.pers;}));
+  tt('EBITDA (MOL)',vec(function(x){return x.ebitda;}),1); pc('% EBITDA',vec(function(x){return x.ric>0.004?x.ebitda/x.ric:null;}));
+  sez('5 · AMMORTAMENTI'); B.ammL.forEach(function(x){ ln(x.nome,U.map(function(k){return x.v[k];})); });
+  tt('EBIT = RISULTATO OPERATIVO (RO)',vec(function(x){return x.ebit;}),1); pc('% EBIT / RO',vec(function(x){return x.ric>0.004?x.ebit/x.ric:null;}));
+  sez('6 · GESTIONE FINANZIARIA'); ln('Interessi attivi (mutuo a socio)',vec(function(x){return x.int;})); B.finL.forEach(function(x){ ln(x.nome,U.map(function(k){return x.v[k];})); });
+  tt('SALDO GESTIONE FINANZIARIA',vec(function(x){return x.fin;}),1); tt('RISULTATO ANTE IMPOSTE (EBT)',vec(function(x){return x.ebt;}),1); pc('% ante imposte',vec(function(x){return x.ric>0.004?x.ebt/x.ric:null;}));
+  sez('7 · IMPOSTE E RISULTATO NETTO'); ln('Imposte stimate (IRES + IRAP)',vec(function(x){return x.imp;})); tt('UTILE / PERDITA NETTO',vec(function(x){return x.net;}),1); pc('% utile netto',vec(function(x){return x.ric>0.004?x.net/x.ric:null;}));
+  sez('8 · BREAK EVEN (EBIT = 0)');
+  ln('Costi fissi da coprire (fissi + personale + ammortamenti)',vec(function(x){return x.F;}));
+  ln('Margine di contribuzione in % dei ricavi',vec(function(x){return x.mdcP;})); rows[rows.length-1].k='pr';
+  tt('RICAVI DI PAREGGIO OPERATIVO',vec(function(x){return x.bep;}),0); rows[rows.length-1].nopct=1;
+  ln('Ricavi di pareggio al mese',vec(function(x){return x.bep===null?null:x.bep/n;})); rows[rows.length-1].nopct=1;
+  ln('Ricavi del periodo',vec(function(x){return x.ric;}));
+  tt('MARGINE DI SICUREZZA (ricavi − pareggio)',vec(function(x){return x.bep===null?null:x.ric-x.bep;}),1); rows[rows.length-1].nopct=1;
+  pc('Margine di sicurezza in % dei ricavi',vec(function(x){return x.bep===null||x.ric<=0.004?null:(x.ric-x.bep)/x.ric;}));
+  tt('RICAVI DI PAREGGIO ANTE IMPOSTE (EBT = 0)',vec(function(x){return x.bepF;}),0); rows[rows.length-1].nopct=1;
+  var fe=function(x){ return x===null||x===undefined?'–':eur(x); }, fp=function(x){ return x===null||x===undefined?'–':IT.format(Math.round(x*1000)/10)+' %'; };
+  var tabBU=function(i){ var k=U[i], base=X[k].ric;
+    var body=rows.map(function(x){
+      if(x.k==='sez') return '<tr class="s"><td colspan="3" style="background:#eef2f7;text-align:left"><b>'+x.l+'</b></td></tr>';
+      var v=x.v[i];
+      if(x.k==='pr') return '<tr class="s"><td style="padding-left:14px;font-style:italic;text-align:left;white-space:normal">'+x.l+'</td><td style="font-style:italic" class="'+(v===null?'':cls(v))+'">'+fp(v)+'</td><td></td></tr>';
+      var c2=x.c?cls(v||0):'';
+      return '<tr class="'+(x.k==='t'?'t':'')+'"><td style="text-align:left;white-space:normal;'+(x.ind?'padding-left:14px':'')+'">'+x.l+'</td><td class="'+c2+'">'+fe(v)+'</td><td>'+(x.nopct||v===null?'':pct(v,base))+'</td></tr>'; }).join('');
+    return '<div class="card tw" style="min-width:330px"><div style="font-size:15px;margin-bottom:4px"><b>'+esc(BU_UN[i][1])+'</b></div><div class="note" style="margin:0 0 6px">Ricavi '+eur(X[k].ric)+' € · '+(R>0.004?IT.format(Math.round(X[k].ric/R*1000)/10)+' % del totale':'–')+'</div><table style="width:100%;table-layout:auto"><thead><tr><th style="text-align:left">€ · periodo cumulato</th><th>Importo</th><th>% ricavi</th></tr></thead><tbody>'+body+'</tbody></table></div>'; };
+  var griglia='<div style="display:grid;grid-template-columns:repeat(3,minmax(300px,1fr));gap:10px;overflow-x:auto;align-items:start">'+tabBU(0)+tabBU(1)+tabBU(2)+'</div>';
+  var sEbt=U.reduce(function(a,k){return a+X[k].ebt;},0), sNet=U.reduce(function(a,k){return a+X[k].net;},0), sRic=U.reduce(function(a,k){return a+X[k].ric;},0);
+  var dRic=Math.abs(sRic-R), dEbt=Math.abs(sEbt-B.ebtTot), dNet=Math.abs(sNet-B.netTot);
+  var chk='<div class="card"><b>Quadratura con il P&L</b><div class="note">Somma delle tre business unit: ricavi '+eur(sRic)+' € · ante imposte '+eur(sEbt)+' € · utile netto '+eur(sNet)+' €. P&L mensile: ricavi '+eur(R)+' € · ante imposte '+eur(B.ebtTot)+' € · utile netto '+eur(B.netTot)+' €. '
+    +((dRic>0.01||dEbt>0.01||dNet>0.01)?'<span class="neg"><b>Differenza da controllare</b>: ricavi '+eur(dRic)+', ante imposte '+eur(dEbt)+', netto '+eur(dNet)+'.</span>':'<span class="pos"><b>Quadra al centesimo.</b></span>')+'</div></div>';
+  var costi=buCosti(), ric0=B.ric0, ripRows=costi.map(function(cx){ var al=buAl(cx.id), tot=r.mesi.reduce(function(a,m){return a+cx.f(m);},0); if(Math.abs(tot)<0.005&&al.mode!=='man') return ''; var q=buQ(cx.id,ric0), man=al.mode==='man';
+    var inp=function(f){ return '<td class="mod"><input type="text" inputmode="decimal" data-bu="'+cx.id+'|'+f+'" value="'+eurIn(al[f])+'" '+(man?'':'disabled style="opacity:.45"')+'></td>'; };
+    var opt=function(v,t){ return '<option value="'+v+'"'+(al.mode===v?' selected':'')+'>'+t+'</option>'; };
+    return '<tr><td style="text-align:left">'+esc(cx.nome)+'</td><td>'+eur(tot)+'</td><td><select data-bu="'+cx.id+'|mode">'+(buIsBe(cx.id)?opt('be','Come nella pagina Break even'):'')+opt('rev3','In proporzione ai ricavi')+opt('man','Percentuali a mano')+'</select></td>'+inp('a')+inp('p')+inp('v')
+      +'<td>'+IT.format(Math.round(q.a*1000)/10)+' % · '+IT.format(Math.round(q.p*1000)/10)+' % · '+IT.format(Math.round(q.v*1000)/10)+' %</td></tr>'; }).join('');
+  var rip='<details class="card tw"><summary><b>Come sono attribuiti i costi alle business unit (modificabile)</b></summary><div class="note" style="margin-top:6px">I ricavi sono attribuiti per fonte: Adler = fatture ad Adler; Paysolution = fatture a Paysolution e ricavi da Dashboard V6; Vendita gettoniere (Amazon) = vendite gettoniere, Amazon e corrispettivi. I costi collegati a una fonte seguono la ripartizione della pagina Break even; tutti gli altri (struttura, personale, ammortamenti, oneri finanziari) e la parte non attribuita sono divisi in proporzione ai ricavi, oppure con le percentuali che scrivi qui. Gli interessi attivi seguono i ricavi. Le imposte sono divise in proporzione al risultato ante imposte positivo di ciascuna unità. Le impostazioni sono salvate nel Foglio Google.</div>'
+    +'<table class="fit" style="min-width:820px"><thead><tr><th style="text-align:left">Costo</th><th>Periodo €</th><th style="text-align:left">Criterio</th><th>Adler %</th><th>Paysolution %</th><th>Vendita gett. %</th><th>Risultato (A · P · V)</th></tr></thead><tbody>'+ripRows+'</tbody></table></details>';
+  var nota='<div class="note">Importi IVA esclusa, periodo '+etm(r.mesi[0].m)+' – '+etm(r.mesi[n-1].m)+' ('+n+' mesi), cumulati. Il break even di ogni unità copre solo i suoi costi fissi attribuiti: se i costi comuni sono divisi in proporzione ai ricavi, il pareggio dipende da questa scelta, quindi vale come indicazione e non come contabilità separata.</div>';
+  return bar+griglia+chk+rip+nota; }
 
 /* ── Pagina Break even: costi collegati alla fonte di ricavo ── */
 var BE_FONTI=[['a','Adler (consulenza)'],['p','Paysolution'],['v','Vendite (Amazon, Shopify, estero)']];
@@ -2143,7 +2248,7 @@ async function pdfCommercialista(){ var sc0=[0,0], pm=document.getElementById('p
     await w.save();
     fissaSvg(false); window.scrollTo(sc0[0],sc0[1]); document.body.classList.remove('pdfmode'); if(pm){ pm.textContent='PDF scaricato: '+nome; pm.className='note ok'; }
   }catch(e){ fissaSvg(false); window.scrollTo(sc0[0],sc0[1]); document.body.classList.remove('pdfmode'); if(pm){ pm.textContent='Download diretto non riuscito ('+e.message+'): apro la stampa, scegli "Salva come PDF".'; pm.className='note ko'; } setTimeout(function(){ window.print(); },400); } }
-document.addEventListener('change',function(e){ if(e.target&&e.target.dataset&&e.target.dataset.be){ beSet(e.target); return; } if(!e.target||e.target.id!=='provv') return; simS().includiProvvisorie=e.target.checked; render(); (async function(){ var m=document.getElementById('pdfmsg'); try{ S.config=await call('apiSalvaConfig',{sim:JSON.stringify(simS())}); m=document.getElementById('pdfmsg'); if(m){ m.textContent=e.target.checked?'Voci provvisorie incluse':'Voci provvisorie escluse'; m.className='note ok'; } }catch(x){ m=document.getElementById('pdfmsg'); if(m){ m.textContent='Salvataggio non riuscito: '+x.message; m.className='note ko'; } } })(); });
+document.addEventListener('change',function(e){ if(e.target&&e.target.dataset&&e.target.dataset.be){ beSet(e.target); return; } if(e.target&&e.target.dataset&&e.target.dataset.bu){ buSet(e.target); return; } if(!e.target||e.target.id!=='provv') return; simS().includiProvvisorie=e.target.checked; render(); (async function(){ var m=document.getElementById('pdfmsg'); try{ S.config=await call('apiSalvaConfig',{sim:JSON.stringify(simS())}); m=document.getElementById('pdfmsg'); if(m){ m.textContent=e.target.checked?'Voci provvisorie incluse':'Voci provvisorie escluse'; m.className='note ok'; } }catch(x){ m=document.getElementById('pdfmsg'); if(m){ m.textContent='Salvataggio non riuscito: '+x.message; m.className='note ko'; } } })(); });
 document.addEventListener('change',function(e){ if(e.target&&e.target.id==='repmese'){ S.repMese=e.target.value; render(); } if(e.target&&e.target.id==='marinidata'){ S.mariniData=e.target.value; render(); } if(e.target&&e.target.id==='marinidett'){ S.mariniDett=e.target.checked; render(); } if(e.target&&e.target.id==='marininote'){ simS().mariniNote=e.target.value; var dn=e.target.parentNode.querySelector('.onlyrep'); if(dn) dn.textContent=e.target.value; (async function(){ var m=document.getElementById('marinimsg'); try{ S.config=await call('apiSalvaConfig',{sim:JSON.stringify(simS())}); if(m){ m.textContent='Note salvate'; m.className='note ok norep'; } }catch(x){ if(m){ m.textContent='Salvataggio non riuscito: '+x.message; m.className='note neg norep'; } } })(); } });
 function vDash(r){ var d=S.dash||{}, ch=Object.keys(d.chiusure||{}).sort();
   return '<div class="card"><b>Dati letti dalla Dashboard V6 (sola lettura)</b><div class="note">Letti il '+esc(d.letto_il||'—')+'. Mese con chiusura = valori della chiusura (immutabili); mesi senza chiusura = fatture intercompany approvate.</div></div>'
