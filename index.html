@@ -1626,6 +1626,29 @@ function bulkCard(){ var cs=E.CATEGORIE.filter(function(c){return c.tipo!=='sp';
    +'<div><label>Da competenza</label><input type="month" id="b_da" value="2026-01"></div><div><label>A competenza</label><input type="month" id="b_a" value="2026-12"></div></div>'
    +'<div id="b_info" class="note" style="margin-top:6px"></div><button class="l" data-a="bulkdel" style="margin-top:8px;color:var(--ko)">Elimina in blocco</button></div>'; }
 function vVoci(){ return formVoce(false)+bulkCard()+elencoVoci(false); }
+
+/* Registro dei cespiti al 31/12/2025 (stampa dello studio). Campi: conto, descrizione, codice, acquisto, costo, aliq %, deducibilita %, amm.to 2025 ordinario, amm.to 2025 indeducibile, fondo ordinario, fondo indeducibile, residuo. */
+var CESP25={data:"31/12/2025",
+ righe:[
+  ["102.00033 Licenze di programmi software","Licenza software CRM","2024-1","2024",801.68,50,100,400.84,0,801.68,0,0],
+  ["102.00033 Licenze di programmi software","Licenza software offline time board","2024-2","2024",116.12,50,100,58.06,0,116.12,0,0],
+  ["104.00032 Macchine elettriche ed elettroniche d'ufficio","Tablet","2024-3","2024",535.55,20,50,53.55,53.56,80.33,80.34,374.88],
+  ["104.00032 Macchine elettriche ed elettroniche d'ufficio","Tritacarta","2025-2","09/04/2025",1319.90,10,100,131.99,0,131.99,0,1187.91],
+  ["104.00032 Macchine elettriche ed elettroniche d'ufficio","iMac 24\" 32 GB","iMac 24\"","13/02/2025",2227.36,12.5,100,278.42,0,278.42,0,1948.94],
+  ["104.01000 Telefonia mobile","iPhone 12 128 GB","2024-5","2024",444.12,20,20,17.76,71.06,26.64,106.59,310.89],
+  ["104.01000 Telefonia mobile","iPhone 16","2025-1","29/04/2025",1098.90,12.5,20,27.47,109.89,27.47,109.89,961.54],
+  ["104.01001 Attrezzature","Attrezzatura Shellon E20250615 wire machine","2025-3","23/06/2025",1499.00,7.5,100,112.43,0,112.43,0,1386.57]],
+ tot:{imm:{costo:917.80,amm:458.90,fondo:917.80},mat:{costo:7124.83,amm:621.62,ammInd:234.51,fondo:657.28,fondoInd:296.82},costoTot:8042.63,ammTot:1080.52,ammIndTot:234.51,fondiTot:1575.08,fondiIndTot:296.82,residuoMat:6170.73}};
+function vCespiti(){
+  var V=CESP25, th='<th style="text-align:left">', q=function(a){ return '<td>'+eur(a)+'</td>'; };
+  var pc=function(x){ return IT.format(x)+' %'; };
+  var h='<div class="card tw"><details open><summary><b>Registro dei cespiti al '+V.data+' (stampa dello studio)</b></summary><table class="fit" style="min-width:1000px;margin-top:6px"><thead><tr>'+th+'Conto</th>'+th+'Bene</th>'+th+'Cod.</th>'+th+'Acquisto</th><th>Costo storico</th><th>Aliq.</th><th>Ded.</th><th>Amm.to 2025</th><th>Amm.to indeduc.</th><th>Fondo ordinario</th><th>Fondo indeduc.</th><th>Residuo</th></tr></thead><tbody>'
+   +V.righe.map(function(x){ return '<tr><td style="text-align:left;white-space:normal">'+esc(x[0])+'</td><td style="text-align:left;white-space:normal">'+esc(x[1])+'</td><td style="text-align:left">'+esc(x[2])+'</td><td style="text-align:left">'+esc(x[3])+'</td>'+q(x[4])+'<td>'+pc(x[5])+'</td><td>'+pc(x[6])+'</td>'+q(x[7])+q(x[8])+q(x[9])+q(x[10])+q(x[11])+'</tr>'; }).join('')
+   +'<tr class="t"><td style="text-align:left" colspan="4">Totale immateriali</td>'+q(V.tot.imm.costo)+'<td></td><td></td>'+q(V.tot.imm.amm)+q(0)+q(V.tot.imm.fondo)+q(0)+q(0)+'</tr>'
+   +'<tr class="t"><td style="text-align:left" colspan="4">Totale materiali (ded. inferiore al 100%)</td>'+q(V.tot.mat.costo)+'<td></td><td></td>'+q(V.tot.mat.amm)+q(V.tot.mat.ammInd)+q(V.tot.mat.fondo)+q(V.tot.mat.fondoInd)+q(V.tot.residuoMat||V.residuoMat)+'</tr>'
+   +'<tr class="t"><td style="text-align:left" colspan="4">Totale costi e ammortamenti</td>'+q(V.tot.costoTot)+'<td></td><td></td>'+q(V.tot.ammTot)+q(V.tot.ammIndTot)+q(V.tot.fondiTot)+q(V.tot.fondiIndTot)+q(V.tot.residuoMat)+'</tr></tbody></table>'
+   +'<div class="note">Dati ripresi dal registro dei cespiti dello studio al 31/12/2025. Il residuo dei beni materiali è '+eur(V.tot.residuoMat)+' €, mentre le immobilizzazioni materiali del bilancio 2025 sono inserite per 6.188 € (differenza 17,27 €: da verificare con lo studio, può dipendere dagli arrotondamenti). I cespiti acquistati nel 2026 verranno aggiunti in seguito.</div></details></div>';
+  return h; }
 function vPatrimonio(r,noform,maxM){ var sp=E.statoPatrimoniale(r,S.voci), cats=E.CATEGORIE.filter(function(c){return c.tipo==='sp';});
   if(maxM) sp=sp.filter(function(x){ return x.apertura||String(x.m)<=maxM; });
   var h='';
@@ -1648,6 +1671,7 @@ function vPatrimonio(r,noform,maxM){ var sp=E.statoPatrimoniale(r,S.voci), cats=
   var rt=(r.rimanenze||[]).map(function(x){ return '<tr><td style="text-align:left">'+etm(x.m)+'</td><td>'+eur(x.saldo)+'</td><td class="'+cls(x.variazione)+'">'+(x.variazione?eur(x.variazione):'–')+'</td><td style="text-align:left">'+(x.reale?'saldo inserito':'da report magazzino (parametro)')+'</td></tr>'; }).join('');
   h+='<div class="card"><b>Magazzino mese per mese ↔ P&amp;L</b><div class="note">Valore del magazzino SRL (merce consegnata a Paysolution da recuperare con le fatture) a fine mese. La variazione rispetto al mese prima entra nel P&amp;L: calo = costo del venduto. Dal 01/03 i saldi seguono il report del commercialista (consegna 40.983,61 + acquisti +8% − recuperi fatturati nel mese di emissione); al 31/10 il magazzino è 0. Un saldo inserito a mano in "Voci manuali" prevale sul parametro.</div>'
     +(rt?'<div class="tw"><table><tr><th style="text-align:left">Mese</th><th>Rimanenza fine mese €</th><th>Variazione (P&amp;L) €</th><th style="text-align:left">Fonte</th></tr>'+rt+'</table></div>':'')+'</div>';
+  h+=vCespiti();
   return h+(noform?'':formVoce(true)+elencoVoci(true)); }
 /* ── Budget annuale e piano compensi → anticipo utili ── */
 var MESI3=['GEN','FEB','MAR','APR','MAG','GIU','LUG','AGO','SET','OTT','NOV','DIC'];
